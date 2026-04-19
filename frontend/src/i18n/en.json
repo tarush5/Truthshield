@@ -1,0 +1,68 @@
+{
+  "app_name": "TruthShield",
+  "tagline": "AI-Powered Misinformation Detection",
+  "nav": {
+    "analyze": "Analyze",
+    "dashboard": "Dashboard",
+    "about": "About"
+  },
+  "analyze": {
+    "title": "Analyze Content",
+    "subtitle": "Upload text, images, audio, video, or paste a URL to verify",
+    "drop_zone": "Drop files here or click to upload",
+    "drop_hint": "Supports: Text, Images, Audio, Video (max 100MB)",
+    "url_placeholder": "Paste a URL to analyze...",
+    "text_placeholder": "Or paste text content here...",
+    "btn_analyze": "Analyze Now",
+    "btn_analyzing": "Analyzing...",
+    "progress": {
+      "preprocessing": "Preprocessing content...",
+      "detecting": "Running detection models...",
+      "verifying": "Verifying claims...",
+      "explaining": "Generating explanation...",
+      "done": "Analysis complete!"
+    }
+  },
+  "report": {
+    "title": "Analysis Report",
+    "trust_score": "Trust Score",
+    "verdict": "Verdict",
+    "credibility": "Credibility Breakdown",
+    "claims": "Claim Verification",
+    "claim": "Claim",
+    "evidence": "Evidence",
+    "inconsistencies": "Inconsistencies Found",
+    "counter_narrative": "Counter-Narrative",
+    "explanation": "Explanation",
+    "sources": "Sources",
+    "share": "Share Report",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "processing_time": "Processing Time",
+    "no_claims": "No verifiable claims found."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "total_analyses": "Total Analyses",
+    "avg_trust": "Average Trust Score",
+    "verdicts": "Verdict Distribution",
+    "languages": "Language Distribution",
+    "recent": "Recent Analyses",
+    "top_domains": "Top Flagged Domains"
+  },
+  "verdicts": {
+    "TRUE": "True",
+    "FALSE": "False",
+    "MISLEADING": "Misleading",
+    "UNVERIFIED": "Unverified"
+  },
+  "languages": {
+    "en": "English",
+    "hi": "Hindi",
+    "ta": "Tamil"
+  },
+  "footer": {
+    "built_with": "Built with AI for truth",
+    "copyright": "© 2026 TruthShield. Fighting misinformation with technology."
+  }
+}

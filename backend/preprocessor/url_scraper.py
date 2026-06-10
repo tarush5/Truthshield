@@ -8,6 +8,9 @@ import re
 from typing import Optional
 from urllib.parse import urlparse
 
+import requests
+from bs4 import BeautifulSoup
+
 from backend.models.schemas import ContentPacket, ContentType, Language
 
 logger = logging.getLogger(__name__)
@@ -30,9 +33,6 @@ class URLScraper:
             dict with 'text', 'title', 'og_image', 'domain', 'meta_description'
         """
         try:
-            import requests
-            from bs4 import BeautifulSoup
-
             response = requests.get(url, headers=self.HEADERS, timeout=15)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")

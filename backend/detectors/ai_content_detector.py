@@ -22,6 +22,11 @@ class AIContentDetector:
     def __init__(self):
         pass
 
+    def _heuristic_detect(self, text: str) -> float:
+        """Alias for comprehensive heuristic check to maintain backward compatibility with tests."""
+        prob, _ = self._comprehensive_heuristic(text)
+        return prob
+
     def check_c2pa_watermark(self, file_path: str) -> Optional[dict]:
         """
         Check for C2PA/Content Credentials watermark in media files.
@@ -185,10 +190,10 @@ class AIContentDetector:
         ]
         ai_phrase_count = sum(1 for phrase in ai_phrases if phrase in text_lower)
         if ai_phrase_count >= 4:
-            score += 0.25
+            score += 0.32
             signals.append(f"Multiple AI-typical phrases detected ({ai_phrase_count})")
         elif ai_phrase_count >= 2:
-            score += 0.12
+            score += 0.16
             signals.append(f"Some AI-typical phrases detected ({ai_phrase_count})")
         elif ai_phrase_count >= 1:
             score += 0.05

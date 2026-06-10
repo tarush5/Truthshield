@@ -33,6 +33,9 @@ async def lifespan(app: FastAPI):
     """Application lifespan — startup and shutdown events."""
 
     # Ensure required directories exist
+    from backend.models import init_db
+    init_db()
+
     if getattr(settings, "UPLOAD_DIR", None):
         os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 

@@ -56,6 +56,7 @@ async def websocket_analyze(websocket: WebSocket):
             text = data.get("text")
             url = data.get("url")
             lang = data.get("lang", "en")
+            token = data.get("token")
 
             tracker = AnalysisProgressTracker(websocket)
 
@@ -63,6 +64,35 @@ async def websocket_analyze(websocket: WebSocket):
             content_type = ContentType.TEXT
             if url:
                 content_type = ContentType.URL
+
+            # Resolve user from token
+            user_uuid = None
+            if token:
+                from jose import jwt
+                from backend.config import get_settings
+                settings = get_settings()
+                try:
+                    payload = jwt.decode(
+                        token,
+                        settings.JWT_SECRET_KEY,
+                        algorithms=[settings.JWT_ALGORITHM],
+                        options={"verify_aud": False},
+                    )
+                    user_id = payload.get("sub")
+                    if user_id:
+                        import uuid
+                        user_uuid = uuid.UUID(user_id)
+                except Exception:
+                    # Dev mode fallback
+                    if settings.APP_ENV == "development" and settings.JWT_SECRET_KEY == "change-me-in-production":
+                        try:
+                            unverified_payload = jwt.get_unverified_claims(token)
+                            user_id = unverified_payload.get("sub")
+                            if user_id:
+                                import uuid
+                                user_uuid = uuid.UUID(user_id)
+                        except Exception:
+                            pass
 
             # Run the full pipeline with streaming progress
             from backend.api.routes import run_analysis_pipeline
@@ -75,6 +105,39 @@ async def websocket_analyze(websocket: WebSocket):
                 lang=lang,
                 progress_callback=tracker.send_progress,
             )
+
+            # Save report to Database
+            if user_uuid:
+                from backend.models.db import SessionLocal, Report as ReportDB, EvidenceDB
+                db = SessionLocal()
+                try:
+                    db_report = ReportDB(
+                        id=report.id,
+                        user_id=user_uuid,
+                        content_type=report.content_type.value,
+                        input_text=report.original_text,
+                        verdict=report.credibility.verdict,
+                        confidence=report.credibility.trust_score / 100.0,
+                    )
+                    db.add(db_report)
+                    
+                    # Save evidence
+                    if report.claims:
+                        for claim_verdict in report.claims:
+                            for ev in claim_verdict.evidence:
+                                db_ev = EvidenceDB(
+                                    report_id=report.id,
+                                    source_url=ev.url,
+                                    source_name=ev.title,
+                                    credibility_score=ev.source_score,
+                                )
+                                db.add(db_ev)
+                    db.commit()
+                    logger.info(f"WS: Report {report.id} saved to DB for user {user_uuid}")
+                except Exception as db_err:
+                    logger.warning(f"WS: Failed to persist report to DB: {db_err}")
+                finally:
+                    db.close()
 
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")

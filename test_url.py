@@ -38,6 +38,8 @@ def test():
         re.IGNORECASE,
     )
     for el in soup.find_all(attrs={"class": True}):
+        if el.attrs is None:
+            continue
         classes = el.get("class", [])
         if isinstance(classes, list):
             classes = " ".join(classes)
@@ -45,6 +47,8 @@ def test():
             el.decompose()
 
     for el in soup.find_all(attrs={"id": True}):
+        if el.attrs is None:
+            continue
         ident = el.get("id", "")
         if junk_patterns.search(ident):
             el.decompose()

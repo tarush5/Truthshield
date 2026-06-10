@@ -57,8 +57,11 @@ class VoiceCloneDetector:
 
     def compute_anomaly_score(self, audio_path: str) -> float:
         """
-        Compute anomaly score for potential voice cloning.
-        Uses spectral analysis and embedding statistics.
+        Compute anomaly score for potential voice cloning using audio forensics:
+        - Zero crossing rate and spectral flatness
+        - Spectral roll-off and MFCC variance
+        - Spectral artifacts (high-frequency energy spikes)
+        - Phase inconsistency (variance of STFT phase difference)
 
         Returns:
             Anomaly score (0.0 = natural, 1.0 = highly anomalous)
@@ -68,11 +71,11 @@ class VoiceCloneDetector:
 
             y, sr = librosa.load(audio_path, sr=16000)
 
-            # Spectral flatness — synthetic speech tends to have different patterns
+            # Spectral flatness
             spectral_flatness = librosa.feature.spectral_flatness(y=y)
             avg_flatness = float(np.mean(spectral_flatness))
 
-            # Zero crossing rate — cloned voices may have unusual patterns
+            # Zero crossing rate
             zcr = librosa.feature.zero_crossing_rate(y)
             avg_zcr = float(np.mean(zcr))
 
@@ -80,11 +83,24 @@ class VoiceCloneDetector:
             rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
             avg_rolloff = float(np.mean(rolloff))
 
-            # MFCCs variance — natural speech has more variance
+            # MFCCs variance
             mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
             mfcc_var = float(np.mean(np.var(mfccs, axis=1)))
 
-            # Simple anomaly heuristic
+            # ── Audio Forensics: Phase Inconsistency ──────────────
+            stft = librosa.stft(y)
+            magnitude = np.abs(stft)
+            phase = np.angle(stft)
+            phase_diff = np.diff(phase, axis=1)
+            phase_var = float(np.mean(np.var(phase_diff, axis=1)))
+
+            # ── Audio Forensics: Frequency Anomalies ──────────────
+            # Energy ratio of high-to-low bands
+            high_freq_energy = float(np.sum(magnitude[len(magnitude)//4:]))
+            low_freq_energy = float(np.sum(magnitude[:len(magnitude)//4]))
+            freq_ratio = high_freq_energy / (low_freq_energy + 1e-10)
+
+            # Aggregate scores
             anomaly = 0.0
 
             # Very flat spectrum suggests synthesis
@@ -93,13 +109,23 @@ class VoiceCloneDetector:
             if avg_flatness > 0.3:
                 anomaly += 0.2
 
-            # Low MFCC variance suggests lack of natural variation
+            # Low MFCC variance suggests lack of natural vocal variation
             if mfcc_var < 50:
-                anomaly += 0.2
+                anomaly += 0.15
 
             # Unusual zero crossing rate
             if avg_zcr < 0.02 or avg_zcr > 0.15:
                 anomaly += 0.15
+
+            # Phase inconsistency detection
+            if phase_var > 1.2:
+                anomaly += 0.15
+                logger.info(f"Audio forensics: High phase inconsistency detected (var={phase_var:.3f})")
+
+            # High frequency energy ratio anomaly
+            if freq_ratio > 0.4:
+                anomaly += 0.15
+                logger.info(f"Audio forensics: Unnatural high-frequency energy ratio (ratio={freq_ratio:.3f})")
 
             return min(anomaly, 1.0)
 

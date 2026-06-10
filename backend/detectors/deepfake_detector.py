@@ -145,7 +145,7 @@ class DeepfakeDetector:
 
     def analyze(self, frame_paths: List[str]) -> DeepfakeResult:
         """
-        Analyze multiple frames and aggregate results.
+        Analyze multiple frames and aggregate results with temporal coherence checks.
 
         Args:
             frame_paths: List of paths to video frames or images
@@ -166,16 +166,27 @@ class DeepfakeDetector:
                 flagged.append(idx)
 
         avg_score = float(np.mean(scores)) if scores else 0.0
+        
+        # Temporal Analysis: Check for frame-to-frame score inconsistencies (flicker)
+        temporal_anomaly = 0.0
+        if len(scores) > 1:
+            diffs = [abs(scores[i] - scores[i-1]) for i in range(1, len(scores))]
+            temporal_anomaly = float(np.mean(diffs))
+            # If frame predictions fluctuate wildly (e.g. mean diff > 0.15), increase confidence
+            if temporal_anomaly > 0.15:
+                avg_score = min(1.0, avg_score + 0.12)
+                logger.info(f"Temporal anomaly detected: frame fluctuation={temporal_anomaly:.3f}. Score boosted.")
+
         is_deepfake = avg_score > self.THRESHOLD
 
         logger.info(
             f"Deepfake analysis: {len(frame_paths)} frames, "
-            f"avg_score={avg_score:.3f}, flagged={len(flagged)}"
+            f"avg_score={avg_score:.3f}, flagged={len(flagged)}, temporal_anomaly={temporal_anomaly:.3f}"
         )
 
         return DeepfakeResult(
             is_deepfake=is_deepfake,
             confidence=round(avg_score, 4),
             flagged_frames=flagged,
-            needs_human_review=(0.4 <= avg_score <= 0.7)
+            needs_human_review=(0.4 <= avg_score <= 0.7) or (temporal_anomaly > 0.2)
         )

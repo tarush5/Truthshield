@@ -33,12 +33,14 @@ Respond with ONLY valid JSON, no other text:
 }
 
 Rules:
-- TRUE: Claim is substantially accurate
-- FALSE: Claim is demonstrably wrong
-- MISLEADING: Contains some truth but deceptive
-- UNVERIFIED: Insufficient evidence
-- Be conservative — default to UNVERIFIED if evidence is weak
-- Consider source credibility"""
+- You are NOT allowed to use prior knowledge.
+- Use ONLY the evidence provided.
+- TRUE: Claim is substantially accurate and directly supported by the evidence.
+- FALSE: Claim is demonstrably wrong or contradicted by the evidence.
+- MISLEADING: Contains some truth but is deceptive or taken out of context.
+- UNVERIFIED: Insufficient evidence to confirm or refute the claim.
+- Be conservative — default to UNVERIFIED if evidence is weak or unrelated.
+- Consider source credibility."""
 
 
 class VerdictEngine:

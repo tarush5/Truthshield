@@ -47,7 +47,8 @@ export default function Analyze() {
           ws.send(JSON.stringify({
             text: text || null,
             url: url || null,
-            lang: i18n.language || 'en'
+            lang: i18n.language || 'en',
+            token: localStorage.getItem('token')
           }));
         };
 
@@ -115,8 +116,15 @@ export default function Analyze() {
       const stageTimer2 = setTimeout(() => setCurrentStage('verifying'), 5000);
       const stageTimer3 = setTimeout(() => setCurrentStage('explaining'), 8000);
 
+      const token = localStorage.getItem('token');
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_BASE}/analyze`, {
         method: 'POST',
+        headers: headers,
         body: formData,
       });
 

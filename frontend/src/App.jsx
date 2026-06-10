@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Shield, BarChart3, Search, Globe, Menu, X } from 'lucide-react';
 import Analyze from './pages/Analyze';
 import Report from './pages/Report';
 import Dashboard from './pages/Dashboard';
+import Login from './pages/Login';
 
 function NavBar() {
   const { t, i18n } = useTranslation();
@@ -18,6 +19,15 @@ function NavBar() {
 
   const changeLang = (lang) => {
     i18n.changeLanguage(lang);
+  };
+
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
   };
 
   return (
@@ -54,7 +64,7 @@ function NavBar() {
             ))}
           </div>
 
-          {/* Language Switcher + Mobile Toggle */}
+          {/* Language Switcher + User + Mobile Toggle */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
               {['en', 'hi', 'ta'].map((lang) => (
@@ -71,6 +81,26 @@ function NavBar() {
                 </button>
               ))}
             </div>
+
+            {/* Auth Buttons */}
+            {user ? (
+              <div className="hidden md:flex items-center gap-3">
+                <span className="text-xs text-white/55 font-medium">{user.email}</span>
+                <button
+                  onClick={handleLogout}
+                  className="px-3.5 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-semibold transition-all border border-red-500/10"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                className="hidden md:block px-3.5 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-400 text-white text-xs font-semibold shadow-md shadow-brand-500/20 transition-all"
+              >
+                Login
+              </Link>
+            )}
 
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
@@ -99,11 +129,42 @@ function NavBar() {
                 {label}
               </Link>
             ))}
+
+            {/* Mobile Auth */}
+            <div className="border-t border-white/5 mt-3 pt-3 px-4 flex items-center justify-between">
+              {user ? (
+                <>
+                  <span className="text-xs text-white/55 font-medium truncate max-w-[180px]">{user.email}</span>
+                  <button
+                    onClick={handleLogout}
+                    className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-xs font-semibold"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <Link
+                  to="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="w-full text-center py-2.5 rounded-lg bg-brand-500 text-white text-xs font-semibold"
+                >
+                  Login
+                </Link>
+              )}
+            </div>
           </div>
         )}
       </div>
     </nav>
   );
+}
+
+function ProtectedRoute({ children }) {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
 }
 
 function App() {
@@ -116,8 +177,16 @@ function App() {
           <Routes>
             <Route path="/" element={<Analyze />} />
             <Route path="/analyze" element={<Analyze />} />
+            <Route path="/login" element={<Login />} />
             <Route path="/report/:id" element={<Report />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </main>
       </div>

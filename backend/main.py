@@ -27,6 +27,54 @@ logging.basicConfig(
 logger = logging.getLogger("truthshield")
 
 
+async def start_realtime_ingestion_simulation():
+    """Periodically simulate social ingestion feeds, analyze them, and store in trending_misinfo."""
+    import asyncio
+    from backend.models.db import SessionLocal, TrendingMisinfo
+    from backend.pipeline.decision_pipeline import DecisionPipeline
+    
+    # Wait a little bit after startup to avoid blocking initial API readiness
+    await asyncio.sleep(5)
+    
+    mock_feed = [
+        {"claim": "New study claims drinking coffee cures COVID-19 within 24 hours.", "platform": "Twitter", "virality": 9.4},
+        {"claim": "Government to impose 50% tax on all digital transactions starting next week.", "platform": "Reddit", "virality": 8.7},
+        {"claim": "Leaked video shows UFO landing in London outskirts yesterday morning.", "platform": "RSS", "virality": 7.2},
+        {"claim": "World health experts recommend bananas as 100% cure for influenza.", "platform": "Twitter", "virality": 5.1},
+    ]
+    
+    pipeline = DecisionPipeline()
+    while True:
+        db = SessionLocal()
+        try:
+            for item in mock_feed:
+                exists = db.query(TrendingMisinfo).filter(TrendingMisinfo.claim == item["claim"]).first()
+                if exists:
+                    continue
+                    
+                report = await pipeline.execute(text=item["claim"])
+                
+                # If verdict is FALSE or MISLEADING, flag it and add to trending misinfo table
+                if report.credibility.verdict in ("FALSE", "MISLEADING"):
+                    trending = TrendingMisinfo(
+                        claim=item["claim"],
+                        verdict=report.credibility.verdict,
+                        confidence=report.credibility.trust_score / 100.0,
+                        source_platform=item["platform"],
+                        virality_score=item["virality"]
+                    )
+                    db.add(trending)
+            db.commit()
+            logger.info("Real-time ingestion simulation task completed successfully.")
+        except Exception as e:
+            logger.warning(f"Real-time monitor simulation encountered error: {e}")
+        finally:
+            db.close()
+            
+        # Sleep for 5 minutes before polling again
+        await asyncio.sleep(300)
+
+
 # ── Lifespan Events (Startup & Shutdown) ──────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -41,6 +89,10 @@ async def lifespan(app: FastAPI):
 
     if getattr(settings, "MODEL_CACHE_DIR", None):
         os.makedirs(settings.MODEL_CACHE_DIR, exist_ok=True)
+
+    # Start real-time monitoring simulation task in background
+    import asyncio
+    asyncio.create_task(start_realtime_ingestion_simulation())
 
     logger.info("=" * 60)
     logger.info("  TruthShield — AI Misinformation Response System")

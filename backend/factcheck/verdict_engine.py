@@ -96,6 +96,28 @@ class VerdictEngine:
         self, claim: Claim, evidence: List[Evidence], is_crisis: bool = False,
     ) -> ClaimVerdict:
         """Evaluate a single claim — tries Gemini → Claude → TF-IDF."""
+        # Add RAG enhancement
+        if evidence:
+            try:
+                from backend.factcheck.rag_store import RAGStore
+                rag = RAGStore()
+                docs = [
+                    {
+                        "text": f"{ev.title} {ev.snippet}",
+                        "title": ev.title,
+                        "url": ev.url,
+                        "source_score": ev.source_score,
+                        "raw_ev": ev
+                    }
+                    for ev in evidence
+                ]
+                rag.add_documents(docs)
+                retrieved_docs = rag.query(claim.text, top_k=4)
+                evidence = [doc["raw_ev"] for doc in retrieved_docs]
+                logger.info(f"RAG Store filtered evidence for claim: {len(evidence)} items retrieved.")
+            except Exception as e:
+                logger.warning(f"RAG retrieval skipped or failed: {e}")
+
         # 1. Try Gemini Flash (fastest — ~1-2s with built-in Google Search)
         gemini = self._get_gemini_client()
         if gemini:

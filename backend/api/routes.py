@@ -8,7 +8,7 @@ import os
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Depends
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
@@ -149,26 +149,83 @@ async def verify_otp(verify_data: dict, db: Session = Depends(get_db)):
     }
 
 
+def run_async_analysis_in_background(
+    report_id: str,
+    text: Optional[str],
+    file_path: Optional[str],
+    url: Optional[str],
+    content_type: ContentType,
+    lang: str
+):
+    """FastAPI BackgroundTasks fallback to execute decision pipeline."""
+    import asyncio
+    from backend.pipeline.decision_pipeline import DecisionPipeline
+    from backend.models.db import SessionLocal, Report as ReportDB, EvidenceDB
+    
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+    pipeline = DecisionPipeline()
+    report = loop.run_until_complete(
+        pipeline.execute(
+            text=text,
+            file_path=file_path,
+            url=url,
+            content_type=content_type,
+            lang=lang
+        )
+    )
+    
+    db = SessionLocal()
+    try:
+        db_report = db.query(ReportDB).filter(ReportDB.id == report_id).first()
+        if db_report:
+            db_report.verdict = report.credibility.verdict
+            db_report.confidence = report.credibility.trust_score / 100.0
+            
+            # Save evidence
+            if report.claims:
+                for claim_verdict in report.claims:
+                    for ev in claim_verdict.evidence:
+                        db_ev = EvidenceDB(
+                            report_id=report_id,
+                            source_url=ev.url,
+                            source_name=ev.title,
+                            credibility_score=ev.source_score,
+                        )
+                        db.add(db_ev)
+            db.commit()
+    except Exception as e:
+        logger.error(f"Failed to save background analysis results: {e}")
+    finally:
+        db.close()
+
+
 @router.post("/analyze", response_model=AnalysisReport)
 async def analyze_content(
+    background_tasks: BackgroundTasks,
     file: Optional[UploadFile] = File(None),
     url: Optional[str] = Form(None),
     text: Optional[str] = Form(None),
     lang: str = Form("en"),
+    async_mode: bool = Form(False),
     db: Session = Depends(get_db),
     current_user: Optional[CurrentUser] = Depends(get_current_user),
 ):
     """
     Analyze content for misinformation.
-    Accepts multipart form with file, URL, or text.
+    Supports asynchronous processing for large media uploads (video/audio).
     """
     settings = get_settings()
+    from backend.models.schemas import Language
 
     content_type = ContentType.TEXT
     file_path = None
 
     if file:
-        # Determine content type from file extension
         ext = os.path.splitext(file.filename or "")[1].lower()
         if ext in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
             content_type = ContentType.IMAGE
@@ -179,14 +236,12 @@ async def analyze_content(
         else:
             content_type = ContentType.TEXT
 
-        # Save uploaded file
         os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
         file_path = str(settings.UPLOAD_DIR / f"{uuid.uuid4().hex}{ext}")
         with open(file_path, "wb") as f:
             content = await file.read()
             f.write(content)
 
-        # If text file, read its content
         if content_type == ContentType.TEXT:
             text = content.decode("utf-8", errors="ignore")
 
@@ -200,6 +255,73 @@ async def analyze_content(
             detail="Provide at least one of: file, url, or text",
         )
 
+    # Automatically queue background job for large/heavy contents
+    should_queue = async_mode or content_type in (ContentType.VIDEO, ContentType.AUDIO)
+
+    if should_queue:
+        report_id = uuid.uuid4().hex
+        try:
+            user_uuid = uuid.UUID(current_user.id) if current_user else None
+        except Exception:
+            user_uuid = None
+            
+        from backend.models.db import Report as ReportDB
+        db_report = ReportDB(
+            id=report_id,
+            user_id=user_uuid,
+            content_type=content_type.value,
+            input_text=text or url or (file.filename if file else "Media File"),
+            verdict="UNVERIFIED",
+            confidence=0.0,
+        )
+        db.add(db_report)
+        db.commit()
+
+        celery_queued = False
+        try:
+            # Task 9: Queue Celery job via Redis broker
+            from backend.tasks import analyze_content_task
+            analyze_content_task.delay(
+                report_id=report_id,
+                text=text,
+                file_path=file_path,
+                url=url,
+                content_type=content_type.value,
+                lang=lang
+            )
+            celery_queued = True
+            logger.info(f"Asynchronously queued report {report_id} to Celery worker.")
+        except Exception as e:
+            logger.warning(f"Failed to queue to Celery: {e}. Falling back to FastAPI BackgroundTasks.")
+
+        if not celery_queued:
+            background_tasks.add_task(
+                run_async_analysis_in_background,
+                report_id=report_id,
+                text=text,
+                file_path=file_path,
+                url=url,
+                content_type=content_type,
+                lang=lang
+            )
+            logger.info(f"Asynchronously queued report {report_id} to FastAPI BackgroundTasks.")
+
+        from backend.models.schemas import CredibilityScore
+        return AnalysisReport(
+            id=report_id,
+            content_type=content_type,
+            original_text=text or url or (file.filename if file else "Media File"),
+            language=Language(lang),
+            credibility=CredibilityScore(
+                trust_score=0,
+                verdict="UNVERIFIED",
+                confidence_band="LOW"
+            ),
+            processing_time_seconds=0.0,
+            risk_factors=["Processing in background queue"]
+        )
+
+    # Otherwise process synchronously
     report = await run_analysis_pipeline(
         text=text,
         file_path=file_path,
@@ -208,10 +330,13 @@ async def analyze_content(
         lang=lang,
     )
 
-    # Save to Database
     from backend.models.db import Report as ReportDB, EvidenceDB
     try:
-        user_uuid = uuid.UUID(current_user.id) if current_user else None
+        try:
+            user_uuid = uuid.UUID(current_user.id) if current_user else None
+        except Exception:
+            user_uuid = None
+            
         db_report = ReportDB(
             id=report.id,
             user_id=user_uuid,
@@ -222,7 +347,6 @@ async def analyze_content(
         )
         db.add(db_report)
 
-        # Save evidence
         if report.claims:
             for claim_verdict in report.claims:
                 for ev in claim_verdict.evidence:
@@ -394,6 +518,25 @@ async def get_stats(db: Session = Depends(get_db)):
             top_flagged_domains=[],
             avg_trust_score=50.0,
         )
+
+
+@router.get("/realtime/trending")
+async def get_trending_misinfo(db: Session = Depends(get_db)):
+    """Retrieve currently active and flagged trending misinformation from social feeds."""
+    from backend.models.db import TrendingMisinfo
+    items = db.query(TrendingMisinfo).order_by(TrendingMisinfo.virality_score.desc()).limit(10).all()
+    return [
+        {
+            "id": str(item.id),
+            "claim": item.claim,
+            "verdict": item.verdict,
+            "confidence": int(item.confidence * 100),
+            "platform": item.source_platform,
+            "virality": item.virality_score,
+            "created_at": item.created_at.isoformat()
+        }
+        for item in items
+    ]
 
 
 @router.get("/health")

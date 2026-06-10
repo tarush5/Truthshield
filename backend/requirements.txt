@@ -46,6 +46,8 @@ efficientnet-pytorch==0.7.1
 # ── AI / LLM ────────────────────────────────
 anthropic==0.34.0
 numpy==1.26.4
+google-genai>=0.1.0
+duckduckgo-search>=6.0.0
 
 # ── Utilities ────────────────────────────────
 python-dotenv==1.0.1

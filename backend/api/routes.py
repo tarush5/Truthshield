@@ -36,6 +36,7 @@ import json
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+settings = get_settings()
 
 # ── In-memory store (replace with PostgreSQL in production) ───
 reports_store: dict = {}
@@ -160,6 +161,221 @@ async def verify_otp(verify_data: dict, db: Session = Depends(get_db)):
     }
 
 
+def hash_password(password: str) -> str:
+    import hashlib
+    import secrets
+    salt = secrets.token_hex(16)
+    hash_bytes = hashlib.pbkdf2_hmac(
+        'sha256', 
+        password.encode('utf-8'), 
+        salt.encode('utf-8'), 
+        100000
+    )
+    return f"pbkdf2_sha256$100000${salt}${hash_bytes.hex()}"
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    import hashlib
+    import secrets
+    if not hashed:
+        return False
+    try:
+        parts = hashed.split('$')
+        if len(parts) != 4 or parts[0] != 'pbkdf2_sha256':
+            return False
+        iterations = int(parts[1])
+        salt = parts[2]
+        original_hash = parts[3]
+        
+        new_hash_bytes = hashlib.pbkdf2_hmac(
+            'sha256',
+            password.encode('utf-8'),
+            salt.encode('utf-8'),
+            iterations
+        )
+        return secrets.compare_digest(new_hash_bytes.hex(), original_hash)
+    except Exception:
+        return False
+
+
+@router.post("/auth/signup")
+async def signup(payload: dict, db: Session = Depends(get_db)):
+    """Register a new user with email and password."""
+    email = payload.get("email")
+    password = payload.get("password")
+    
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password are required")
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
+        
+    from backend.models.db import User
+    # Check if user exists
+    db_user = db.query(User).filter(User.email == email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+        
+    # Create new user
+    hashed = hash_password(password)
+    db_user = User(email=email, password_hash=hashed)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    
+    # Generate JWT token
+    from jose import jwt
+    from datetime import datetime, timedelta, timezone
+    
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRATION_MINUTES)
+    token_payload = {
+        "sub": str(db_user.id),
+        "email": db_user.email,
+        "exp": expire
+    }
+    access_token = jwt.encode(token_payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": str(db_user.id),
+            "email": db_user.email
+        }
+    }
+
+
+@router.post("/auth/signin")
+async def signin(payload: dict, db: Session = Depends(get_db)):
+    """Authenticate a user with email and password."""
+    email = payload.get("email")
+    password = payload.get("password")
+    
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password are required")
+        
+    from backend.models.db import User
+    db_user = db.query(User).filter(User.email == email).first()
+    if not db_user or not db_user.password_hash:
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+        
+    if not verify_password(password, db_user.password_hash):
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+        
+    # Generate JWT token
+    from jose import jwt
+    from datetime import datetime, timedelta, timezone
+    
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRATION_MINUTES)
+    token_payload = {
+        "sub": str(db_user.id),
+        "email": db_user.email,
+        "exp": expire
+    }
+    access_token = jwt.encode(token_payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": str(db_user.id),
+            "email": db_user.email
+        }
+    }
+
+
+@router.post("/auth/demo")
+async def demo_login(db: Session = Depends(get_db)):
+    """Demo Login — signs in as a guest/demo user."""
+    demo_email = "demo@truthshield.ai"
+    
+    from backend.models.db import User
+    db_user = db.query(User).filter(User.email == demo_email).first()
+    if not db_user:
+        db_user = User(email=demo_email)
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+        
+    # Generate JWT token
+    from jose import jwt
+    from datetime import datetime, timedelta, timezone
+    
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRATION_MINUTES)
+    token_payload = {
+        "sub": str(db_user.id),
+        "email": db_user.email,
+        "exp": expire
+    }
+    access_token = jwt.encode(token_payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": str(db_user.id),
+            "email": db_user.email,
+            "is_demo": True
+        }
+    }
+
+
+@router.post("/auth/oauth-verify")
+async def oauth_verify(payload: dict, db: Session = Depends(get_db)):
+    """Verify Supabase OAuth session and return a local JWT token."""
+    email = payload.get("email")
+    supabase_token = payload.get("supabase_token")
+    
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+        
+    # If SUPABASE_JWT_SECRET is configured, verify the supabase_token
+    if settings.SUPABASE_JWT_SECRET and supabase_token:
+        try:
+            from jose import jwt as jose_jwt
+            token_payload = jose_jwt.decode(
+                supabase_token,
+                settings.SUPABASE_JWT_SECRET,
+                algorithms=[settings.JWT_ALGORITHM],
+                options={"verify_aud": False},
+            )
+            # Ensure email in token matches email in payload
+            token_email = token_payload.get("email")
+            if token_email and token_email != email:
+                raise HTTPException(status_code=401, detail="Token email mismatch")
+        except Exception as e:
+            raise HTTPException(status_code=401, detail=f"Invalid Supabase session token: {str(e)}")
+            
+    # Auto-create user in database if they don't exist
+    from backend.models.db import User
+    db_user = db.query(User).filter(User.email == email).first()
+    if not db_user:
+        db_user = User(email=email)
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+        
+    # Generate local JWT token
+    from jose import jwt as jose_jwt
+    from datetime import datetime, timedelta, timezone
+    
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRATION_MINUTES)
+    token_payload = {
+        "sub": str(db_user.id),
+        "email": db_user.email,
+        "exp": expire
+    }
+    access_token = jose_jwt.encode(token_payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": str(db_user.id),
+            "email": db_user.email
+        }
+    }
+
+
 def run_async_analysis_in_background(
     report_id: str,
     text: Optional[str],
@@ -194,15 +410,27 @@ def run_async_analysis_in_background(
     
     db = SessionLocal()
     try:
+        import json
         db_report = db.query(ReportDB).filter(ReportDB.id == report_id).first()
         if db_report:
             db_report.verdict = report.credibility.verdict
             db_report.confidence = report.credibility.trust_score / 100.0
             if user_id:
                 db_report.user_id = uuid.UUID(user_id)
-            if org_id:
+            if org_id and org_id != "personal":
                 db_report.org_id = uuid.UUID(org_id)
             
+            # Serialized JSON fields
+            db_report.claims_json = json.dumps([cv.model_dump() for cv in report.claims]) if report.claims else None
+            db_report.explanation_json = json.dumps(report.explanation.model_dump()) if report.explanation else None
+            db_report.counter_narrative_json = json.dumps(report.counter_narrative.model_dump()) if report.counter_narrative else None
+            db_report.inconsistencies_json = json.dumps([inc.model_dump() for inc in report.inconsistencies]) if report.inconsistencies else None
+            db_report.social_signals_json = json.dumps([sig.model_dump() for sig in report.social_signals]) if report.social_signals else None
+            db_report.risk_factors_json = json.dumps(report.risk_factors) if report.risk_factors else None
+            db_report.signal_correlations_json = json.dumps(report.signal_correlations) if report.signal_correlations else None
+            db_report.confidence_profile_json = json.dumps(report.confidence_profile) if report.confidence_profile else None
+            db_report.processing_time_seconds = report.processing_time_seconds or 0.0
+
             # Save evidence
             if report.claims:
                 for claim_verdict in report.claims:
@@ -217,7 +445,7 @@ def run_async_analysis_in_background(
             db.commit()
 
             # Log audit trail if org_id is provided
-            if org_id:
+            if org_id and org_id != "personal":
                 AuthService.log_action(
                     db,
                     uuid.UUID(org_id),
@@ -294,9 +522,9 @@ async def analyze_content(
     # Determine user/organization ownership
     user_uuid = uuid.UUID(current_user.id)
     resolved_org_id = None
-    if current_user.org_id:
+    if current_user.org_id and current_user.org_id != "personal":
         resolved_org_id = uuid.UUID(current_user.org_id)
-    elif resolved_org_id_param:
+    elif resolved_org_id_param and resolved_org_id_param != "personal":
         role = AuthService.check_user_role(db, uuid.UUID(resolved_org_id_param), user_uuid)
         if not role:
             raise HTTPException(status_code=403, detail="You are not a member of this workspace")
@@ -393,26 +621,109 @@ async def get_report(report_id: str, db: Session = Depends(get_db)):
         if not db_report:
             raise HTTPException(status_code=404, detail="Report not found")
         
-        # Reconstruct AnalysisReport from db_report
-        from backend.models.schemas import CredibilityScore, Evidence
-        evidence_list = [
-            Evidence(
-                title=ev.source_name or "",
-                url=ev.source_url,
-                snippet="",
-                source_score=ev.credibility_score,
-            )
-            for ev in db_report.evidence
-        ]
+        # Reconstruct AnalysisReport from db_report JSON fields
+        import json
+        from backend.models.schemas import (
+            CredibilityScore, Evidence, ClaimVerdict, Explanation,
+            CounterNarrative, Inconsistency, SocialSignal, Language
+        )
+        
+        claims = []
+        if db_report.claims_json:
+            try:
+                claims_data = json.loads(db_report.claims_json)
+                claims = [ClaimVerdict(**c) for c in claims_data]
+            except Exception as e:
+                logger.warning(f"Failed to deserialize claims: {e}")
+                
+        explanation = None
+        if db_report.explanation_json:
+            try:
+                explanation = Explanation(**json.loads(db_report.explanation_json))
+            except Exception as e:
+                logger.warning(f"Failed to deserialize explanation: {e}")
+                
+        counter_narrative = None
+        if db_report.counter_narrative_json:
+            try:
+                counter_narrative = CounterNarrative(**json.loads(db_report.counter_narrative_json))
+            except Exception as e:
+                logger.warning(f"Failed to deserialize counter_narrative: {e}")
+                
+        inconsistencies = []
+        if db_report.inconsistencies_json:
+            try:
+                inconsistencies = [Inconsistency(**inc) for inc in json.loads(db_report.inconsistencies_json)]
+            except Exception as e:
+                logger.warning(f"Failed to deserialize inconsistencies: {e}")
+                
+        social_signals = []
+        if db_report.social_signals_json:
+            try:
+                social_signals = [SocialSignal(**sig) for sig in json.loads(db_report.social_signals_json)]
+            except Exception as e:
+                logger.warning(f"Failed to deserialize social_signals: {e}")
+                
+        risk_factors = []
+        if db_report.risk_factors_json:
+            try:
+                risk_factors = json.loads(db_report.risk_factors_json)
+            except Exception as e:
+                logger.warning(f"Failed to deserialize risk_factors: {e}")
+                
+        signal_correlations = {}
+        if db_report.signal_correlations_json:
+            try:
+                signal_correlations = json.loads(db_report.signal_correlations_json)
+            except Exception as e:
+                logger.warning(f"Failed to deserialize signal_correlations: {e}")
+                
+        confidence_profile = None
+        if db_report.confidence_profile_json:
+            try:
+                confidence_profile = json.loads(db_report.confidence_profile_json)
+            except Exception as e:
+                logger.warning(f"Failed to deserialize confidence_profile: {e}")
+
+        # Fallback for old records: reconstruct a claim if none exist in claims_json but there is evidence in the DB
+        if not claims and db_report.evidence:
+            from backend.models.schemas import Claim
+            evidence_list = [
+                Evidence(
+                    title=ev.source_name or "",
+                    url=ev.source_url,
+                    snippet="",
+                    source_score=ev.credibility_score,
+                )
+                for ev in db_report.evidence
+            ]
+            claims = [
+                ClaimVerdict(
+                    claim=Claim(text=db_report.input_text or "Ingested URL/Media"),
+                    verdict=db_report.verdict,
+                    confidence=db_report.confidence,
+                    evidence=evidence_list,
+                )
+            ]
         
         report = AnalysisReport(
             id=db_report.id,
             content_type=ContentType(db_report.content_type),
             original_text=db_report.input_text,
+            language=Language(db_report.language) if db_report.language else Language.EN,
             credibility=CredibilityScore(
                 trust_score=int(db_report.confidence * 100),
                 verdict=db_report.verdict,
             ),
+            claims=claims,
+            explanation=explanation,
+            counter_narrative=counter_narrative,
+            inconsistencies=inconsistencies,
+            social_signals=social_signals,
+            risk_factors=risk_factors,
+            signal_correlations=signal_correlations,
+            confidence_profile=confidence_profile,
+            processing_time_seconds=db_report.processing_time_seconds or 0.0,
         )
     return report
 
@@ -456,7 +767,7 @@ async def get_user_dashboard(
     db: Session = Depends(get_db),
 ):
     """Retrieve personal or workspace-scoped dashboard stats for the authenticated user."""
-    if org_id:
+    if org_id and org_id != "personal":
         role = AuthService.check_user_role(db, uuid.UUID(org_id), uuid.UUID(current_user.id))
         if not role:
             raise HTTPException(status_code=403, detail="You are not a member of this workspace")
@@ -578,6 +889,9 @@ async def invite_member(
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")
     
+    if org_id == "personal":
+        raise HTTPException(status_code=400, detail="Cannot invite members to personal node.")
+        
     actor_role = AuthService.check_user_role(db, uuid.UUID(org_id), uuid.UUID(current_user.id))
     if actor_role != "Admin":
         raise HTTPException(status_code=403, detail="Only Admins can invite team members.")
@@ -598,6 +912,17 @@ async def list_members(
     current_user: CurrentUser = Depends(require_user),
     db: Session = Depends(get_db)
 ):
+    if org_id == "personal":
+        from datetime import datetime, timezone
+        return [
+            {
+                "id": str(current_user.id),
+                "email": current_user.email,
+                "role": "Owner",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+        ]
+        
     role = AuthService.check_user_role(db, uuid.UUID(org_id), uuid.UUID(current_user.id))
     if not role:
         raise HTTPException(status_code=403, detail="You are not a member of this workspace.")
@@ -621,6 +946,9 @@ async def create_api_key(
     current_user: CurrentUser = Depends(require_user),
     db: Session = Depends(get_db)
 ):
+    if org_id == "personal":
+        raise HTTPException(status_code=400, detail="Cannot create API keys for personal node.")
+        
     label = data.get("label", "Production API Key")
     role = AuthService.check_user_role(db, uuid.UUID(org_id), uuid.UUID(current_user.id))
     if role != "Admin":
@@ -646,6 +974,9 @@ async def list_api_keys(
     current_user: CurrentUser = Depends(require_user),
     db: Session = Depends(get_db)
 ):
+    if org_id == "personal":
+        return []
+        
     role = AuthService.check_user_role(db, uuid.UUID(org_id), uuid.UUID(current_user.id))
     if not role:
         raise HTTPException(status_code=403, detail="You are not a member of this workspace.")
@@ -687,6 +1018,9 @@ async def get_audit_logs(
     current_user: CurrentUser = Depends(require_user),
     db: Session = Depends(get_db)
 ):
+    if org_id == "personal":
+        return []
+        
     role = AuthService.check_user_role(db, uuid.UUID(org_id), uuid.UUID(current_user.id))
     if not role:
         raise HTTPException(status_code=403, detail="You are not a member of this workspace.")

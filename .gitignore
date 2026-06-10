@@ -111,3 +111,4 @@ truthshield_test.db
 # Agent and scratch folders
 .agents/
 scratch/
+backend/uploads/

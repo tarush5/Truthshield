@@ -6,7 +6,7 @@ echo ===================================================
 cd /d "%~dp0"
 
 echo Starting ML Backend (Port 8000)...
-start "TruthShield ML Backend" cmd /k "cd backend && pip install -r requirements.txt && python -m uvicorn main:app --reload --port 8000"
+start "TruthShield ML Backend" cmd /k "pip install -r backend\requirements.txt && python -m uvicorn backend.main:app --reload --port 8000"
 
 echo Starting React Frontend (Port 5173)...
 start "TruthShield React Frontend" cmd /k "cd frontend && npm install && npm run dev"

@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Activity, UserPlus, Key, LogIn, Clock } from 'lucide-react';
+import InteractiveCard from '../InteractiveCard';
 
 // Action type → color + icon mapping
 const ACTION_CONFIG = {
@@ -60,16 +61,21 @@ const itemVariants = {
  * ActivityFeed — vertical timeline of audit log entries
  * @param {array} logs - Array of { id, action, user_email, details, created_at }
  */
-export default function ActivityFeed({ logs }) {
-  const isEmpty = !logs || logs.length === 0;
+export default function ActivityFeed({ logs, loading = false }) {
+  if (loading || !logs) {
+    return <ActivityFeedSkeleton />;
+  }
+  const isEmpty = logs.length === 0;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.25, ease: [0.4, 0, 0.2, 1] }}
-      className="glass-card p-6 h-full"
-    >
+    <InteractiveCard className="border border-white/5 bg-[#030712]/40 backdrop-blur-xl h-full">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.25, ease: [0.4, 0, 0.2, 1] }}
+        className="p-6"
+      >
+
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -128,7 +134,15 @@ export default function ActivityFeed({ logs }) {
                   </p>
                   <p className="text-[11px] text-white/35 truncate mt-0.5">
                     {log.user_email}
-                    {log.details && <> — {log.details}</>}
+                    {log.details && (
+                      <>
+                        {' — '}
+                        {typeof log.details === 'object'
+                          ? log.details.verdict || log.details.label || JSON.stringify(log.details)
+                          : log.details}
+                      </>
+                    )}
+
                   </p>
                 </div>
 
@@ -140,7 +154,35 @@ export default function ActivityFeed({ logs }) {
             );
           })}
         </motion.div>
-      )}
-    </motion.div>
+        )}
+      </motion.div>
+    </InteractiveCard>
+  );
+}
+
+
+
+function ActivityFeedSkeleton() {
+  return (
+    <div className="glass-card p-6 animate-pulse h-full">
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <div className="h-5 w-28 rounded bg-white/[0.06] mb-1" />
+          <div className="h-3 w-36 rounded bg-white/[0.04]" />
+        </div>
+      </div>
+      <div className="space-y-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="flex items-start gap-3 py-1">
+            <div className="w-7 h-7 rounded-lg bg-white/[0.06] shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3.5 w-1/2 rounded bg-white/[0.06]" />
+              <div className="h-3 w-3/4 rounded bg-white/[0.04]" />
+            </div>
+            <div className="h-3 w-8 rounded bg-white/[0.04]" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

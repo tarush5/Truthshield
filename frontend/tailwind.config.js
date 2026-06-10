@@ -18,6 +18,16 @@ export default {
           900: '#19408f',
           950: '#142857',
         },
+        stitch: {
+          cyan: '#00f0ff',
+          purple: '#bc13fe',
+          emerald: '#00ff94',
+          rose: '#ffb4ab',
+          bg: '#101417',
+          surface: '#1c2024',
+          surfaceHigh: '#272a2e',
+          outline: '#849495',
+        },
         trust: {
           high: '#10b981',
           medium: '#f59e0b',
@@ -31,10 +41,12 @@ export default {
           800: '#0f172a',
           900: '#020617',
         }
+
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        display: ['Outfit', 'Inter', 'sans-serif'],
+        sans: ['Geist', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['Satoshi', 'Geist', 'sans-serif'],
+        mono: ['Geist Mono', 'JetBrains Mono', 'monospace'],
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

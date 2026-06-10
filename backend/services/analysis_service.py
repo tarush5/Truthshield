@@ -45,6 +45,7 @@ class AnalysisService:
         # Persist to database
         logger.debug("AnalysisService.analyze called. user_id=%s, org_id=%s", user_id, org_id)
         try:
+            import json
             logger.debug("Persisting report %s to database", report.id)
             db_report = ReportDB(
                 id=report.id,
@@ -55,6 +56,17 @@ class AnalysisService:
                 input_text=report.original_text,
                 verdict=report.credibility.verdict,
                 confidence=report.credibility.trust_score / 100.0,
+                
+                # Serialized fields
+                claims_json=json.dumps([cv.model_dump() for cv in report.claims]) if report.claims else None,
+                explanation_json=json.dumps(report.explanation.model_dump()) if report.explanation else None,
+                counter_narrative_json=json.dumps(report.counter_narrative.model_dump()) if report.counter_narrative else None,
+                inconsistencies_json=json.dumps([inc.model_dump() for inc in report.inconsistencies]) if report.inconsistencies else None,
+                social_signals_json=json.dumps([sig.model_dump() for sig in report.social_signals]) if report.social_signals else None,
+                risk_factors_json=json.dumps(report.risk_factors) if report.risk_factors else None,
+                signal_correlations_json=json.dumps(report.signal_correlations) if report.signal_correlations else None,
+                confidence_profile_json=json.dumps(report.confidence_profile) if report.confidence_profile else None,
+                processing_time_seconds=report.processing_time_seconds or 0.0,
             )
             db.add(db_report)
 

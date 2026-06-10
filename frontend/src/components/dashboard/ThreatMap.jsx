@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Globe, X, MapPin, ExternalLink } from 'lucide-react';
+import InteractiveCard from '../InteractiveCard';
 
 /**
  * Convert lat/lng to SVG coordinates (Mercator-ish projection)
@@ -44,12 +45,14 @@ export default function ThreatMap({ threats = [] }) {
   const [selected, setSelected] = useState(null);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-      className="glass-card overflow-hidden"
-    >
+    <InteractiveCard className="border border-white/5 bg-[#030712]/40 backdrop-blur-xl overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+        className="p-6"
+      >
+
       {/* Header */}
       <div className="p-6 pb-0">
         <div className="flex items-center justify-between">
@@ -127,7 +130,13 @@ export default function ThreatMap({ threats = [] }) {
                     className="transition-all"
                   />
                   {isSelected && (
-                    <circle cx={x} cy={y} r="8" fill="none" stroke="#3b93ff" strokeWidth="1.5" opacity="0.6" />
+                    <>
+                      <circle cx={x} cy={y} r="8" fill="none" stroke="#3b93ff" strokeWidth="1.5" opacity="0.6" />
+                      <circle cx={x} cy={y} r="16" fill="none" stroke="#22d3ee" strokeWidth="2" opacity="0.8">
+                        <animate attributeName="r" values="8;24" dur="1.5s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.8;0" dur="1.5s" repeatCount="indefinite" />
+                      </circle>
+                    </>
                   )}
                 </g>
               );
@@ -203,5 +212,7 @@ export default function ThreatMap({ threats = [] }) {
         )}
       </div>
     </motion.div>
+    </InteractiveCard>
   );
 }
+

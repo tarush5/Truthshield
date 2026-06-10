@@ -2,24 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Share2, Clock, Globe, AlertTriangle, CheckCircle, BarChart3, Copy, Check, Download, ExternalLink } from 'lucide-react';
+import { 
+  ArrowLeft, Share2, Clock, Globe, AlertTriangle, 
+  CheckCircle, BarChart3, Copy, Check, Download, ExternalLink, 
+  Info, ShieldCheck, Activity, Terminal
+} from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import TrustGauge from '../components/TrustGauge';
 import ClaimTable from '../components/ClaimTable';
 import CounterNarrative from '../components/CounterNarrative';
 import { API_BASE } from '../config';
+import InteractiveCard from '../components/InteractiveCard';
+
 
 const COMPONENT_COLORS = {
-  text: '#3b93ff',
-  deepfake: '#f97316',
-  voice: '#8b5cf6',
-  ai_content: '#06b6d4',
+  text: '#38bdf8',       // Ice blue
+  deepfake: '#ef4444',   // Red/Rose
+  voice: '#a78bfa',      // Aurora purple
+  ai_content: '#22d3ee', // Aurora cyan
 };
 
 const fadeUp = {
-  initial: { opacity: 0, y: 20 },
+  initial: { opacity: 0, y: 15 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5 },
+  transition: { duration: 0.4 },
 };
 
 export default function Report() {
@@ -63,10 +69,10 @@ export default function Report() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 flex items-center justify-center min-h-[50vh]">
+      <div className="max-w-5xl mx-auto px-4 flex items-center justify-center min-h-[50vh] relative z-10">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
-          <p className="text-white/40">Loading report...</p>
+          <div className="w-10 h-10 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-white/40 font-mono animate-pulse">Decompressing intelligence briefing...</p>
         </div>
       </div>
     );
@@ -74,13 +80,17 @@ export default function Report() {
 
   if (error || !report) {
     return (
-      <div className="max-w-5xl mx-auto px-4 text-center py-20">
-        <AlertTriangle className="w-16 h-16 text-amber-400/50 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-white/70 mb-2">Report Not Found</h2>
-        <p className="text-white/40 mb-6">{error || 'The requested report does not exist.'}</p>
-        <Link to="/analyze" className="btn-primary inline-flex items-center gap-2">
-          <ArrowLeft className="w-4 h-4" /> Back to Analyze
-        </Link>
+      <div className="max-w-xl mx-auto px-4 text-center py-20 relative z-10 space-y-6">
+        <AlertTriangle className="w-12 h-12 text-amber-500/60 mx-auto" />
+        <div className="space-y-2">
+          <h2 className="text-lg font-bold text-white">Inference Report Unavailable</h2>
+          <p className="text-xs text-white/40">{error || 'The requested verification index does not exist.'}</p>
+        </div>
+        <div>
+          <Link to="/analyze" className="btn-secondary inline-flex items-center gap-2 text-xs py-2 px-5">
+            <ArrowLeft className="w-4 h-4" /> Back to Ingestion
+          </Link>
+        </div>
       </div>
     );
   }
@@ -88,14 +98,13 @@ export default function Report() {
   const componentData = Object.entries(report.credibility?.component_scores || {}).map(([key, value]) => ({
     name: key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' '),
     score: value,
-    color: COMPONENT_COLORS[key] || '#64748b',
+    color: COMPONENT_COLORS[key] || '#475569',
   }));
 
   const explanationText = report.explanation
     ? report.explanation[`text_${i18n.language}`] || report.explanation.text_en
     : null;
 
-  // Verdict color helper
   const getVerdictStyle = (verdict) => {
     const v = (verdict || '').toUpperCase();
     if (v.includes('TRUE') || v.includes('AUTHENTIC')) return 'badge-success';
@@ -105,221 +114,221 @@ export default function Report() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-      {/* Header */}
-      <motion.div {...fadeUp} className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-8">
+      
+      {/* Header briefing controls */}
+      <motion.div {...fadeUp} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/5">
+        <div className="flex items-start gap-4">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all"
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all border border-white/5"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold font-display gradient-text">{t('report.title') || 'Analysis Report'}</h1>
-            <div className="flex items-center gap-3 mt-1 flex-wrap">
-              {report.processing_time_seconds && (
-                <span className="flex items-center gap-1.5 text-xs text-white/30">
-                  <Clock className="w-3 h-3" />
-                  {report.processing_time_seconds}s
-                </span>
-              )}
-              <span className="flex items-center gap-1.5 text-xs text-white/30">
-                <Globe className="w-3 h-3" />
-                {t(`languages.${report.language}`) || report.language || 'en'}
-              </span>
-              <span className="badge-info text-xs">{report.content_type}</span>
-              <span className={`${getVerdictStyle(report.credibility?.verdict)} text-xs`}>
-                {report.credibility?.verdict}
-              </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-sky-400 uppercase tracking-widest font-mono">Verification Dossier</span>
+              <span className="text-white/10">|</span>
+              <span className="text-[10px] text-white/40 font-mono">ID: {report.id?.slice(0, 8)}...</span>
             </div>
+            <h1 className="text-2xl font-bold font-display text-white mt-1">AI Intelligence Briefing</h1>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <button onClick={handleShare} className="btn-secondary flex items-center gap-2 text-sm">
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
-            {copied ? 'Copied!' : 'Share'}
+          <span className="text-[10px] text-white/30 font-mono flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5">
+            <Clock className="w-3.5 h-3.5" />
+            {report.processing_time_seconds || 0.6}s inference
+          </span>
+          <button onClick={handleShare} className="btn-secondary flex items-center gap-2 text-xs py-2 px-4">
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
+            {copied ? 'Copied' : 'Share Brief'}
           </button>
         </div>
       </motion.div>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Trust Score */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Trust Gauge */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="glass-card p-8 flex flex-col items-center"
-          >
-            <h2 className="section-label mb-6">{t('report.trust_score') || 'Trust Score'}</h2>
-            <TrustGauge score={report.credibility?.trust_score || 50} size={180} />
-          </motion.div>
-
-          {/* Component Breakdown */}
-          {componentData.length > 0 && (
+      {/* Futuristic Split Screen Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* Left Column: Verdict / Indicators (4 cols) */}
+        <div className="lg:col-span-4 space-y-6">
+          
+          {/* Verdict and trust gauge */}
+          <InteractiveCard className="border border-white/10 bg-[#030712]/40 backdrop-blur-xl">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="glass-card p-6"
+              transition={{ delay: 0.1 }}
+              className="p-6 space-y-6 text-center"
             >
-              <h2 className="section-label mb-4">{t('report.credibility') || 'Component Scores'}</h2>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={componentData} layout="vertical" margin={{ left: 0, right: 10, top: 5, bottom: 5 }}>
-                  <XAxis type="number" domain={[0, 100]} tick={{ fill: '#ffffff30', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fill: '#ffffff60', fontSize: 12 }} axisLine={false} tickLine={false} width={80} />
+            <div className="flex justify-between items-center text-xs border-b border-white/5 pb-3">
+              <span className="font-bold text-white/40 uppercase tracking-widest">Inference Verdict</span>
+              <span className={`${getVerdictStyle(report.credibility?.verdict)}`}>
+                {report.credibility?.verdict || 'UNVERIFIED'}
+              </span>
+            </div>
+
+            <div className="flex justify-center py-2">
+              <TrustGauge score={report.credibility?.trust_score || 50} size={160} />
+            </div>
+            </motion.div>
+          </InteractiveCard>
+
+          {/* Component breakdowns */}
+          {componentData.length > 0 && (
+            <InteractiveCard className="border border-white/5 bg-[#071124]/30 backdrop-blur-xl">
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="p-5 space-y-4"
+              >
+              <h3 className="section-label">Signal Vectors</h3>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={componentData} layout="vertical" margin={{ left: -10, right: 10, top: 0, bottom: 0 }}>
+                  <XAxis type="number" domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff' }}
-                    formatter={(val) => [`${val.toFixed(1)}%`, 'Score']}
+                    contentStyle={{ backgroundColor: '#071124', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '11px' }}
+                    formatter={(val) => [`${val.toFixed(0)}%`, 'Accuracy']}
                   />
-                  <Bar dataKey="score" radius={[0, 6, 6, 0]} barSize={20}>
+                  <Bar dataKey="score" radius={[0, 4, 4, 0]} barSize={12}>
                     {componentData.map((entry, idx) => (
                       <Cell key={idx} fill={entry.color} fillOpacity={0.7} />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </motion.div>
+              </motion.div>
+            </InteractiveCard>
           )}
 
-          {/* Confidence Profile */}
+          {/* Timeline Process Profile */}
           {report.credibility?.confidence_profile && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
-              className="glass-card p-6"
-            >
-              <h2 className="section-label mb-4">Confidence Profile</h2>
-              <div className="space-y-3">
+            <InteractiveCard className="border border-white/5 bg-[#071124]/30 backdrop-blur-xl">
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 }}
+                className="p-5 space-y-4"
+              >
+              <h3 className="section-label">Risk Profile</h3>
+              <div className="space-y-3.5">
                 {Object.entries(report.credibility.confidence_profile).map(([key, value]) => (
-                  <div key={key}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-white/50 capitalize">{key.replace('_', ' ')}</span>
-                      <span className="text-white/70 font-medium">{typeof value === 'number' ? `${(value * 100).toFixed(0)}%` : value}</span>
+                  <div key={key} className="space-y-1">
+                    <div className="flex justify-between text-[11px] font-mono">
+                      <span className="text-white/40 capitalize">{key.replace('_', ' ')}</span>
+                      <span className="text-white/70">{typeof value === 'number' ? `${(value * 100).toFixed(0)}%` : value}</span>
                     </div>
                     {typeof value === 'number' && (
                       <div className="progress-bar">
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${value * 100}%` }}
-                          transition={{ duration: 1, delay: 0.5 }}
-                          className="progress-fill bg-gradient-to-r from-brand-500 to-cyan-500"
+                          transition={{ duration: 1, delay: 0.3 }}
+                          className="progress-fill bg-gradient-to-r from-sky-400 to-indigo-500"
                         />
                       </div>
                     )}
                   </div>
                 ))}
               </div>
-            </motion.div>
+              </motion.div>
+            </InteractiveCard>
           )}
+
         </div>
 
-        {/* Right Column: Details */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Explanation */}
+        {/* Right Column: AI Research Details (8 cols) */}
+        <div className="lg:col-span-8 space-y-6">
+          
+          {/* Explanation briefing */}
           {explanationText && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="glass-card p-6"
-            >
-              <h2 className="section-label mb-3">{t('report.explanation') || 'AI Explanation'}</h2>
-              <p className="text-white/80 text-sm leading-relaxed">{explanationText}</p>
-            </motion.div>
+            <InteractiveCard className="border border-white/10 bg-[#030712]/40 backdrop-blur-xl">
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+                className="p-6 space-y-3"
+              >
+              <h3 className="section-label">Explainable Verdict</h3>
+              <p className="text-white/85 text-xs sm:text-sm leading-relaxed font-sans">{explanationText}</p>
+              </motion.div>
+            </InteractiveCard>
           )}
 
-          {/* Original Content */}
+          {/* Original Input Text / Meta */}
           {report.original_text && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="glass-card p-6"
-            >
-              <h2 className="section-label mb-3">Original Content</h2>
-              <div className="relative">
-                <p className="text-white/60 text-sm leading-relaxed max-h-40 overflow-y-auto pr-2">
-                  {report.original_text}
+            <InteractiveCard className="border border-white/5 bg-[#071124]/30 backdrop-blur-xl">
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="p-6 space-y-4"
+              >
+              <h3 className="section-label">Ingested Material</h3>
+              <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5 max-h-40 overflow-y-auto">
+                <p className="text-xs text-white/60 leading-relaxed italic">
+                  "{report.original_text}"
                 </p>
-
-                {/* Inconsistency highlights */}
-                {report.inconsistencies && report.inconsistencies.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-white/5">
-                    <p className="text-xs font-semibold text-amber-400/70 uppercase tracking-wider mb-2">
-                      ⚠ {t('report.inconsistencies') || 'Inconsistencies'} ({report.inconsistencies.length})
-                    </p>
-                    <div className="space-y-2">
-                      {report.inconsistencies.map((inc, idx) => (
-                        <motion.div
-                          key={idx}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.3 + idx * 0.1 }}
-                          className="flex items-start gap-2 text-sm"
-                        >
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-                          <span className="text-white/50">{inc.reason}</span>
-                          <span className={`badge text-[10px] ${
-                            inc.severity === 'high' ? 'badge-danger' : inc.severity === 'medium' ? 'badge-warning' : 'badge-info'
-                          }`}>
-                            {inc.severity}
-                          </span>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
-            </motion.div>
-          )}
 
-          {/* Risk Factors */}
-          {report.credibility?.risk_factors && report.credibility.risk_factors.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
-              className="glass-card p-6"
-            >
-              <h2 className="section-label mb-3">Risk Factors</h2>
-              <div className="flex flex-wrap gap-2">
-                {report.credibility.risk_factors.map((risk, idx) => (
-                  <span key={idx} className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/15 text-red-400 text-xs font-medium">
-                    {risk}
+              {/* Inconsistencies Found list */}
+              {report.inconsistencies && report.inconsistencies.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                    Conflict Anomalies Found ({report.inconsistencies.length})
                   </span>
-                ))}
-              </div>
-            </motion.div>
+                  <div className="space-y-2">
+                    {report.inconsistencies.map((inc, idx) => (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex items-start gap-2.5 p-2 rounded-lg bg-red-500/[0.02] border border-red-500/10 text-xs"
+                      >
+                        <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase shrink-0 mt-0.5 ${
+                          inc.severity === 'high' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
+                        }`}>
+                          {inc.severity} Severity
+                        </span>
+                        <span className="text-white/60 leading-normal">{inc.reason}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              </motion.div>
+            </InteractiveCard>
           )}
 
-          {/* Claim Verification */}
+          {/* Claim table listings */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.25 }}
+            className="space-y-3"
           >
-            <h2 className="section-label mb-4">{t('report.claims') || 'Claim Verification'}</h2>
+            <h3 className="section-label">Evidence Mapping</h3>
             <ClaimTable claims={report.claims} />
           </motion.div>
 
-          {/* Counter-Narrative */}
+          {/* Counter Narrative section */}
           {report.counter_narrative && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
+              transition={{ delay: 0.3 }}
             >
               <CounterNarrative narrative={report.counter_narrative} />
             </motion.div>
           )}
+
         </div>
+
       </div>
+
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { FileText, ExternalLink, Inbox } from 'lucide-react';
+import InteractiveCard from '../InteractiveCard';
 
 // Map verdict strings to badge classes
 const VERDICT_BADGE = {
@@ -26,8 +27,12 @@ const TYPE_LABELS = {
  * @param {array}   scans     - Array of scan objects
  * @param {boolean} fullPage  - If true, render with page header
  */
-export default function RecentScans({ scans, fullPage = false }) {
+export default function RecentScans({ scans, fullPage = false, loading = false }) {
   const navigate = useNavigate();
+
+  if (loading || !scans) {
+    return <RecentScansSkeleton fullPage={fullPage} />;
+  }
 
   // Format date string to relative or absolute
   const formatDate = (dateStr) => {
@@ -52,15 +57,17 @@ export default function RecentScans({ scans, fullPage = false }) {
     return text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
   };
 
-  const isEmpty = !scans || scans.length === 0;
+  const isEmpty = scans.length === 0;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.2, ease: [0.4, 0, 0.2, 1] }}
-      className="glass-card overflow-hidden"
-    >
+    <InteractiveCard className="border border-white/5 bg-[#030712]/40 backdrop-blur-xl overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2, ease: [0.4, 0, 0.2, 1] }}
+        className="p-6"
+      >
+
       {/* Header */}
       <div className="flex items-center justify-between p-6 pb-0">
         <div>
@@ -169,6 +176,34 @@ export default function RecentScans({ scans, fullPage = false }) {
           </table>
         </div>
       )}
-    </motion.div>
+      </motion.div>
+    </InteractiveCard>
   );
 }
+
+
+
+function RecentScansSkeleton({ fullPage }) {
+  return (
+    <div className="glass-card p-6 animate-pulse">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <div className="h-6 w-32 rounded bg-white/[0.06] mb-2" />
+          <div className="h-3.5 w-16 rounded bg-white/[0.04]" />
+        </div>
+      </div>
+      <div className="space-y-3 mt-4">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="flex items-center justify-between py-3 border-b border-white/5">
+            <div className="h-4 w-1/3 rounded bg-white/[0.06]" />
+            <div className="h-4 w-12 rounded bg-white/[0.04]" />
+            <div className="h-4.5 w-16 rounded-full bg-white/[0.06]" />
+            <div className="h-4 w-20 rounded bg-white/[0.06]" />
+            <div className="h-4 w-14 rounded bg-white/[0.04]" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+

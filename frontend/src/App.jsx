@@ -11,7 +11,8 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Landing from './pages/Landing';
 import AuthCallback from './pages/AuthCallback';
-
+import ArcticIntelligenceBackground from './components/ArcticIntelligenceBackground';
+import CursorTrail from './components/CursorTrail';
 /* ─────────── NavBar ─────────── */
 function NavBar() {
   const { t, i18n } = useTranslation();
@@ -233,10 +234,12 @@ function AppContent() {
   const isDashboard = location.pathname === '/dashboard';
 
   return (
-    <div className={`min-h-screen bg-surface-900 ${isDashboard ? '' : 'bg-grid'}`}>
-      {!isDashboard && <div className="bg-radial-glow fixed inset-0 pointer-events-none" />}
+    <div className={`min-h-screen bg-surface-900 ${isDashboard ? '' : 'bg-grid'} relative overflow-hidden`}>
+      <ArcticIntelligenceBackground />
+      <CursorTrail />
+      {!isDashboard && <div className="bg-radial-glow fixed inset-0 pointer-events-none z-0" />}
       {!isDashboard && <NavBar />}
-      <main className={`relative ${isDashboard ? '' : 'pt-20 pb-12'}`}>
+      <main className={`relative z-10 ${isDashboard ? '' : 'pt-20 pb-12'}`}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />

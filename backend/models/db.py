@@ -96,6 +96,7 @@ class User(Base):
     __tablename__ = "users"
     id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     email = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
@@ -134,8 +135,6 @@ class AuditLog(Base):
     action = Column(String, nullable=False)  # analyze_created, api_key_created, member_invited
     details = Column(Text, nullable=True)  # JSON text
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-
-
 class Report(Base):
     __tablename__ = "reports"
     id = Column(String, primary_key=True)  # Hex string UUID from schemas.py
@@ -147,6 +146,17 @@ class Report(Base):
     verdict = Column(String, nullable=False)
     confidence = Column(Float, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
+    # Serialized JSON fields to fully reconstruct AnalysisReport
+    claims_json = Column(Text, nullable=True)
+    explanation_json = Column(Text, nullable=True)
+    counter_narrative_json = Column(Text, nullable=True)
+    inconsistencies_json = Column(Text, nullable=True)
+    social_signals_json = Column(Text, nullable=True)
+    risk_factors_json = Column(Text, nullable=True)
+    signal_correlations_json = Column(Text, nullable=True)
+    confidence_profile_json = Column(Text, nullable=True)
+    processing_time_seconds = Column(Float, nullable=True, default=0.0)
 
     evidence = relationship("EvidenceDB", back_populates="report", cascade="all, delete-orphan")
 
@@ -212,6 +222,7 @@ except Exception as e:
     # Fallback to local SQLite file
     engine = create_engine("sqlite:///./truthshield_dev.db", connect_args={"check_same_thread": False})
 
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -227,6 +238,41 @@ def init_db():
                 logger.info("pgvector extension initialized.")
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables initialized successfully.")
+        
+        # Self-healing check: Ensure users table has password_hash column
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        columns = [col['name'] for col in inspector.get_columns('users')]
+        if 'password_hash' not in columns:
+            logger.info("Adding password_hash column to users table...")
+            with engine.connect() as conn:
+                if "sqlite" in engine.url.drivername or "sqlite" in engine.url.scheme:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN password_hash TEXT"))
+                else:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR(255)"))
+                conn.commit()
+                logger.info("password_hash column added successfully.")
+
+        # Self-healing check: Ensure reports table has JSON columns
+        reports_cols = [col['name'] for col in inspector.get_columns('reports')]
+        json_cols = [
+            ("claims_json", "TEXT"),
+            ("explanation_json", "TEXT"),
+            ("counter_narrative_json", "TEXT"),
+            ("inconsistencies_json", "TEXT"),
+            ("social_signals_json", "TEXT"),
+            ("risk_factors_json", "TEXT"),
+            ("signal_correlations_json", "TEXT"),
+            ("confidence_profile_json", "TEXT"),
+            ("processing_time_seconds", "REAL"),
+        ]
+        with engine.connect() as conn:
+            for col_name, col_type in json_cols:
+                if col_name not in reports_cols:
+                    logger.info(f"Adding {col_name} column to reports table...")
+                    conn.execute(text(f"ALTER TABLE reports ADD COLUMN {col_name} {col_type}"))
+            conn.commit()
+            logger.info("JSON columns added to reports table successfully.")
     except Exception as e:
         logger.warning(f"Database initialization failed: {e}")
 

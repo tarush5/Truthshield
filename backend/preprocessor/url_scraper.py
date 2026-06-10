@@ -33,7 +33,7 @@ class URLScraper:
             dict with 'text', 'title', 'og_image', 'domain', 'meta_description'
         """
         try:
-            response = requests.get(url, headers=self.HEADERS, timeout=15)
+            response = requests.get(url, headers=self.HEADERS, timeout=4.0)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
 
@@ -129,6 +129,15 @@ class URLScraper:
                     if len(p.get_text(strip=True)) > 50  # Strict: skip short junk
                 ]
                 article_text = "\n\n".join(good_paras)
+
+            # Fallback to Title and Meta Description if body text is still completely empty
+            if not article_text:
+                parts = []
+                if title:
+                    parts.append(title)
+                if meta_desc:
+                    parts.append(meta_desc)
+                article_text = "\n\n".join(parts)
 
             # Clean up text
             article_text = re.sub(r"\n{3,}", "\n\n", article_text).strip()

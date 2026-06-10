@@ -16,6 +16,10 @@ class RAGStore:
     Falls back to TF-IDF vector space model if dense model loading fails,
     ensuring zero-config offline capability.
     """
+    _cached_tokenizer = None
+    _cached_model = None
+    _model_loaded = False
+
     def __init__(self):
         self.documents = []
         self.vectorizer = None
@@ -26,18 +30,33 @@ class RAGStore:
         self._load_dense_model()
 
     def _load_dense_model(self):
-        """Try to load a lightweight Transformer model for dense embeddings."""
+        """Try to load a lightweight Transformer model for dense embeddings (cached)."""
+        if RAGStore._model_loaded:
+            self.tokenizer = RAGStore._cached_tokenizer
+            self.model = RAGStore._cached_model
+            if self.tokenizer is None or self.model is None:
+                from sklearn.feature_extraction.text import TfidfVectorizer
+                self.vectorizer = TfidfVectorizer(stop_words='english')
+            return
+
         try:
             import torch
             from transformers import AutoTokenizer, AutoModel
             
             # Use a fast, small embedding model cached locally
             model_name = "sentence-transformers/all-MiniLM-L6-v2"
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModel.from_pretrained(model_name)
-            logger.info("Dense sentence embeddings model loaded for RAG Store.")
+            RAGStore._cached_tokenizer = AutoTokenizer.from_pretrained(model_name)
+            RAGStore._cached_model = AutoModel.from_pretrained(model_name)
+            RAGStore._model_loaded = True
+            
+            self.tokenizer = RAGStore._cached_tokenizer
+            self.model = RAGStore._cached_model
+            logger.info("Dense sentence embeddings model loaded for RAG Store (Singleton).")
         except Exception as e:
             logger.warning(f"Could not load dense embeddings model ({e}). Falling back to TF-IDF Vectorizer.")
+            RAGStore._model_loaded = True # mark attempted
+            RAGStore._cached_tokenizer = None
+            RAGStore._cached_model = None
             from sklearn.feature_extraction.text import TfidfVectorizer
             self.vectorizer = TfidfVectorizer(stop_words='english')
 

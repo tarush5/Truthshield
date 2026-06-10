@@ -57,6 +57,7 @@ async def websocket_analyze(websocket: WebSocket):
             url = data.get("url")
             lang = data.get("lang", "en")
             token = data.get("token")
+            org_id = data.get("org_id")
 
             tracker = AnalysisProgressTracker(websocket)
 
@@ -111,9 +112,18 @@ async def websocket_analyze(websocket: WebSocket):
                 from backend.models.db import SessionLocal, Report as ReportDB, EvidenceDB
                 db = SessionLocal()
                 try:
+                    org_uuid = None
+                    if org_id:
+                        try:
+                            import uuid
+                            org_uuid = uuid.UUID(org_id)
+                        except ValueError:
+                            pass
+
                     db_report = ReportDB(
                         id=report.id,
                         user_id=user_uuid,
+                        org_id=org_uuid,
                         content_type=report.content_type.value,
                         input_text=report.original_text,
                         verdict=report.credibility.verdict,
@@ -133,7 +143,18 @@ async def websocket_analyze(websocket: WebSocket):
                                 )
                                 db.add(db_ev)
                     db.commit()
-                    logger.info(f"WS: Report {report.id} saved to DB for user {user_uuid}")
+                    logger.info(f"WS: Report {report.id} saved to DB for user {user_uuid}, org {org_uuid}")
+
+                    # Log audit action
+                    if org_uuid:
+                        from backend.services.auth_service import AuthService
+                        AuthService.log_action(
+                            db,
+                            org_uuid,
+                            user_uuid,
+                            "analyze_created",
+                            {"report_id": report.id, "verdict": report.credibility.verdict, "content_type": content_type.value}
+                        )
                 except Exception as db_err:
                     logger.warning(f"WS: Failed to persist report to DB: {db_err}")
                 finally:

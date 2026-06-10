@@ -33,24 +33,42 @@ class InconsistencyHighlighter:
     """Identify and highlight inconsistencies in analyzed content."""
 
     def __init__(self):
-        self._client = None
+        self._gemini_client = None
+        self._claude_client = None
+        self._gemini_checked = False
+        self._claude_checked = False
 
-    def _get_client(self):
-        if self._client is None:
+    def _get_gemini_client(self):
+        if not self._gemini_checked:
+            self._gemini_checked = True
+            try:
+                from google import genai
+                settings = get_settings()
+                key = settings.GEMINI_API_KEY
+                if key and key != "your_gemini_api_key" and len(key) > 10:
+                    self._gemini_client = genai.Client(api_key=key)
+            except Exception as e:
+                logger.warning(f"Gemini init failed: {e}")
+        return self._gemini_client
+
+    def _get_claude_client(self):
+        if not self._claude_checked:
+            self._claude_checked = True
             try:
                 import anthropic
-
                 settings = get_settings()
-                self._client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+                key = settings.ANTHROPIC_API_KEY
+                if key and key != "your_anthropic_api_key" and len(key) > 10:
+                    self._claude_client = anthropic.Anthropic(api_key=key)
             except Exception as e:
-                logger.error(f"Failed to init Anthropic client: {e}")
-        return self._client
+                logger.warning(f"Claude init failed: {e}")
+        return self._claude_client
 
     def highlight_text(
         self, text: str, verdict: str = "", evidence_summary: str = ""
     ) -> List[Inconsistency]:
         """
-        Identify inconsistent spans in text using Claude.
+        Identify inconsistent spans in text using Gemini or Claude.
 
         Args:
             text: The text to analyze
@@ -60,13 +78,12 @@ class InconsistencyHighlighter:
         Returns:
             List of Inconsistency objects with span positions
         """
-        client = self._get_client()
-
-        if client is None:
-            return self._fallback_highlight(text)
-
-        try:
-            user_message = f"""TEXT TO ANALYZE:
+        # 1. Try Gemini
+        gemini = self._get_gemini_client()
+        if gemini:
+            try:
+                from backend.config import GEMINI_MODEL
+                user_message = f"""TEXT TO ANALYZE:
 {text[:2000]}
 
 VERDICT: {verdict}
@@ -74,15 +91,47 @@ EVIDENCE CONTEXT: {evidence_summary[:500] if evidence_summary else 'None'}
 
 Identify all inconsistencies in the text above."""
 
-            response = client.messages.create(
-                model=CLAUDE_MODEL,
-                max_tokens=CLAUDE_MAX_TOKENS,
-                system=HIGHLIGHTER_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_message}],
-            )
+                from google.genai import types
+                response = gemini.models.generate_content(
+                    model=GEMINI_MODEL,
+                    contents=user_message,
+                    config=types.GenerateContentConfig(
+                        system_instruction=HIGHLIGHTER_SYSTEM_PROMPT,
+                        temperature=0.1,
+                    )
+                )
+                response_text = response.text.strip()
+                return self._parse_inconsistencies(response_text)
+            except Exception as e:
+                logger.warning(f"Gemini inconsistency highlighting failed: {e}")
 
-            response_text = response.content[0].text.strip()
+        # 2. Try Claude
+        claude = self._get_claude_client()
+        if claude:
+            try:
+                user_message = f"""TEXT TO ANALYZE:
+{text[:2000]}
 
+VERDICT: {verdict}
+EVIDENCE CONTEXT: {evidence_summary[:500] if evidence_summary else 'None'}
+
+Identify all inconsistencies in the text above."""
+
+                response = claude.messages.create(
+                    model=CLAUDE_MODEL,
+                    max_tokens=CLAUDE_MAX_TOKENS,
+                    system=HIGHLIGHTER_SYSTEM_PROMPT,
+                    messages=[{"role": "user", "content": user_message}],
+                )
+                response_text = response.content[0].text.strip()
+                return self._parse_inconsistencies(response_text)
+            except Exception as e:
+                logger.warning(f"Claude inconsistency highlighting failed: {e}")
+
+        return self._fallback_highlight(text)
+
+    def _parse_inconsistencies(self, response_text: str) -> List[Inconsistency]:
+        try:
             # Extract JSON array
             if "```json" in response_text:
                 response_text = response_text.split("```json")[1].split("```")[0].strip()
@@ -104,13 +153,9 @@ Identify all inconsistencies in the text above."""
 
             logger.info(f"Found {len(inconsistencies)} inconsistencies in text")
             return inconsistencies
-
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse inconsistency response: {e}")
-            return self._fallback_highlight(text)
         except Exception as e:
-            logger.error(f"Inconsistency highlighting failed: {e}")
-            return self._fallback_highlight(text)
+            logger.error(f"Failed to parse inconsistencies: {e}")
+            raise e
 
     def generate_gradcam_overlay(
         self, image_path: str, model=None

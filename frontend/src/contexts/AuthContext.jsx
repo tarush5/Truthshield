@@ -15,51 +15,53 @@ export function AuthProvider({ children }) {
 
   // Initialize auth state
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.access_token) {
-        localStorage.setItem('token', s.access_token);
-        localStorage.setItem('user', JSON.stringify({ email: s.user.email, id: s.user.id }));
-      }
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.access_token) {
-        localStorage.setItem('token', s.access_token);
-        localStorage.setItem('user', JSON.stringify({ email: s.user.email, id: s.user.id }));
-      } else {
+    // Get initial session from localStorage for self-contained local auth
+    const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    if (token && savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setSession({ access_token: token });
+        setUser(parsedUser);
+      } catch (e) {
+        console.error('Failed to parse saved user:', e);
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
-    });
-
-    return () => subscription.unsubscribe();
+    }
+    setLoading(false);
   }, []);
 
-  // Sign in with OTP
+  // Sign in with OTP via backend auth
   const signInWithOtp = useCallback(async (email) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: true },
+    const res = await fetch(`${API_BASE}/auth/otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
     });
-    if (error) throw error;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to send OTP');
+    }
     return true;
   }, []);
 
-  // Verify OTP
+  // Verify OTP via backend auth
   const verifyOtp = useCallback(async (email, token) => {
-    const { data, error } = await supabase.auth.verifyOtp({
-      email,
-      token,
-      type: 'email',
+    const res = await fetch(`${API_BASE}/auth/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, token }),
     });
-    if (error) throw error;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Invalid OTP code');
+    }
+    const data = await res.json();
+    setSession({ access_token: data.access_token });
+    setUser(data.user);
+    localStorage.setItem('token', data.access_token);
+    localStorage.setItem('user', JSON.stringify(data.user));
     return data;
   }, []);
 
@@ -74,9 +76,77 @@ export function AuthProvider({ children }) {
     if (error) throw error;
   }, []);
 
+  // Sign up with Password
+  const signUpWithPassword = useCallback(async (email, password) => {
+    const res = await fetch(`${API_BASE}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Sign up failed');
+    }
+    const data = await res.json();
+    setSession({ access_token: data.access_token });
+    setUser(data.user);
+    localStorage.setItem('token', data.access_token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    return data;
+  }, []);
+
+  // Sign in with Password
+  const signInWithPassword = useCallback(async (email, password) => {
+    const res = await fetch(`${API_BASE}/auth/signin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Sign in failed');
+    }
+    const data = await res.json();
+    setSession({ access_token: data.access_token });
+    setUser(data.user);
+    localStorage.setItem('token', data.access_token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    return data;
+  }, []);
+
+  // Sign in as Demo
+  const signInAsDemo = useCallback(async () => {
+    const res = await fetch(`${API_BASE}/auth/demo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Demo login failed');
+    }
+    const data = await res.json();
+    setSession({ access_token: data.access_token });
+    setUser(data.user);
+    localStorage.setItem('token', data.access_token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    return data;
+  }, []);
+
+  // Complete OAuth login callback flow
+  const completeOAuthLogin = useCallback((token, user) => {
+    setSession({ access_token: token });
+    setUser(user);
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+  }, []);
+
   // Sign out
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      // ignore
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('active_org_id');
@@ -99,7 +169,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('active_org_name', orgName);
   }, []);
 
-  // Fetch user's organizations
+  // Fetch user's organizations (supports array or nested object payload)
   const fetchOrganizations = useCallback(async () => {
     const token = session?.access_token || localStorage.getItem('token');
     if (!token) return [];
@@ -109,7 +179,7 @@ export function AuthProvider({ children }) {
       });
       if (!res.ok) return [];
       const data = await res.json();
-      return data.organizations || [];
+      return Array.isArray(data) ? data : (data.organizations || []);
     } catch {
       return [];
     }
@@ -141,6 +211,10 @@ export function AuthProvider({ children }) {
     signInWithOtp,
     verifyOtp,
     signInWithGoogle,
+    signUpWithPassword,
+    signInWithPassword,
+    signInAsDemo,
+    completeOAuthLogin,
     signOut,
     getAuthHeader,
     setOrganization,

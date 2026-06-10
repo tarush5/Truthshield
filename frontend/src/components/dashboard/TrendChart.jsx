@@ -4,6 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from 'recharts';
 import { TrendingUp } from 'lucide-react';
+import InteractiveCard from '../InteractiveCard';
 
 // Time range options
 const RANGES = [
@@ -39,7 +40,7 @@ function CustomTooltip({ active, payload, label }) {
  * @param {array}    data       - Array of { date, scans, threats }
  * @param {function} onRangeChange - Optional callback with range ID
  */
-export default function TrendChart({ data, onRangeChange }) {
+export default function TrendChart({ data, onRangeChange, loading = false }) {
   const [activeRange, setActiveRange] = useState('7d');
 
   const handleRangeChange = (rangeId) => {
@@ -47,13 +48,22 @@ export default function TrendChart({ data, onRangeChange }) {
     if (onRangeChange) onRangeChange(rangeId);
   };
 
+  if (loading || !data) {
+    return <TrendChartSkeleton />;
+  }
+
+  // Determine x-axis data key (backend returns 'day' for weekly trend)
+  const xAxisKey = data.length > 0 && 'day' in data[0] ? 'day' : 'date';
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.15, ease: [0.4, 0, 0.2, 1] }}
-      className="glass-card p-6"
-    >
+    <InteractiveCard className="border border-white/5 bg-[#030712]/40 backdrop-blur-xl">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.15, ease: [0.4, 0, 0.2, 1] }}
+        className="p-6"
+      >
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -84,7 +94,7 @@ export default function TrendChart({ data, onRangeChange }) {
 
       {/* Chart */}
       <div className="h-64">
-        {data && data.length > 0 ? (
+        {data.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
               <defs>
@@ -107,7 +117,7 @@ export default function TrendChart({ data, onRangeChange }) {
               />
 
               <XAxis
-                dataKey="date"
+                dataKey={xAxisKey}
                 stroke="rgba(255,255,255,0.15)"
                 fontSize={11}
                 tickLine={false}
@@ -139,21 +149,23 @@ export default function TrendChart({ data, onRangeChange }) {
                   strokeWidth: 2,
                 }}
               />
-              <Area
-                type="monotone"
-                dataKey="threats"
-                stroke="#ef4444"
-                strokeWidth={1.5}
-                fillOpacity={1}
-                fill="url(#gradientThreats)"
-                dot={false}
-                activeDot={{
-                  r: 3,
-                  fill: '#ef4444',
-                  stroke: '#020617',
-                  strokeWidth: 2,
-                }}
-              />
+              {data[0] && 'threats' in data[0] && (
+                <Area
+                  type="monotone"
+                  dataKey="threats"
+                  stroke="#ef4444"
+                  strokeWidth={1.5}
+                  fillOpacity={1}
+                  fill="url(#gradientThreats)"
+                  dot={false}
+                  activeDot={{
+                    r: 3,
+                    fill: '#ef4444',
+                    stroke: '#020617',
+                    strokeWidth: 2,
+                  }}
+                />
+              )}
             </AreaChart>
           </ResponsiveContainer>
         ) : (
@@ -162,6 +174,32 @@ export default function TrendChart({ data, onRangeChange }) {
           </div>
         )}
       </div>
-    </motion.div>
+      </motion.div>
+    </InteractiveCard>
   );
 }
+
+
+
+function TrendChartSkeleton() {
+  return (
+    <div className="glass-card p-6 animate-pulse">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <div className="h-6 w-36 rounded bg-white/[0.06] mb-2" />
+          <div className="h-3 w-48 rounded bg-white/[0.04]" />
+        </div>
+        <div className="h-7 w-24 rounded bg-white/[0.06]" />
+      </div>
+      <div className="h-64 bg-white/[0.02] border border-white/[0.04] rounded-xl flex items-center justify-center">
+        <div className="w-full h-full p-4 flex flex-col justify-between">
+          <div className="w-full h-px bg-white/[0.03]" />
+          <div className="w-full h-px bg-white/[0.03]" />
+          <div className="w-full h-px bg-white/[0.03]" />
+          <div className="w-full h-px bg-white/[0.03]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+

@@ -25,18 +25,36 @@ class MultilingualExplainer:
     LANG_NAMES = {"en": "English", "hi": "Hindi", "ta": "Tamil"}
 
     def __init__(self):
-        self._client = None
+        self._gemini_client = None
+        self._claude_client = None
+        self._gemini_checked = False
+        self._claude_checked = False
 
-    def _get_client(self):
-        if self._client is None:
+    def _get_gemini_client(self):
+        if not self._gemini_checked:
+            self._gemini_checked = True
+            try:
+                from google import genai
+                settings = get_settings()
+                key = settings.GEMINI_API_KEY
+                if key and key != "your_gemini_api_key" and len(key) > 10:
+                    self._gemini_client = genai.Client(api_key=key)
+            except Exception as e:
+                logger.warning(f"Gemini init failed: {e}")
+        return self._gemini_client
+
+    def _get_claude_client(self):
+        if not self._claude_checked:
+            self._claude_checked = True
             try:
                 import anthropic
-
                 settings = get_settings()
-                self._client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+                key = settings.ANTHROPIC_API_KEY
+                if key and key != "your_anthropic_api_key" and len(key) > 10:
+                    self._claude_client = anthropic.Anthropic(api_key=key)
             except Exception as e:
-                logger.error(f"Failed to init Anthropic client: {e}")
-        return self._client
+                logger.warning(f"Claude init failed: {e}")
+        return self._claude_client
 
     def explain(
         self, content_summary: str, verdict: str, evidence_summary: str = ""
@@ -74,17 +92,15 @@ class MultilingualExplainer:
         lang_name: str,
     ) -> str:
         """Generate a single language explanation."""
-        client = self._get_client()
-
-        if client is None:
-            return self._fallback_explanation(verdict, lang_code)
-
-        try:
-            system = EXPLAINER_SYSTEM_PROMPT.format(
-                verdict=verdict, lang=lang_name
-            )
-
-            user_message = f"""Content: {content_summary[:500]}
+        # 1. Try Gemini
+        gemini = self._get_gemini_client()
+        if gemini:
+            try:
+                from backend.config import GEMINI_MODEL
+                system = EXPLAINER_SYSTEM_PROMPT.format(
+                    verdict=verdict, lang=lang_name
+                )
+                user_message = f"""Content: {content_summary[:500]}
 
 Verdict: {verdict}
 
@@ -92,18 +108,45 @@ Key Evidence: {evidence_summary[:300] if evidence_summary else 'No specific evid
 
 Provide a simple explanation in {lang_name}."""
 
-            response = client.messages.create(
-                model=CLAUDE_MODEL,
-                max_tokens=300,
-                system=system,
-                messages=[{"role": "user", "content": user_message}],
-            )
+                from google.genai import types
+                response = gemini.models.generate_content(
+                    model=GEMINI_MODEL,
+                    contents=user_message,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system,
+                        temperature=0.2,
+                    )
+                )
+                return response.text.strip()
+            except Exception as e:
+                logger.warning(f"Gemini explanation generation failed ({lang_code}): {e}")
 
-            return response.content[0].text.strip()
+        # 2. Try Claude
+        claude = self._get_claude_client()
+        if claude:
+            try:
+                system = EXPLAINER_SYSTEM_PROMPT.format(
+                    verdict=verdict, lang=lang_name
+                )
+                user_message = f"""Content: {content_summary[:500]}
 
-        except Exception as e:
-            logger.error(f"Explanation generation failed ({lang_code}): {e}")
-            return self._fallback_explanation(verdict, lang_code)
+Verdict: {verdict}
+
+Key Evidence: {evidence_summary[:300] if evidence_summary else 'No specific evidence available.'}
+
+Provide a simple explanation in {lang_name}."""
+
+                response = claude.messages.create(
+                    model=CLAUDE_MODEL,
+                    max_tokens=300,
+                    system=system,
+                    messages=[{"role": "user", "content": user_message}],
+                )
+                return response.content[0].text.strip()
+            except Exception as e:
+                logger.warning(f"Claude explanation generation failed ({lang_code}): {e}")
+
+        return self._fallback_explanation(verdict, lang_code)
 
     def _fallback_explanation(self, verdict: str, lang_code: str) -> str:
         """Provide basic fallback explanations."""

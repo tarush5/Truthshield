@@ -10,7 +10,7 @@ from backend.pipeline.decision_pipeline import DecisionPipeline
 from backend.models.schemas import AnalyzeRequest
 
 
-async def test_pipeline():
+async def run_test_pipeline():
     pipeline = DecisionPipeline()
 
     test_claims = [
@@ -47,4 +47,4 @@ async def test_pipeline():
         print()
 
 
-asyncio.run(test_pipeline())
+asyncio.run(run_test_pipeline())

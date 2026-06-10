@@ -1,26 +1,26 @@
-import asyncio
-import os
 import sys
+import os
+import asyncio
 
-# Add project root to sys path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Add project root to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.factcheck.evidence_retriever import EvidenceRetriever
 from backend.models.schemas import Claim
 
-def main():
+async def main():
     retriever = EvidenceRetriever()
-    claim = Claim(
-        text="The Earth is flat",
-        entity="Earth"
-    )
+    claim = Claim(text="New study claims drinking coffee cures COVID-19 within 24 hours.", entity="coffee")
     
-    print(f"Retrieving evidence for: '{claim.text}'")
-    evidence = retriever.retrieve(claim)
+    print("Testing EvidenceRetriever.retrieve()...")
+    evidence = await retriever.retrieve(claim)
     
-    print(f"Found {len(evidence)} pieces of evidence:")
-    for e in evidence:
-        print(f"- {e.title} ({e.url})")
+    print(f"\nRetrieved {len(evidence)} evidence items:")
+    for i, ev in enumerate(evidence):
+        print(f"\n[{i+1}] Title: {ev.title}")
+        print(f"    URL: {ev.url}")
+        print(f"    Snippet: {ev.snippet[:120]}...")
+        print(f"    Source Score: {ev.source_score}")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

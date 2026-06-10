@@ -66,6 +66,7 @@ def analyze_content_task(
     # Save the completed report to the database
     db = SessionLocal()
     try:
+        import json
         db_report = db.query(ReportDB).filter(ReportDB.id == report_id).first()
         if db_report:
             db_report.verdict = report.credibility.verdict
@@ -75,6 +76,17 @@ def analyze_content_task(
             if org_id:
                 db_report.org_id = uuid.UUID(org_id)
             
+            # Serialized JSON fields
+            db_report.claims_json = json.dumps([cv.model_dump() for cv in report.claims]) if report.claims else None
+            db_report.explanation_json = json.dumps(report.explanation.model_dump()) if report.explanation else None
+            db_report.counter_narrative_json = json.dumps(report.counter_narrative.model_dump()) if report.counter_narrative else None
+            db_report.inconsistencies_json = json.dumps([inc.model_dump() for inc in report.inconsistencies]) if report.inconsistencies else None
+            db_report.social_signals_json = json.dumps([sig.model_dump() for sig in report.social_signals]) if report.social_signals else None
+            db_report.risk_factors_json = json.dumps(report.risk_factors) if report.risk_factors else None
+            db_report.signal_correlations_json = json.dumps(report.signal_correlations) if report.signal_correlations else None
+            db_report.confidence_profile_json = json.dumps(report.confidence_profile) if report.confidence_profile else None
+            db_report.processing_time_seconds = report.processing_time_seconds or 0.0
+
             # Save any retrieved evidence
             if report.claims:
                 for claim_verdict in report.claims:

@@ -29,18 +29,36 @@ class CounterNarrativeGenerator:
     LANG_NAMES = {"en": "English", "hi": "Hindi", "ta": "Tamil"}
 
     def __init__(self):
-        self._client = None
+        self._gemini_client = None
+        self._claude_client = None
+        self._gemini_checked = False
+        self._claude_checked = False
 
-    def _get_client(self):
-        if self._client is None:
+    def _get_gemini_client(self):
+        if not self._gemini_checked:
+            self._gemini_checked = True
+            try:
+                from google import genai
+                settings = get_settings()
+                key = settings.GEMINI_API_KEY
+                if key and key != "your_gemini_api_key" and len(key) > 10:
+                    self._gemini_client = genai.Client(api_key=key)
+            except Exception as e:
+                logger.warning(f"Gemini init failed: {e}")
+        return self._gemini_client
+
+    def _get_claude_client(self):
+        if not self._claude_checked:
+            self._claude_checked = True
             try:
                 import anthropic
-
                 settings = get_settings()
-                self._client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+                key = settings.ANTHROPIC_API_KEY
+                if key and key != "your_anthropic_api_key" and len(key) > 10:
+                    self._claude_client = anthropic.Anthropic(api_key=key)
             except Exception as e:
-                logger.error(f"Failed to init Anthropic client: {e}")
-        return self._client
+                logger.warning(f"Claude init failed: {e}")
+        return self._claude_client
 
     def generate(
         self, original_text: str, claim_verdicts: List[ClaimVerdict]
@@ -88,15 +106,13 @@ class CounterNarrativeGenerator:
         lang_name: str,
     ) -> tuple:
         """Generate counter-narrative in a single language."""
-        client = self._get_client()
-
-        if client is None:
-            return self._fallback_narrative(lang_code), []
-
-        try:
-            system = COUNTER_NARRATIVE_SYSTEM_PROMPT.format(lang=lang_name)
-
-            user_message = f"""ORIGINAL CONTENT:
+        # 1. Try Gemini
+        gemini = self._get_gemini_client()
+        if gemini:
+            try:
+                from backend.config import GEMINI_MODEL
+                system = COUNTER_NARRATIVE_SYSTEM_PROMPT.format(lang=lang_name)
+                user_message = f"""ORIGINAL CONTENT:
 {original_text[:1000]}
 
 VERIFIED EVIDENCE AND VERDICTS:
@@ -104,34 +120,60 @@ VERIFIED EVIDENCE AND VERDICTS:
 
 Generate a factual counter-narrative in {lang_name}."""
 
-            response = client.messages.create(
-                model=CLAUDE_MODEL,
-                max_tokens=CLAUDE_MAX_TOKENS,
-                system=system,
-                messages=[{"role": "user", "content": user_message}],
-            )
-
-            response_text = response.content[0].text.strip()
-
-            # Try parsing as JSON
-            try:
-                if "```json" in response_text:
-                    response_text = response_text.split("```json")[1].split("```")[0].strip()
-                elif "```" in response_text:
-                    response_text = response_text.split("```")[1].split("```")[0].strip()
-
-                result = json.loads(response_text)
-                return (
-                    result.get("summary", response_text),
-                    result.get("sources_cited", []),
+                from google.genai import types
+                response = gemini.models.generate_content(
+                    model=GEMINI_MODEL,
+                    contents=user_message,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system,
+                        temperature=0.2,
+                    )
                 )
-            except json.JSONDecodeError:
-                # If not JSON, use the raw text as the narrative
-                return response_text, []
+                response_text = response.text.strip()
+                return self._parse_counter_narrative_response(response_text)
+            except Exception as e:
+                logger.warning(f"Gemini counter-narrative generation failed ({lang_code}): {e}")
 
-        except Exception as e:
-            logger.error(f"Counter-narrative generation failed ({lang_code}): {e}")
-            return self._fallback_narrative(lang_code), []
+        # 2. Try Claude
+        claude = self._get_claude_client()
+        if claude:
+            try:
+                system = COUNTER_NARRATIVE_SYSTEM_PROMPT.format(lang=lang_name)
+                user_message = f"""ORIGINAL CONTENT:
+{original_text[:1000]}
+
+VERIFIED EVIDENCE AND VERDICTS:
+{evidence_text[:2000]}
+
+Generate a factual counter-narrative in {lang_name}."""
+
+                response = claude.messages.create(
+                    model=CLAUDE_MODEL,
+                    max_tokens=CLAUDE_MAX_TOKENS,
+                    system=system,
+                    messages=[{"role": "user", "content": user_message}],
+                )
+                response_text = response.content[0].text.strip()
+                return self._parse_counter_narrative_response(response_text)
+            except Exception as e:
+                logger.warning(f"Claude counter-narrative generation failed ({lang_code}): {e}")
+
+        return self._fallback_narrative(lang_code), []
+
+    def _parse_counter_narrative_response(self, response_text: str) -> tuple:
+        try:
+            if "```json" in response_text:
+                response_text = response_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in response_text:
+                response_text = response_text.split("```")[1].split("```")[0].strip()
+
+            result = json.loads(response_text)
+            return (
+                result.get("summary", response_text),
+                result.get("sources_cited", []),
+            )
+        except json.JSONDecodeError:
+            return response_text, []
 
     def _fallback_narrative(self, lang_code: str) -> str:
         """Provide fallback counter-narratives."""

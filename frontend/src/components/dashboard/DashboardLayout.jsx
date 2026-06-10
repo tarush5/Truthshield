@@ -7,10 +7,7 @@ import Sidebar from './Sidebar';
 const VIEW_TITLES = {
   overview: 'Overview',
   analyze:  'Analyze Content',
-  reports:  'Reports',
-  threats:  'Threat Map',
-  team:     'Team Management',
-  apikeys:  'API Keys',
+  history:  'Analysis History',
   settings: 'Settings',
 };
 
@@ -43,7 +40,7 @@ export default function DashboardLayout({ children, activeView, onViewChange }) 
     if (isMobile) setMobileOpen(false);
   };
 
-  const sidebarWidth = collapsed ? 72 : 260;
+  const sidebarWidth = collapsed ? 76 + 16 : 260 + 16;
 
   return (
     <div className="min-h-screen bg-surface-900">

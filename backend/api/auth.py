@@ -139,6 +139,29 @@ def require_user(current_user: Optional[CurrentUser] = Depends(get_current_user)
 def require_user_or_api_key(current_user: Optional[CurrentUser] = Depends(get_current_user_or_api_key)) -> CurrentUser:
     """Dependency that mandates JWT token OR API Key header."""
     if not current_user:
+        if settings.APP_ENV == "development":
+            # Auto-provision a default guest user in development mode
+            logger.info("No authentication provided. Falling back to default guest user in development mode.")
+            from backend.models.db import SessionLocal
+            db = SessionLocal()
+            try:
+                guest_id = uuid.UUID("00000000-0000-0000-0000-000000000000")
+                guest_user = db.query(User).filter(User.id == guest_id).first()
+                if not guest_user:
+                    guest_user = User(id=guest_id, email="guest@truthshield.ai")
+                    db.add(guest_user)
+                    db.commit()
+                    db.refresh(guest_user)
+                return CurrentUser(
+                    id=str(guest_user.id),
+                    email=guest_user.email,
+                    org_id=None
+                )
+            except Exception as e:
+                logger.error(f"Failed to auto-provision guest user: {e}")
+            finally:
+                db.close()
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required. Provide valid JWT Bearer token or X-API-Key header.",

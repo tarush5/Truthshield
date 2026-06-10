@@ -9,9 +9,8 @@ import StatsGrid from '../components/dashboard/StatsGrid';
 import TrendChart from '../components/dashboard/TrendChart';
 import RecentScans from '../components/dashboard/RecentScans';
 import ActivityFeed from '../components/dashboard/ActivityFeed';
-import ThreatMap from '../components/dashboard/ThreatMap';
-import TeamPanel from '../components/dashboard/TeamPanel';
-import APIKeysPanel from '../components/dashboard/APIKeysPanel';
+import HistoryPanel from '../components/dashboard/HistoryPanel';
+import SettingsPanel from '../components/dashboard/SettingsPanel';
 
 // Page transition variants
 const pageVariants = {
@@ -22,7 +21,10 @@ const pageVariants = {
 
 /**
  * Dashboard — main authenticated dashboard page
- * Renders different sub-views based on sidebar navigation
+ * Renders different sub-views based on sidebar navigation:
+ *   - overview: Stats, charts, recent activity
+ *   - history: Full past analyses with search/filter
+ *   - settings: User preferences (via profile menu)
  */
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -34,7 +36,6 @@ export default function Dashboard() {
 
   // Data state
   const [dashData, setDashData] = useState(null);
-  const [threats, setThreats] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -60,19 +61,6 @@ export default function Dashboard() {
     }
   }, [token, orgId]);
 
-  // Fetch threats for map view
-  const fetchThreats = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/realtime/threats`);
-      if (res.ok) {
-        const data = await res.json();
-        setThreats(data.threats || data || []);
-      }
-    } catch (err) {
-      console.error('Threats fetch error:', err);
-    }
-  }, []);
-
   // Fetch audit logs for activity feed
   const fetchLogs = useCallback(async () => {
     if (!orgId || !token) return;
@@ -93,8 +81,7 @@ export default function Dashboard() {
   useEffect(() => {
     fetchDashboard();
     if (activeView === 'overview') fetchLogs();
-    if (activeView === 'threats') fetchThreats();
-  }, [activeView, fetchDashboard, fetchLogs, fetchThreats]);
+  }, [activeView, fetchDashboard, fetchLogs]);
 
   // Handle view changes — redirect 'analyze' to /analyze page
   const handleViewChange = (view) => {
@@ -111,52 +98,30 @@ export default function Dashboard() {
         {/* ── Overview ── */}
         {activeView === 'overview' && (
           <motion.div key="overview" {...pageVariants} className="space-y-6">
-            <StatsGrid stats={dashData?.stats} />
+            <StatsGrid stats={dashData} loading={loading} />
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               <div className="xl:col-span-2">
-                <TrendChart data={dashData?.weekly_trend} />
+                <TrendChart data={dashData?.weekly_trend} loading={loading} />
               </div>
               <div className="xl:col-span-1">
-                <ActivityFeed logs={auditLogs} />
+                <ActivityFeed logs={auditLogs} loading={loading} />
               </div>
             </div>
-            <RecentScans scans={dashData?.recent_scans} />
+            <RecentScans scans={dashData?.recent_scans} loading={loading} />
           </motion.div>
         )}
 
-        {/* ── Threat Map ── */}
-        {activeView === 'threats' && (
-          <motion.div key="threats" {...pageVariants}>
-            <ThreatMap threats={threats} />
+        {/* ── History ── */}
+        {activeView === 'history' && (
+          <motion.div key="history" {...pageVariants}>
+            <HistoryPanel scans={dashData?.recent_scans || []} loading={loading} />
           </motion.div>
         )}
 
-        {/* ── Team ── */}
-        {activeView === 'team' && (
-          <motion.div key="team" {...pageVariants}>
-            <TeamPanel orgId={orgId} token={token} />
-          </motion.div>
-        )}
-
-        {/* ── API Keys ── */}
-        {activeView === 'apikeys' && (
-          <motion.div key="apikeys" {...pageVariants}>
-            <APIKeysPanel orgId={orgId} token={token} />
-          </motion.div>
-        )}
-
-        {/* ── Reports (full page scans) ── */}
-        {activeView === 'reports' && (
-          <motion.div key="reports" {...pageVariants}>
-            <RecentScans scans={dashData?.recent_scans} fullPage />
-          </motion.div>
-        )}
-
-        {/* ── Settings placeholder ── */}
+        {/* ── Settings (via profile menu) ── */}
         {activeView === 'settings' && (
-          <motion.div key="settings" {...pageVariants}
-            className="glass-card p-12 text-center">
-            <p className="text-white/30 text-sm">Settings panel coming soon.</p>
+          <motion.div key="settings" {...pageVariants}>
+            <SettingsPanel />
           </motion.div>
         )}
       </AnimatePresence>

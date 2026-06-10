@@ -33,8 +33,8 @@ async def start_realtime_ingestion_simulation():
     from backend.models.db import SessionLocal, TrendingMisinfo
     from backend.pipeline.decision_pipeline import DecisionPipeline
     
-    # Wait a little bit after startup to avoid blocking initial API readiness
-    await asyncio.sleep(5)
+    # Wait longer after startup to avoid blocking initial API readiness and testing
+    await asyncio.sleep(45)
     
     mock_feed = [
         {"claim": "New study claims drinking coffee cures COVID-19 within 24 hours.", "platform": "Twitter", "virality": 9.4},
@@ -53,6 +53,7 @@ async def start_realtime_ingestion_simulation():
                     continue
                     
                 report = await pipeline.execute(text=item["claim"])
+                await asyncio.sleep(2)
                 
                 # If verdict is FALSE or MISLEADING, flag it and add to trending misinfo table
                 if report.credibility.verdict in ("FALSE", "MISLEADING"):
@@ -90,9 +91,10 @@ async def lifespan(app: FastAPI):
     if getattr(settings, "MODEL_CACHE_DIR", None):
         os.makedirs(settings.MODEL_CACHE_DIR, exist_ok=True)
 
-    # Start real-time monitoring simulation task in background
-    import asyncio
-    asyncio.create_task(start_realtime_ingestion_simulation())
+    # Start real-time monitoring simulation task in background (disabled by default in dev)
+    if os.getenv("RUN_SIMULATION") == "true":
+        import asyncio
+        asyncio.create_task(start_realtime_ingestion_simulation())
 
     logger.info("=" * 60)
     logger.info("  TruthShield — AI Misinformation Response System")

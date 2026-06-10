@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     DISCORD_BOT_TOKEN: str = Field(default="")
     DISCORD_GUILD_IDS: str = Field(default="")
 
+    GOOGLE_FACTCHECK_API_KEY: str = Field(default="", description="Google Fact Check Tools API Key")
+    EVIDENCE_TIMEOUT: int = Field(default=5, description="Evidence retriever timeout in seconds")
+
     # ── Database ──────────────────────────────────────────────
     DATABASE_URL: str = Field(
         default="postgresql://truthshield:truthshield_pass@localhost:5432/truthshield"
@@ -124,10 +127,13 @@ SOURCE_CREDIBILITY = {
     "nytimes.com": 0.8,
     "theguardian.com": 0.75,
     "wikipedia.org": 0.65,
-    "snopes.com": 0.9,
-    "factcheck.org": 0.9,
-    "altnews.in": 0.9,
-    "boomlive.in": 0.9,
+    "snopes.com": 0.95,
+    "factcheck.org": 0.95,
+    "altnews.in": 0.95,
+    "boomlive.in": 0.95,
+    "fullfact.org": 0.95,
+    "factcheck.afp.com": 0.95,
+    "politifact.com": 0.95,
     "smhoaxslayer.com": 0.85,
     "vishvasnews.com": 0.85,
     "washingtonpost.com": 0.8,
@@ -141,6 +147,10 @@ KNOWN_DISINFO_DOMAINS = [
     "beforeitsnews.com",
     "yournewswire.com",
     "worldnewsdailyreport.com",
+    "rt.com",
+    "sputniknews.com",
+    "principia-scientific.com",
+    "nexusnewsfeed.com",
 ]
 
 # ── Detection Weights ─────────────────────────────────────────
@@ -156,8 +166,8 @@ CLAUDE_MODEL = "claude-sonnet-4-6"
 CLAUDE_MAX_TOKENS = 1024
 
 # ── Gemini Model Config ──────────────────────────────────────
-GEMINI_MODEL = "gemini-2.0-flash"
-GEMINI_MAX_TOKENS = 512
+GEMINI_MODEL = "gemini-3.5-flash"
+GEMINI_MAX_TOKENS = 1024
 
 # ── Supported Languages ──────────────────────────────────────
 SUPPORTED_LANGUAGES = {"en": "English", "hi": "Hindi", "ta": "Tamil"}

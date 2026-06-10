@@ -4,8 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Shield, Zap, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
 import UploadZone from '../components/UploadZone';
 import TrustGauge from '../components/TrustGauge';
-
-const API_BASE = '/api/v1';
+import { API_BASE, getWsUrl } from '../config';
 
 const stages = [
   { key: 'preprocessing', pct: 20 },
@@ -40,9 +39,7 @@ export default function Analyze() {
     try {
       // ── Use WebSocket for Text/URL analysis ──
       if (!file) {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // Connect to the proxy or direct backend WS port
-        const wsUrl = `${protocol}//${window.location.host}/ws/analyze`;
+        const wsUrl = getWsUrl();
         
         const ws = new WebSocket(wsUrl);
 

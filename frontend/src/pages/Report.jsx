@@ -6,8 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import TrustGauge from '../components/TrustGauge';
 import ClaimTable from '../components/ClaimTable';
 import CounterNarrative from '../components/CounterNarrative';
-
-const API_BASE = '/api/v1';
+import { API_BASE } from '../config';
 
 const COMPONENT_COLORS = {
   text: '#3b93ff',

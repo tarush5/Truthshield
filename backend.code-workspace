@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "../../project/project/backend"
+		},
+		{
+			"path": "../../project/project/datasets"
+		},
+		{
+			"path": "../../project/project/frontend"
+		},
+		{
+			"path": "../../project/project/ml-backend"
+		},
+		{
+			"path": "../../project/project/models"
+		}
+	]
+}

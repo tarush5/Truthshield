@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BarChart3, TrendingUp, Globe, Shield, AlertTriangle, RefreshCw } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-
-const API_BASE = '/api/v1';
+import { API_BASE } from '../config';
 
 const VERDICT_COLORS = {
   TRUE: '#10b981',

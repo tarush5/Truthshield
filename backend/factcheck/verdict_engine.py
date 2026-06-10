@@ -382,3 +382,7 @@ Analyze this claim and provide your verdict as JSON."""
             confidence=round(confidence, 3),
             evidence=evidence,
         )
+
+    def _fallback_evaluate(self, claim: Claim, evidence: List[Evidence]) -> ClaimVerdict:
+        """Alias for _tfidf_evaluate to maintain backward compatibility with test suites."""
+        return self._tfidf_evaluate(claim, evidence)

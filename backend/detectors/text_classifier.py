@@ -93,10 +93,6 @@ class TextClassifier:
                 multi_label=False,
             )
 
-            # result["labels"] is sorted by score descending — the top label won
-            winning_candidate = result["labels"][0]
-            top_score = result["scores"][0]
-
             # Build a reverse map: candidate label string → our internal label
             # candidate_labels order is always [real, misleading, fake]
             candidate_to_internal = {
@@ -104,19 +100,56 @@ class TextClassifier:
                 candidate_labels[1]: "misleading",
                 candidate_labels[2]: "fake",
             }
-            label = candidate_to_internal.get(winning_candidate, "unknown")
+
+            # Get zero-shot model probabilities
+            model_probs = {}
+            for label_str, score_val in zip(result["labels"], result["scores"]):
+                internal_label = candidate_to_internal.get(label_str, "unknown")
+                if internal_label != "unknown":
+                    model_probs[internal_label] = score_val
+
+            # Get heuristic score and probabilities
+            h_score = self._calculate_heuristic_score(text)
+            
+            import math
+            d_real = abs(h_score - 0.2)
+            d_misleading = abs(h_score - 0.475)
+            d_fake = abs(h_score - 0.75)
+            
+            w_real = math.exp(-d_real * 5)
+            w_misleading = math.exp(-d_misleading * 5)
+            w_fake = math.exp(-d_fake * 5)
+            
+            total = w_real + w_misleading + w_fake
+            h_probs = {
+                "real": w_real / total,
+                "misleading": w_misleading / total,
+                "fake": w_fake / total,
+            }
+
+            # Combine model and heuristic probabilities
+            # Model has 40% weight, heuristics have 60% weight
+            combined_probs = {}
+            for lbl in ["real", "misleading", "fake"]:
+                combined_probs[lbl] = 0.4 * model_probs.get(lbl, 0.33) + 0.6 * h_probs[lbl]
+
+            # Find the winning label
+            label = max(combined_probs, key=combined_probs.get)
+            confidence = round(combined_probs[label], 4)
 
             logger.info(
-                f"Zero-shot classifier result: winning='{winning_candidate}' "
-                f"→ label='{label}', confidence={top_score:.4f}"
+                f"Combined classifier result: model_probs={model_probs} "
+                f"h_score={h_score:.2f} h_probs={h_probs} "
+                f"→ label='{label}', confidence={confidence:.4f}"
             )
 
             # Extract key tokens (words that appear in high-attention positions)
             explanation_tokens = self._extract_key_tokens(text, label)
+            explanation_tokens.append("Combined analysis (Model + Heuristics)")
 
             return TextClassificationResult(
                 label=label,
-                confidence=round(top_score, 4),
+                confidence=confidence,
                 explanation_tokens=explanation_tokens,
             )
 
@@ -124,8 +157,8 @@ class TextClassifier:
             logger.error(f"Text classification failed: {e}")
             return self._fallback_classify(text)
 
-    def _fallback_classify(self, text: str) -> TextClassificationResult:
-        """Heuristic fallback when model is unavailable."""
+    def _calculate_heuristic_score(self, text: str) -> float:
+        """Calculate a heuristic score from 0.0 (definitely real) to 1.0 (definitely fake)."""
         import re
 
         text_lower = text.lower()
@@ -190,6 +223,11 @@ class TextClassifier:
             score -= 0.05  # Extra nudge toward "real"
 
         score = max(0.0, min(1.0, score))
+        return score
+
+    def _fallback_classify(self, text: str) -> TextClassificationResult:
+        """Heuristic fallback when model is unavailable."""
+        score = self._calculate_heuristic_score(text)
 
         if score > 0.55:
             label = "fake"
@@ -212,10 +250,7 @@ class TextClassifier:
             confidence=confidence,
             explanation_tokens=[
                 f"Heuristic analysis (model unavailable)",
-                f"Fake indicators: {fake_count}",
-                f"Credible indicators: {credible_count}",
-                f"Factual patterns: {factual_count}",
-                f"ALL-CAPS words: {allcaps_words}",
+                f"Heuristic score: {score:.2f}",
             ],
         )
 

@@ -43,7 +43,7 @@ def test_text_classifier():
         r = classifier.classify(fake_text)
         print(f"  Run {i+1}: label={r.label}, conf={r.confidence}")
     
-    print("\n✅ Text classifier tests passed!")
+    print("\n[OK] Text classifier tests passed!")
 
 
 def test_ai_content_detector():
@@ -77,7 +77,7 @@ def test_ai_content_detector():
     print(f"3 runs: {results}")
     assert len(set(results)) == 1, f"Results should be identical: {results}"
     
-    print("\n✅ AI content detector tests passed!")
+    print("\n[OK] AI content detector tests passed!")
 
 
 def test_verdict_engine_fallback():
@@ -125,7 +125,7 @@ def test_verdict_engine_fallback():
     assert result2.verdict.value in ("UNVERIFIED", "MISLEADING"), \
         f"Expected UNVERIFIED/MISLEADING, got {result2.verdict.value}"
     
-    print("\n✅ Verdict engine fallback tests passed!")
+    print("\n[OK] Verdict engine fallback tests passed!")
 
 
 if __name__ == "__main__":
@@ -138,5 +138,5 @@ if __name__ == "__main__":
     test_verdict_engine_fallback()
     
     print("\n" + "=" * 60)
-    print("  ALL TESTS PASSED ✅")
+    print("  ALL TESTS PASSED")
     print("=" * 60)

@@ -1,4 +1,5 @@
 # Truthshield Git Push - TODO Steps
+
 ✅ All steps completed successfully:
 
 1. ✅ Created .gitignore 

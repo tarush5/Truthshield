@@ -24,6 +24,35 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - model_cache:/app/model_cache
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    restart: unless-stopped
+
+  # ── Celery Worker ──────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: celery -A tasks worker --loglevel=info
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://truthshield:truthshield_pass@db:5432/truthshield
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./uploads:/app/uploads
+      - model_cache:/app/model_cache
+    deploy:
+      resources:
+        limits:
+          memory: 2g
     restart: unless-stopped
 
   # ── Frontend ────────────────────────────────
@@ -55,7 +84,7 @@ services:
 
   # ── PostgreSQL ──────────────────────────────
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: truthshield
       POSTGRES_PASSWORD: truthshield_pass

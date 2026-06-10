@@ -103,3 +103,11 @@ build/
 # OS
 Thumbs.db
 
+# SQLite databases
+*.db
+truthshield_scratch.db
+truthshield_test.db
+
+# Agent and scratch folders
+.agents/
+scratch/

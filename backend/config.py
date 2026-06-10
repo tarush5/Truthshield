@@ -4,12 +4,13 @@ Centralized configuration management using Pydantic Settings.
 """
 
 import os
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import List
 
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, model_validator
 
 
 class Settings(BaseSettings):
@@ -47,6 +48,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = Field(default="HS256")
     JWT_EXPIRATION_MINUTES: int = Field(default=60)
 
+    # ── Supabase Auth ─────────────────────────────────────────
+    SUPABASE_JWT_SECRET: str = Field(default="", description="Supabase JWT secret for verifying Supabase-issued tokens")
+
     # ── Twilio WhatsApp ───────────────────────────────────────
     TWILIO_ACCOUNT_SID: str = Field(default="")
     TWILIO_AUTH_TOKEN: str = Field(default="")
@@ -80,6 +84,18 @@ class Settings(BaseSettings):
     @property
     def max_upload_bytes(self) -> int:
         return self.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+    @model_validator(mode="after")
+    def _warn_default_jwt_secret(self) -> "Settings":
+        if self.JWT_SECRET_KEY == "change-me-in-production" and self.APP_ENV != "development":
+            _logger = logging.getLogger("truthshield.config")
+            _logger.warning(
+                "SECURITY WARNING: JWT_SECRET_KEY is still the default value "
+                "'change-me-in-production' in %s mode. Set a strong secret "
+                "via the JWT_SECRET_KEY environment variable.",
+                self.APP_ENV,
+            )
+        return self
 
     class Config:
         env_file = ".env"
@@ -120,7 +136,7 @@ SOURCE_CREDIBILITY = {
 }
 
 KNOWN_DISINFO_DOMAINS = [
-    "naturalness.com",
+    "naturalnews.com",
     "infowars.com",
     "beforeitsnews.com",
     "yournewswire.com",

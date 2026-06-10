@@ -33,6 +33,7 @@
 }
 
 @layer components {
+  /* ── Glass Cards ─────────────────────────────── */
   .glass-card {
     @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl;
   }
@@ -41,18 +42,36 @@
     @apply glass-card transition-all duration-300 hover:bg-white/10 hover:border-white/20 hover:shadow-lg hover:shadow-brand-500/5;
   }
 
+  .glass-card-interactive {
+    @apply glass-card transition-all duration-500 hover:bg-white/[0.08] hover:border-white/20 
+           hover:shadow-2xl hover:shadow-brand-500/10 hover:-translate-y-1;
+  }
+
+  /* ── Gradient Text ───────────────────────────── */
   .gradient-text {
     @apply bg-gradient-to-r from-brand-400 via-brand-300 to-cyan-400 bg-clip-text text-transparent;
+  }
+
+  .gradient-text-hero {
+    @apply bg-gradient-to-r from-white via-brand-200 to-cyan-300 bg-clip-text text-transparent;
   }
 
   .gradient-border {
     @apply border border-transparent bg-gradient-to-r from-brand-500/20 to-cyan-500/20;
   }
 
+  /* ── Buttons ─────────────────────────────────── */
   .btn-primary {
     @apply px-6 py-3 bg-gradient-to-r from-brand-600 to-brand-500 text-white font-semibold rounded-xl
            hover:from-brand-500 hover:to-brand-400 transition-all duration-300 
            shadow-lg shadow-brand-500/25 hover:shadow-brand-500/40 
+           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary-lg {
+    @apply px-8 py-4 text-base bg-gradient-to-r from-brand-600 to-brand-500 text-white font-semibold rounded-2xl
+           hover:from-brand-500 hover:to-brand-400 transition-all duration-300 
+           shadow-xl shadow-brand-500/25 hover:shadow-brand-500/50 hover:-translate-y-0.5
            active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
@@ -61,11 +80,19 @@
            hover:bg-white/10 hover:border-white/20 transition-all duration-300 active:scale-95;
   }
 
+  .btn-secondary-lg {
+    @apply px-8 py-4 text-base bg-white/5 border border-white/10 text-white font-medium rounded-2xl
+           hover:bg-white/10 hover:border-white/20 transition-all duration-300 
+           hover:-translate-y-0.5 active:scale-95;
+  }
+
+  /* ── Inputs ──────────────────────────────────── */
   .input-field {
     @apply w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30
            focus:outline-none focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 transition-all duration-300;
   }
 
+  /* ── Badges ──────────────────────────────────── */
   .badge {
     @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
   }
@@ -86,16 +113,32 @@
     @apply badge bg-brand-500/15 text-brand-400 border border-brand-500/20;
   }
 
+  /* ── Typography ──────────────────────────────── */
   .section-title {
     @apply text-2xl font-bold font-display tracking-tight;
   }
 
+  .section-label {
+    @apply text-xs font-semibold uppercase tracking-widest text-brand-400;
+  }
+
+  /* ── Progress ────────────────────────────────── */
   .progress-bar {
     @apply h-2 bg-white/5 rounded-full overflow-hidden;
   }
 
   .progress-fill {
     @apply h-full rounded-full transition-all duration-700 ease-out;
+  }
+
+  /* ── Sidebar ─────────────────────────────────── */
+  .sidebar-nav-item {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium
+           text-white/50 hover:text-white hover:bg-white/5 transition-all duration-200 cursor-pointer;
+  }
+
+  .sidebar-nav-item.active {
+    @apply text-brand-400 bg-brand-500/10 border-l-2 border-brand-400;
   }
 }
 
@@ -104,6 +147,7 @@
     text-wrap: balance;
   }
 
+  /* ── Entrance Animations ─────────────────────── */
   .animate-in {
     animation: fadeInUp 0.5s ease-out forwards;
   }
@@ -119,6 +163,165 @@
     }
   }
 
+  /* ── Aurora Gradient Animation ───────────────── */
+  .aurora-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .aurora-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.15;
+    animation: auroraFloat 12s ease-in-out infinite;
+  }
+
+  .aurora-blob-1 {
+    width: 600px;
+    height: 600px;
+    background: linear-gradient(135deg, #3b93ff, #06b6d4);
+    top: -200px;
+    left: -100px;
+    animation-delay: 0s;
+  }
+
+  .aurora-blob-2 {
+    width: 500px;
+    height: 500px;
+    background: linear-gradient(135deg, #8b5cf6, #ec4899);
+    top: -100px;
+    right: -150px;
+    animation-delay: -4s;
+  }
+
+  .aurora-blob-3 {
+    width: 400px;
+    height: 400px;
+    background: linear-gradient(135deg, #06b6d4, #10b981);
+    bottom: -150px;
+    left: 30%;
+    animation-delay: -8s;
+  }
+
+  @keyframes auroraFloat {
+    0%, 100% {
+      transform: translate(0, 0) scale(1) rotate(0deg);
+    }
+    25% {
+      transform: translate(40px, -30px) scale(1.1) rotate(5deg);
+    }
+    50% {
+      transform: translate(-20px, 20px) scale(0.95) rotate(-3deg);
+    }
+    75% {
+      transform: translate(30px, 10px) scale(1.05) rotate(2deg);
+    }
+  }
+
+  /* ── Particle Canvas ─────────────────────────── */
+  .particle-canvas {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ── Typing Cursor ───────────────────────────── */
+  .typing-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1.1em;
+    background: currentColor;
+    margin-left: 2px;
+    animation: blink 1s step-end infinite;
+    vertical-align: text-bottom;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* ── Counter Card ────────────────────────────── */
+  .counter-card {
+    @apply glass-card p-6 text-center relative overflow-hidden;
+  }
+
+  .counter-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 0%, var(--accent-color, rgba(59, 147, 255, 0.08)), transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ── Bento Grid ──────────────────────────────── */
+  .bento-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: auto auto;
+  }
+
+  .bento-grid .bento-wide {
+    grid-column: span 2;
+  }
+
+  @media (max-width: 768px) {
+    .bento-grid {
+      grid-template-columns: 1fr;
+    }
+    .bento-grid .bento-wide {
+      grid-column: span 1;
+    }
+  }
+
+  /* ── Glow Pulse ──────────────────────────────── */
+  .glow-pulse {
+    animation: glowPulse 3s ease-in-out infinite;
+  }
+
+  @keyframes glowPulse {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(59, 147, 255, 0.15);
+    }
+    50% {
+      box-shadow: 0 0 40px rgba(59, 147, 255, 0.3);
+    }
+  }
+
+  /* ── Shimmer Loading ─────────────────────────── */
+  .shimmer {
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  /* ── Float Animation ─────────────────────────── */
+  .float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  /* ── Mouse-following Spotlight ────────────────── */
+  .spotlight {
+    background: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), 
+                  rgba(59, 147, 255, 0.06), transparent 40%);
+  }
+
+  /* ── Grid Background ─────────────────────────── */
   .bg-grid {
     background-image: 
       linear-gradient(rgba(59, 147, 255, 0.03) 1px, transparent 1px),
@@ -129,4 +332,101 @@
   .bg-radial-glow {
     background: radial-gradient(ellipse at 50% 0%, rgba(59, 147, 255, 0.08) 0%, transparent 60%);
   }
+
+  /* ── Security Badge ──────────────────────────── */
+  .security-badge {
+    @apply glass-card px-5 py-3 flex items-center gap-3 text-sm font-medium text-white/70
+           hover:text-white hover:bg-white/10 hover:border-white/20 transition-all duration-300;
+  }
+
+  /* ── Scroll Reveal ───────────────────────────── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+  }
+
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Premium Light Mode Overrides ────────────── */
+html.light body {
+  background: #f8fafc;
+  color: #0f172a;
+}
+html.light .glass-card,
+html.light .glass-card-hover,
+html.light .glass-card-interactive {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+  backdrop-filter: blur(20px);
+}
+html.light .glass-card-hover:hover,
+html.light .glass-card-interactive:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(15, 23, 42, 0.12);
+}
+html.light input, html.light textarea, html.light select {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+  color: #0f172a !important;
+}
+html.light input::placeholder, html.light textarea::placeholder {
+  color: rgba(15, 23, 42, 0.4) !important;
+}
+html.light .text-white\/40,
+html.light .text-white\/30 {
+  color: rgba(15, 23, 42, 0.5) !important;
+}
+html.light .text-white\/50,
+html.light .text-white\/60 {
+  color: rgba(15, 23, 42, 0.7) !important;
+}
+html.light .bg-surface-900 {
+  background-color: #f8fafc !important;
+}
+html.light .bg-surface-950\/60 {
+  background-color: #f1f5f9 !important;
+}
+html.light .border-white\/5 {
+  border-color: rgba(15, 23, 42, 0.06) !important;
+}
+html.light .border-white\/10 {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+html.light .bg-white\/5 {
+  background-color: rgba(15, 23, 42, 0.04) !important;
+}
+html.light nav {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(15, 23, 42, 0.06) !important;
+}
+html.light nav .absolute {
+  background-color: transparent !important;
+}
+html.light .bg-grid {
+  background-image: 
+    linear-gradient(rgba(59, 147, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 147, 255, 0.06) 1px, transparent 1px);
+}
+html.light .aurora-blob {
+  opacity: 0.08;
+}
+html.light .gradient-text-hero {
+  background-image: linear-gradient(to right, #0f172a, #3b93ff, #06b6d4);
+}
+html.light .sidebar-nav-item {
+  color: rgba(15, 23, 42, 0.5);
+}
+html.light .sidebar-nav-item:hover {
+  color: #0f172a;
+  background: rgba(15, 23, 42, 0.05);
+}
+html.light .sidebar-nav-item.active {
+  color: #3b93ff;
+  background: rgba(59, 147, 255, 0.08);
 }

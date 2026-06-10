@@ -1,15 +1,16 @@
 """
-TruthShield — Supabase / JWT Authentication Dependencies
+TruthShield — Supabase / JWT & API Key Authentication Dependencies
 """
 import logging
+import uuid
 from typing import Optional
 from fastapi import Depends, Header, HTTPException, status
 from jose import jwt, JWTError
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from backend.config import get_settings
 from backend.models.db import get_db, User
-from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -18,6 +19,7 @@ settings = get_settings()
 class CurrentUser(BaseModel):
     id: str
     email: str
+    org_id: Optional[str] = None
 
 
 def get_token_from_header(authorization: Optional[str] = Header(None)) -> Optional[str]:
@@ -39,70 +41,106 @@ def get_current_user(
 ) -> Optional[CurrentUser]:
     """
     FastAPI dependency to extract and verify the current logged-in user.
-    Supports Supabase JWT format.
+    Tries Supabase JWT secret first, then falls back to local JWT secret.
     """
     if not token:
         return None
 
-    try:
-        # Decode the token using local JWT Secret Key (or Supabase JWT Secret)
-        payload = jwt.decode(
-            token,
-            settings.JWT_SECRET_KEY,
-            algorithms=[settings.JWT_ALGORITHM],
-            options={"verify_aud": False},
-        )
-        user_id = payload.get("sub")
-        email = payload.get("email")
+    payload = None
 
-        if not user_id or not email:
-            # Try to decode without verification in development if secret is default
-            if settings.APP_ENV == "development" and settings.JWT_SECRET_KEY == "change-me-in-production":
-                unverified_payload = jwt.get_unverified_claims(token)
-                user_id = unverified_payload.get("sub")
-                email = unverified_payload.get("email")
-            
-        if not user_id or not email:
+    # 1. Try Supabase JWT secret first (if configured)
+    if settings.SUPABASE_JWT_SECRET:
+        try:
+            payload = jwt.decode(
+                token,
+                settings.SUPABASE_JWT_SECRET,
+                algorithms=[settings.JWT_ALGORITHM],
+                options={"verify_aud": False},
+            )
+            logger.debug("Token verified with Supabase JWT secret")
+        except JWTError:
+            logger.debug("Supabase JWT verification failed, trying local secret")
+            payload = None
+
+    # 2. Fall back to local JWT secret
+    if payload is None:
+        try:
+            payload = jwt.decode(
+                token,
+                settings.JWT_SECRET_KEY,
+                algorithms=[settings.JWT_ALGORITHM],
+                options={"verify_aud": False},
+            )
+            logger.debug("Token verified with local JWT secret")
+        except JWTError as e:
+            logger.warning(f"JWT verification failed with both secrets: {e}")
             return None
 
-        # Ensure user exists in our local PostgreSQL database
-        # This auto-syncs Supabase authenticated users to our local users table
-        db_user = db.query(User).filter(User.email == email).first()
-        if not db_user:
-            import uuid
-            try:
-                user_uuid = uuid.UUID(user_id)
-            except ValueError:
-                user_uuid = uuid.uuid4()
-            db_user = User(id=user_uuid, email=email)
-            db.add(db_user)
-            db.commit()
-            db.refresh(db_user)
+    user_id = payload.get("sub")
+    email = payload.get("email")
 
-        return CurrentUser(id=str(db_user.id), email=db_user.email)
-
-    except JWTError as e:
-        logger.warning(f"JWT Verification failed: {e}")
-        # In development mode, allow dummy auth to make local setup zero-config
-        if settings.APP_ENV == "development" and settings.JWT_SECRET_KEY == "change-me-in-production":
-            logger.info("Using development dummy authenticated session")
-            # Create a static dummy user
-            dummy_email = "dev-user@example.com"
-            db_user = db.query(User).filter(User.email == dummy_email).first()
-            if not db_user:
-                db_user = User(email=dummy_email)
-                db.add(db_user)
-                db.commit()
-                db.refresh(db_user)
-            return CurrentUser(id=str(db_user.id), email=db_user.email)
+    if not user_id or not email:
+        logger.warning("JWT payload missing 'sub' or 'email' claim")
         return None
+
+    # Auto-provision user in local DB if they don't exist yet
+    db_user = db.query(User).filter(User.email == email).first()
+    if not db_user:
+        try:
+            user_uuid = uuid.UUID(user_id)
+        except ValueError:
+            user_uuid = uuid.uuid4()
+        db_user = User(id=user_uuid, email=email)
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+
+    return CurrentUser(id=str(db_user.id), email=db_user.email)
+
+
+def get_api_key_from_header(x_api_key: Optional[str] = Header(None)) -> Optional[str]:
+    """Helper dependency to retrieve API key from X-API-Key header."""
+    return x_api_key
+
+
+def get_current_user_or_api_key(
+    current_user: Optional[CurrentUser] = Depends(get_current_user),
+    api_key: Optional[str] = Depends(get_api_key_from_header),
+    db: Session = Depends(get_db)
+) -> Optional[CurrentUser]:
+    """
+    FastAPI dependency that accepts user bearer tokens (JWT) OR 
+    validates the custom X-API-Key header, returning the User context.
+    """
+    if current_user:
+        return current_user
+        
+    if api_key:
+        from backend.services.auth_service import AuthService
+        key_record = AuthService.validate_api_key(db, api_key)
+        if key_record:
+            user = db.query(User).filter(User.id == key_record.created_by).first()
+            if user:
+                return CurrentUser(id=str(user.id), email=user.email, org_id=str(key_record.org_id))
+                
+    return None
 
 
 def require_user(current_user: Optional[CurrentUser] = Depends(get_current_user)) -> CurrentUser:
-    """Dependency that mandates authentication (raises 401 if anonymous)."""
+    """Dependency that mandates user authentication (raises 401 if anonymous)."""
     if not current_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required. Please login first.",
+        )
+    return current_user
+
+
+def require_user_or_api_key(current_user: Optional[CurrentUser] = Depends(get_current_user_or_api_key)) -> CurrentUser:
+    """Dependency that mandates JWT token OR API Key header."""
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Provide valid JWT Bearer token or X-API-Key header.",
         )
     return current_user

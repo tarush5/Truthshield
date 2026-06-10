@@ -21,7 +21,18 @@ from backend.models import (
     Verdict,
     get_db,
 )
-from backend.api.auth import get_current_user, require_user, CurrentUser
+from backend.api.auth import (
+    get_current_user,
+    require_user,
+    require_user_or_api_key,
+    get_current_user_or_api_key,
+    CurrentUser
+)
+from backend.services.auth_service import AuthService
+from backend.services.analysis_service import AnalysisService
+from backend.services.analytics_service import AnalyticsService
+from backend.services.notification_service import NotificationService
+import json
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -129,9 +140,9 @@ async def verify_otp(verify_data: dict, db: Session = Depends(get_db)):
         
     # Generate JWT token
     from jose import jwt
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
     
-    expire = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRATION_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRATION_MINUTES)
     payload = {
         "sub": str(db_user.id),
         "email": db_user.email,
@@ -155,7 +166,9 @@ def run_async_analysis_in_background(
     file_path: Optional[str],
     url: Optional[str],
     content_type: ContentType,
-    lang: str
+    lang: str,
+    user_id: Optional[str] = None,
+    org_id: Optional[str] = None
 ):
     """FastAPI BackgroundTasks fallback to execute decision pipeline."""
     import asyncio
@@ -185,6 +198,10 @@ def run_async_analysis_in_background(
         if db_report:
             db_report.verdict = report.credibility.verdict
             db_report.confidence = report.credibility.trust_score / 100.0
+            if user_id:
+                db_report.user_id = uuid.UUID(user_id)
+            if org_id:
+                db_report.org_id = uuid.UUID(org_id)
             
             # Save evidence
             if report.claims:
@@ -198,6 +215,16 @@ def run_async_analysis_in_background(
                         )
                         db.add(db_ev)
             db.commit()
+
+            # Log audit trail if org_id is provided
+            if org_id:
+                AuthService.log_action(
+                    db,
+                    uuid.UUID(org_id),
+                    uuid.UUID(user_id) if user_id else None,
+                    "analyze_created",
+                    {"report_id": report_id, "verdict": report.credibility.verdict, "content_type": content_type.value}
+                )
     except Exception as e:
         logger.error(f"Failed to save background analysis results: {e}")
     finally:
@@ -212,21 +239,30 @@ async def analyze_content(
     text: Optional[str] = Form(None),
     lang: str = Form("en"),
     async_mode: bool = Form(False),
+    org_id: Optional[str] = Form(None),
     db: Session = Depends(get_db),
-    current_user: Optional[CurrentUser] = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_user_or_api_key),
 ):
     """
     Analyze content for misinformation.
     Supports asynchronous processing for large media uploads (video/audio).
+    Accepts user bearer token (JWT) or custom X-API-Key header.
     """
     settings = get_settings()
     from backend.models.schemas import Language
 
+    # Resolve Form default parameters if called directly in tests
+    resolved_lang = lang.default if hasattr(lang, "default") else lang
+    resolved_async_mode = async_mode.default if hasattr(async_mode, "default") else async_mode
+    resolved_org_id_param = org_id.default if hasattr(org_id, "default") else org_id
+    resolved_url = url.default if hasattr(url, "default") else url
+    resolved_text = text.default if hasattr(text, "default") else text
+
     content_type = ContentType.TEXT
     file_path = None
 
-    if file:
-        ext = os.path.splitext(file.filename or "")[1].lower()
+    if file and hasattr(file, "filename") and file.filename:
+        ext = os.path.splitext(file.filename)[1].lower()
         if ext in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
             content_type = ContentType.IMAGE
         elif ext in (".mp3", ".wav", ".ogg", ".m4a", ".flac"):
@@ -243,11 +279,11 @@ async def analyze_content(
             f.write(content)
 
         if content_type == ContentType.TEXT:
-            text = content.decode("utf-8", errors="ignore")
+            resolved_text = content.decode("utf-8", errors="ignore")
 
-    elif url:
+    elif resolved_url:
         content_type = ContentType.URL
-    elif text:
+    elif resolved_text:
         content_type = ContentType.TEXT
     else:
         raise HTTPException(
@@ -255,22 +291,29 @@ async def analyze_content(
             detail="Provide at least one of: file, url, or text",
         )
 
+    # Determine user/organization ownership
+    user_uuid = uuid.UUID(current_user.id)
+    resolved_org_id = None
+    if current_user.org_id:
+        resolved_org_id = uuid.UUID(current_user.org_id)
+    elif resolved_org_id_param:
+        role = AuthService.check_user_role(db, uuid.UUID(resolved_org_id_param), user_uuid)
+        if not role:
+            raise HTTPException(status_code=403, detail="You are not a member of this workspace")
+        resolved_org_id = uuid.UUID(resolved_org_id_param)
+
     # Automatically queue background job for large/heavy contents
-    should_queue = async_mode or content_type in (ContentType.VIDEO, ContentType.AUDIO)
+    should_queue = resolved_async_mode or content_type in (ContentType.VIDEO, ContentType.AUDIO)
 
     if should_queue:
         report_id = uuid.uuid4().hex
-        try:
-            user_uuid = uuid.UUID(current_user.id) if current_user else None
-        except Exception:
-            user_uuid = None
-            
         from backend.models.db import Report as ReportDB
         db_report = ReportDB(
             id=report_id,
             user_id=user_uuid,
+            org_id=resolved_org_id,
             content_type=content_type.value,
-            input_text=text or url or (file.filename if file else "Media File"),
+            input_text=resolved_text or resolved_url or (file.filename if file else "Media File"),
             verdict="UNVERIFIED",
             confidence=0.0,
         )
@@ -279,15 +322,17 @@ async def analyze_content(
 
         celery_queued = False
         try:
-            # Task 9: Queue Celery job via Redis broker
+            # Queue Celery job via Redis broker
             from backend.tasks import analyze_content_task
             analyze_content_task.delay(
                 report_id=report_id,
-                text=text,
+                text=resolved_text,
                 file_path=file_path,
-                url=url,
+                url=resolved_url,
                 content_type=content_type.value,
-                lang=lang
+                lang=resolved_lang,
+                user_id=str(user_uuid),
+                org_id=str(resolved_org_id) if resolved_org_id else None
             )
             celery_queued = True
             logger.info(f"Asynchronously queued report {report_id} to Celery worker.")
@@ -298,11 +343,13 @@ async def analyze_content(
             background_tasks.add_task(
                 run_async_analysis_in_background,
                 report_id=report_id,
-                text=text,
+                text=resolved_text,
                 file_path=file_path,
-                url=url,
+                url=resolved_url,
                 content_type=content_type,
-                lang=lang
+                lang=resolved_lang,
+                user_id=str(user_uuid),
+                org_id=str(resolved_org_id) if resolved_org_id else None
             )
             logger.info(f"Asynchronously queued report {report_id} to FastAPI BackgroundTasks.")
 
@@ -310,8 +357,8 @@ async def analyze_content(
         return AnalysisReport(
             id=report_id,
             content_type=content_type,
-            original_text=text or url or (file.filename if file else "Media File"),
-            language=Language(lang),
+            original_text=resolved_text or resolved_url or (file.filename if file else "Media File"),
+            language=Language(resolved_lang),
             credibility=CredibilityScore(
                 trust_score=0,
                 verdict="UNVERIFIED",
@@ -321,45 +368,17 @@ async def analyze_content(
             risk_factors=["Processing in background queue"]
         )
 
-    # Otherwise process synchronously
-    report = await run_analysis_pipeline(
-        text=text,
+    # Process synchronously using AnalysisService
+    report = await AnalysisService.analyze(
+        db=db,
+        text=resolved_text,
         file_path=file_path,
-        url=url,
+        url=resolved_url,
         content_type=content_type,
-        lang=lang,
+        lang=resolved_lang,
+        user_id=user_uuid,
+        org_id=resolved_org_id
     )
-
-    from backend.models.db import Report as ReportDB, EvidenceDB
-    try:
-        try:
-            user_uuid = uuid.UUID(current_user.id) if current_user else None
-        except Exception:
-            user_uuid = None
-            
-        db_report = ReportDB(
-            id=report.id,
-            user_id=user_uuid,
-            content_type=report.content_type.value,
-            input_text=report.original_text,
-            verdict=report.credibility.verdict,
-            confidence=report.credibility.trust_score / 100.0,
-        )
-        db.add(db_report)
-
-        if report.claims:
-            for claim_verdict in report.claims:
-                for ev in claim_verdict.evidence:
-                    db_ev = EvidenceDB(
-                        report_id=report.id,
-                        source_url=ev.url,
-                        source_name=ev.title,
-                        credibility_score=ev.source_score,
-                    )
-                    db.add(db_ev)
-        db.commit()
-    except Exception as e:
-        logger.warning(f"Failed to persist report to DB: {e}")
 
     return report
 
@@ -432,10 +451,17 @@ async def submit_feedback(
 
 @router.get("/dashboard")
 async def get_user_dashboard(
+    org_id: Optional[str] = None,
     current_user: CurrentUser = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    """Retrieve personal dashboard stats for the authenticated user."""
+    """Retrieve personal or workspace-scoped dashboard stats for the authenticated user."""
+    if org_id:
+        role = AuthService.check_user_role(db, uuid.UUID(org_id), uuid.UUID(current_user.id))
+        if not role:
+            raise HTTPException(status_code=403, detail="You are not a member of this workspace")
+        return AnalyticsService.get_workspace_stats(db, uuid.UUID(org_id))
+
     from backend.models.db import Report as ReportDB
     
     user_uuid = uuid.UUID(current_user.id)
@@ -459,10 +485,30 @@ async def get_user_dashboard(
         ReportDB.verdict == "FALSE"
     ).count()
 
+    # Query weekly scan trend (last 7 days)
+    from datetime import datetime, timedelta, timezone
+    today = datetime.now(timezone.utc).date()
+    weekly_trend = []
+    for i in range(6, -1, -1):
+        d = today - timedelta(days=i)
+        start_dt = datetime.combine(d, datetime.min.time())
+        end_dt = datetime.combine(d, datetime.max.time())
+        
+        count = db.query(ReportDB).filter(
+            ReportDB.user_id == user_uuid,
+            ReportDB.created_at >= start_dt,
+            ReportDB.created_at <= end_dt
+        ).count()
+        
+        weekly_trend.append({
+            "day": d.strftime("%a"),
+            "scans": count
+        })
+
     # Fetch recent scans
     recent_reports = db.query(ReportDB).filter(
         ReportDB.user_id == user_uuid
-    ).order_by(ReportDB.created_at.desc()).limit(5).all()
+    ).order_by(ReportDB.created_at.desc()).limit(10).all()
 
     recent_scans = [
         {
@@ -481,8 +527,190 @@ async def get_user_dashboard(
         "fake_news": fake_news,
         "deepfakes": deepfakes,
         "voice_clones": voice_clones,
+        "weekly_trend": weekly_trend,
         "recent_scans": recent_scans,
     }
+
+
+# ── Workspace / Organization Endpoints ───
+
+@router.post("/organizations")
+async def create_organization(
+    data: dict,
+    current_user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    name = data.get("name")
+    if not name:
+        raise HTTPException(status_code=400, detail="Workspace name is required")
+    org = AuthService.create_organization(db, name, uuid.UUID(current_user.id))
+    return {"id": str(org.id), "name": org.name}
+
+
+@router.get("/organizations")
+async def list_organizations(
+    current_user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    from backend.models.db import OrganizationMember, Organization
+    memberships = db.query(OrganizationMember).filter(OrganizationMember.user_id == uuid.UUID(current_user.id)).all()
+    orgs = []
+    for m in memberships:
+        org = db.query(Organization).filter(Organization.id == m.org_id).first()
+        if org:
+            orgs.append({
+                "id": str(org.id),
+                "name": org.name,
+                "role": m.role
+            })
+    return orgs
+
+
+@router.post("/organizations/{org_id}/invite")
+async def invite_member(
+    org_id: str,
+    data: dict,
+    current_user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    email = data.get("email")
+    role = data.get("role", "Member")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    
+    actor_role = AuthService.check_user_role(db, uuid.UUID(org_id), uuid.UUID(current_user.id))
+    if actor_role != "Admin":
+        raise HTTPException(status_code=403, detail="Only Admins can invite team members.")
+        
+    member = AuthService.invite_member(
+        db,
+        uuid.UUID(org_id),
+        email,
+        role,
+        uuid.UUID(current_user.id)
+    )
+    return {"status": "ok", "message": f"Successfully invited {email} as {role}."}
+
+
+@router.get("/organizations/{org_id}/members")
+async def list_members(
+    org_id: str,
+    current_user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    role = AuthService.check_user_role(db, uuid.UUID(org_id), uuid.UUID(current_user.id))
+    if not role:
+        raise HTTPException(status_code=403, detail="You are not a member of this workspace.")
+        
+    members_data = AuthService.get_members(db, uuid.UUID(org_id))
+    return [
+        {
+            "id": str(m.id),
+            "email": email,
+            "role": m.role,
+            "created_at": m.created_at.isoformat()
+        }
+        for m, email in members_data
+    ]
+
+
+@router.post("/organizations/{org_id}/apikeys")
+async def create_api_key(
+    org_id: str,
+    data: dict,
+    current_user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    label = data.get("label", "Production API Key")
+    role = AuthService.check_user_role(db, uuid.UUID(org_id), uuid.UUID(current_user.id))
+    if role != "Admin":
+        raise HTTPException(status_code=403, detail="Only Admins can generate API Keys.")
+        
+    key_record, raw_key = AuthService.generate_api_key(
+        db,
+        uuid.UUID(org_id),
+        label,
+        uuid.UUID(current_user.id)
+    )
+    return {
+        "id": str(key_record.id),
+        "label": key_record.label,
+        "api_key": raw_key,
+        "created_at": key_record.created_at.isoformat()
+    }
+
+
+@router.get("/organizations/{org_id}/apikeys")
+async def list_api_keys(
+    org_id: str,
+    current_user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    role = AuthService.check_user_role(db, uuid.UUID(org_id), uuid.UUID(current_user.id))
+    if not role:
+        raise HTTPException(status_code=403, detail="You are not a member of this workspace.")
+        
+    keys = AuthService.list_api_keys(db, uuid.UUID(org_id))
+    return [
+        {
+            "id": str(k.id),
+            "label": k.label,
+            "is_active": k.is_active,
+            "created_at": k.created_at.isoformat()
+        }
+        for k in keys
+    ]
+
+
+@router.delete("/apikeys/{key_id}")
+async def revoke_api_key(
+    key_id: str,
+    current_user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    from backend.models.db import APIKey
+    key_record = db.query(APIKey).filter(APIKey.id == uuid.UUID(key_id)).first()
+    if not key_record:
+        raise HTTPException(status_code=404, detail="API Key not found")
+        
+    role = AuthService.check_user_role(db, key_record.org_id, uuid.UUID(current_user.id))
+    if role != "Admin":
+        raise HTTPException(status_code=403, detail="Only Admins can revoke API Keys.")
+        
+    success = AuthService.revoke_api_key(db, uuid.UUID(key_id), uuid.UUID(current_user.id))
+    return {"status": "ok" if success else "failed"}
+
+
+@router.get("/organizations/{org_id}/audit-logs")
+async def get_audit_logs(
+    org_id: str,
+    current_user: CurrentUser = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    role = AuthService.check_user_role(db, uuid.UUID(org_id), uuid.UUID(current_user.id))
+    if not role:
+        raise HTTPException(status_code=403, detail="You are not a member of this workspace.")
+        
+    logs = AuthService.get_audit_logs(db, uuid.UUID(org_id))
+    return [
+        {
+            "id": str(l.id),
+            "user_email": email or "System",
+            "action": l.action,
+            "details": json.loads(l.details) if l.details else {},
+            "created_at": l.created_at.isoformat()
+        }
+        for l, email in logs
+    ]
+
+
+# ── Threat Intelligence Telemetry Endpoints ───
+
+@router.get("/realtime/threats")
+async def get_realtime_threats(
+    db: Session = Depends(get_db)
+):
+    return AnalyticsService.get_threat_vectors(db)
 
 
 @router.get("/stats", response_model=StatsResponse)
@@ -502,10 +730,21 @@ async def get_stats(db: Session = Depends(get_db)):
         if reports:
             avg_trust = sum(r.confidence for r in reports) / len(reports) * 100.0
 
+        # Compute actual language distribution from DB
+        lang_dist = {}
+        from sqlalchemy import func
+        lang_counts = db.query(ReportDB.language, func.count(ReportDB.id)).group_by(ReportDB.language).all()
+        for lang_code, count in lang_counts:
+            if lang_code:
+                lang_dist[lang_code] = count
+        # Ensure all supported languages are present
+        for code in ("en", "hi", "ta"):
+            lang_dist.setdefault(code, 0)
+
         return StatsResponse(
             total_analyses=total_analyses,
             verdicts=verdicts,
-            language_distribution={"en": total_analyses, "hi": 0, "ta": 0},
+            language_distribution=lang_dist,
             top_flagged_domains=[],
             avg_trust_score=round(avg_trust, 1),
         )

@@ -51,10 +51,12 @@ def get_current_user(
     # 1. Try Supabase JWT secret first (if configured)
     if settings.SUPABASE_JWT_SECRET:
         try:
+            header = jwt.get_unverified_header(token)
+            alg = header.get("alg", "HS256")
             payload = jwt.decode(
                 token,
                 settings.SUPABASE_JWT_SECRET,
-                algorithms=[settings.JWT_ALGORITHM],
+                algorithms=[alg, "HS256", "RS256"],
                 options={"verify_aud": False},
             )
             logger.debug("Token verified with Supabase JWT secret")

@@ -19,9 +19,8 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Pin setuptools<82 — v82+ removed pkg_resources which
-# breaks legacy package builds (openai-whisper, langdetect)
-RUN pip install --no-cache-dir --upgrade pip "setuptools<82" wheel
+# Upgrade pip, setuptools, and wheel
+RUN pip install --upgrade pip setuptools wheel
 
 # Install Python dependencies
 COPY backend/requirements.txt .

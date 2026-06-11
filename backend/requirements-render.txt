@@ -1,0 +1,50 @@
+# ═══════════════════════════════════════════════
+# TruthShield — Lightweight Deploy Dependencies (Render)
+# Excludes heavy ML models (torch, transformers, whisper, speechbrain)
+# Those features degrade gracefully when packages are absent.
+# ═══════════════════════════════════════════════
+
+# ── Core Framework ────────────────────────────
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+pydantic==2.9.0
+pydantic-settings==2.5.0
+python-multipart==0.0.9
+python-jose[cryptography]==3.3.0
+slowapi==0.1.9
+
+# ── Database ──────────────────────────────────
+sqlalchemy==2.0.35
+psycopg2-binary==2.9.9
+aiofiles==24.1.0
+
+# ── HTTP & Scraping ──────────────────────────
+requests==2.32.0
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# ── NLP (lightweight only) ───────────────────
+langdetect==1.0.9
+
+# ── AI / LLM ────────────────────────────────
+anthropic==0.34.0
+numpy==1.26.4
+google-genai>=0.1.0
+duckduckgo-search>=6.0.0
+
+# ── Utilities ────────────────────────────────
+python-dotenv==1.0.1
+websockets==12.0
+feedparser>=6.0.10
+
+# ── Image (lightweight, headless) ────────────
+Pillow==10.4.0
+pytesseract==0.3.10
+
+# ── Text Matching ────────────────────────────
+scikit-learn>=1.3.0
+fuzzywuzzy>=0.18.0
+python-Levenshtein>=0.23.0
+
+# ── Testing ──────────────────────────────────
+httpx==0.27.0

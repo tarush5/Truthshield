@@ -1,32 +1,22 @@
 # ═══════════════════════════════════════════════
-# TruthShield — Backend Dockerfile
+# TruthShield — Lightweight Backend Dockerfile (Render)
+# Uses pip-only install, no heavy system deps or ML models.
 # ═══════════════════════════════════════════════
 FROM python:3.11-slim
 
-# System dependencies for OpenCV, Tesseract, ffmpeg with robust retry loop for mirror transient failures
-RUN apt-get clean && \
-    for i in 1 2 3; do apt-get update && break || if [ $i -eq 3 ]; then exit 1; else echo "Retry $i..." && sleep 5; fi; done && \
-    apt-get install -y --no-install-recommends \
-    build-essential \
-    libgl1 \
-    libglx-mesa0 \
-    libglib2.0-0 \
-    tesseract-ocr \
-    tesseract-ocr-hin \
-    tesseract-ocr-tam \
-    ffmpeg \
-    libsndfile1 \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
-# Install Python dependencies
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir "setuptools<=80.10.2" wheel
-RUN pip install --no-cache-dir --no-build-isolation -r requirements.txt
+# Minimal system deps (only for pillow/lxml)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Download spaCy model
-RUN python -m spacy download en_core_web_sm || true
+# Install Python dependencies (lightweight set)
+COPY backend/requirements-render.txt .
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir -r requirements-render.txt
 
 # Copy source code
 COPY backend/ ./backend/

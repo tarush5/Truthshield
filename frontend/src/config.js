@@ -32,11 +32,18 @@ export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || impor
 
 // Dynamic WebSocket URL resolver
 export const getWsUrl = () => {
+  // Helper: strip any protocol and build a clean ws(s) URL
+  const toWs = (raw) => {
+    const stripped = raw.replace(/^wss?:\/\//, '').replace(/^https?:\/\//, '');
+    const isSecure = raw.startsWith('https:') || raw.startsWith('wss:') || 
+                     (!raw.startsWith('http:') && !raw.startsWith('ws:'));
+    return `${isSecure ? 'wss' : 'ws'}://${stripped}`;
+  };
+
   if (import.meta.env.VITE_WS_URL) {
-    return import.meta.env.VITE_WS_URL;
+    return toWs(import.meta.env.VITE_WS_URL);
   }
   if (import.meta.env.VITE_API_URL) {
-    // Derive WS URL from API URL: https://host/api/v1 → wss://host/ws/analyze
     try {
       const url = new URL(import.meta.env.VITE_API_URL);
       const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';

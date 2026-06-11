@@ -117,10 +117,58 @@ export default function Analyze() {
           }
         };
 
-        ws.onerror = () => {
-          setError('Connection failed. Please check if the backend is running.');
-          setAnalyzing(false);
+        ws.onerror = async () => {
           ws.close();
+          // Fallback: retry via HTTP POST when WebSocket fails
+          console.warn('[TruthShield] WebSocket failed, falling back to HTTP POST');
+          try {
+            const formData = new FormData();
+            if (text) formData.append('text', text);
+            if (url) formData.append('url', url);
+            formData.append('lang', i18n.language || 'en');
+            const orgId = localStorage.getItem('active_org_id');
+            if (orgId) formData.append('org_id', orgId);
+
+            const token = localStorage.getItem('token');
+            const headers = {};
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            // Simulate pipeline stages during HTTP wait
+            const stagesKeys = PIPELINE_STAGES.map(s => s.key);
+            let stepIdx = 0;
+            const interval = setInterval(() => {
+              if (stepIdx < stagesKeys.length - 1) {
+                const current = stagesKeys[stepIdx];
+                setCurrentStage(current);
+                setCompletedStages(prev => [...new Set([...prev, current])]);
+                setProgress((stepIdx + 1) * 20);
+                stepIdx++;
+              }
+            }, 2000);
+
+            const response = await fetch(`${API_BASE}/analyze`, {
+              method: 'POST',
+              headers,
+              body: formData,
+            });
+            clearInterval(interval);
+
+            if (!response.ok) throw new Error(`Analysis failed: ${response.statusText}`);
+
+            const data = await response.json();
+            setCompletedStages(stagesKeys);
+            setProgress(100);
+            setCurrentStage('done');
+            setResult(data);
+            setTimeout(() => navigate(`/report/${data.id}`), 1800);
+          } catch (httpErr) {
+            console.error('HTTP fallback also failed:', httpErr);
+            setError('Connection failed. Please check if the backend is running.');
+            setAnalyzing(false);
+            setCurrentStage(null);
+            setProgress(0);
+            setCompletedStages([]);
+          }
         };
 
         return;

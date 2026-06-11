@@ -5,10 +5,11 @@ FROM python:3.11-slim
 
 # System dependencies for OpenCV, Tesseract, ffmpeg with robust retry loop for mirror transient failures
 RUN apt-get clean && \
-    for i in 1 2 3; do apt-get update && break || (echo "Retry $i..." && sleep 5); done && \
+    for i in 1 2 3; do apt-get update && break || if [ $i -eq 3 ]; then exit 1; else echo "Retry $i..." && sleep 5; fi; done && \
     apt-get install -y --no-install-recommends \
     build-essential \
-    libgl1-mesa-glx \
+    libgl1 \
+    libglx-mesa0 \
     libglib2.0-0 \
     tesseract-ocr \
     tesseract-ocr-hin \

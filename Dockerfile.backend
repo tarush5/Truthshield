@@ -3,10 +3,13 @@
 # ═══════════════════════════════════════════════
 FROM python:3.11-slim-bookworm
 
-# System dependencies for OpenCV, Tesseract, ffmpeg
+# System dependencies for OpenCV, Tesseract, ffmpeg, and git (for pip git installs)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
+    gcc \
+    g++ \
+    git \
     libgl1 \
     libglx-mesa0 \
     libglib2.0-0 \
@@ -19,11 +22,14 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Upgrade pip, setuptools, and wheel
-RUN pip install --upgrade pip setuptools wheel
-
 # Install Python dependencies
 COPY backend/requirements.txt .
+
+# Fix: Explicitly upgrade pip and install setuptools==69.5.1 (has pkg_resources)
+# BEFORE installing requirements, so openai-whisper wheel build succeeds
+RUN python -m pip install --upgrade pip
+RUN python -m pip install setuptools==69.5.1 wheel
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Download spaCy model

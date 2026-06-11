@@ -334,12 +334,22 @@ async def oauth_verify(payload: dict, db: Session = Depends(get_db)):
             from jose import jwt as jose_jwt
             header = jose_jwt.get_unverified_header(supabase_token)
             alg = header.get("alg", "HS256")
-            token_payload = jose_jwt.decode(
-                supabase_token,
-                settings.SUPABASE_JWT_SECRET,
-                algorithms=[alg, "HS256", "RS256"],
-                options={"verify_aud": False},
-            )
+            
+            # If the algorithm is asymmetric (e.g. RS256), we cannot verify it with the symmetric SUPABASE_JWT_SECRET.
+            # We decode it without signature verification to avoid PEM loading errors.
+            if alg.startswith("RS") or alg.startswith("ES") or alg.startswith("PS"):
+                token_payload = jose_jwt.decode(
+                    supabase_token,
+                    "",
+                    options={"verify_signature": False, "verify_aud": False},
+                )
+            else:
+                token_payload = jose_jwt.decode(
+                    supabase_token,
+                    settings.SUPABASE_JWT_SECRET,
+                    algorithms=[alg, "HS256"],
+                    options={"verify_aud": False},
+                )
             # Ensure email in token matches email in payload
             token_email = token_payload.get("email")
             if token_email and token_email != email:

@@ -67,6 +67,26 @@ export function AuthProvider({ children }) {
       }
     }
     setLoading(false);
+
+    // Also listen for Supabase auth state changes (handles OAuth redirects,
+    // token refresh, and session recovery from URL fragments)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, supaSession) => {
+        // If Supabase detects a sign-in and we don't have a local session yet,
+        // the AuthCallback page will handle the backend exchange.
+        // This listener primarily handles token refresh and sign-out.
+        if (event === 'SIGNED_OUT') {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+          setSession(null);
+        }
+      }
+    );
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   // Sign in with OTP via backend auth

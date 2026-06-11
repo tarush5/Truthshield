@@ -17,73 +17,83 @@ export default function AuthCallback() {
   useEffect(() => {
     let active = true;
 
-    async function handleCallback() {
-      try {
-        // Wait a brief moment for Supabase client to parse the OAuth hash in URL
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) throw sessionError;
-        
-        if (!session) {
-          throw new Error('No active Supabase session found. Please try logging in again.');
-        }
-        
-        // POST to local backend to obtain local JWT
-        let response;
-        try {
-          response = await fetch(`${API_BASE}/auth/oauth-verify`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: session.user.email,
-              supabase_token: session.access_token,
-            }),
-          });
-        } catch (fetchErr) {
-          if (isBackendError(fetchErr)) {
-            throw new Error(BACKEND_UNREACHABLE_MSG);
-          }
-          throw fetchErr;
-        }
-        
-        if (!response.ok) {
-          let detail = '';
+    // Use onAuthStateChange to reliably detect when Supabase finishes
+    // the PKCE code exchange from the URL hash/query params.
+    // This avoids the race condition where getSession() is called before
+    // the auth state is fully updated.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!active) return;
+
+        // Only process sign-in events
+        if (event === 'SIGNED_IN' && session) {
           try {
-            const errBody = await response.json();
-            detail = errBody.detail || '';
-          } catch { /* not JSON */ }
-          
-          if (response.status === 404) {
-            throw new Error(
-              detail || 'Backend API not found (404). Ensure the backend is running and VITE_API_URL is set.'
-            );
+            // POST to local backend to obtain local JWT
+            let response;
+            try {
+              response = await fetch(`${API_BASE}/auth/oauth-verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: session.user.email,
+                  supabase_token: session.access_token,
+                }),
+              });
+            } catch (fetchErr) {
+              if (isBackendError(fetchErr)) {
+                throw new Error(BACKEND_UNREACHABLE_MSG);
+              }
+              throw fetchErr;
+            }
+
+            if (!response.ok) {
+              let detail = '';
+              try {
+                const errBody = await response.json();
+                detail = errBody.detail || '';
+              } catch { /* not JSON */ }
+
+              if (response.status === 404) {
+                throw new Error(
+                  detail || 'Backend API not found (404). Ensure the backend is running and VITE_API_URL is set.'
+                );
+              }
+              throw new Error(detail || 'Failed to verify session with backend.');
+            }
+
+            const data = await response.json();
+
+            if (active) {
+              // Sync with context state and localStorage
+              completeOAuthLogin(data.access_token, data.user);
+              // Go back to login/workspace flow
+              navigate('/login', { replace: true });
+            }
+          } catch (err) {
+            console.error('OAuth callback exchange error:', err);
+            if (active) {
+              setError(err.message || 'Authentication failed. Please try again.');
+              setTimeout(() => navigate('/login', { replace: true }), 4000);
+            }
           }
-          throw new Error(detail || 'Failed to verify session with backend.');
-        }
-        
-        const data = await response.json();
-        
-        if (active) {
-          // Sync with context state and localStorage
-          completeOAuthLogin(data.access_token, data.user);
-          // Go back to login/workspace flow
-          navigate('/login', { replace: true });
-        }
-      } catch (err) {
-        console.error('OAuth callback exchange error:', err);
-        if (active) {
-          setError(err.message || 'Authentication failed. Please try again.');
-          setTimeout(() => navigate('/login', { replace: true }), 4000);
+        } else if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          // Ignore these events during callback
         }
       }
-    }
+    );
 
-    handleCallback();
+    // Safety timeout: if no auth event fires within 10 seconds, show error
+    const timeoutId = setTimeout(() => {
+      if (active && !error) {
+        setError('Authentication timed out. Please try logging in again.');
+        setTimeout(() => navigate('/login', { replace: true }), 3000);
+      }
+    }, 10000);
 
     return () => {
       active = false;
+      subscription?.unsubscribe();
+      clearTimeout(timeoutId);
     };
   }, [navigate, completeOAuthLogin]);
 

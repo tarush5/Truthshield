@@ -16,8 +16,10 @@ Gate conditions control whether downstream stages execute.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import time
+from collections import OrderedDict
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, List, Optional
 
@@ -154,8 +156,39 @@ class DecisionPipeline:
         )
     """
 
+    # ── Class-level in-memory response cache (LRU, max 100 entries) ──────
+    _cache: OrderedDict = OrderedDict()
+    _CACHE_MAX_SIZE = 100
+    _CACHE_TTL_SECONDS = 300  # 5 minutes
+
     def __init__(self):
         pass
+
+    @classmethod
+    def _cache_key(cls, text: str = None, url: str = None) -> str:
+        """Generate a deterministic cache key from input."""
+        raw = f"{text or ''}|{url or ''}"
+        return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+    @classmethod
+    def _cache_get(cls, key: str):
+        """Get a cached report if it exists and hasn't expired."""
+        if key in cls._cache:
+            entry = cls._cache[key]
+            if time.time() - entry["ts"] < cls._CACHE_TTL_SECONDS:
+                cls._cache.move_to_end(key)  # LRU refresh
+                logger.info(f"Cache HIT for key={key} (age={time.time()-entry['ts']:.1f}s)")
+                return entry["report"]
+            else:
+                del cls._cache[key]  # Expired
+        return None
+
+    @classmethod
+    def _cache_set(cls, key: str, report):
+        """Store a report in cache with eviction."""
+        cls._cache[key] = {"report": report, "ts": time.time()}
+        if len(cls._cache) > cls._CACHE_MAX_SIZE:
+            cls._cache.popitem(last=False)  # Evict oldest
 
     async def execute(
         self,
@@ -189,6 +222,22 @@ class DecisionPipeline:
             lang=lang,
         )
         ctx.pipeline_start_time = time.time()
+
+        # ── Check in-memory cache ────────────────────────────────
+        cache_key = self._cache_key(text=text, url=url)
+        cached_report = self._cache_get(cache_key)
+        if cached_report:
+            if progress_callback:
+                try:
+                    await progress_callback("done", 1.0, "Analysis complete (cached)!", {
+                        "report_id": cached_report.id,
+                        "trust_score": cached_report.credibility.trust_score,
+                        "verdict": cached_report.credibility.verdict,
+                        "cached": True,
+                    })
+                except Exception:
+                    pass
+            return cached_report
 
         async def _progress(stage: str, progress: float, msg: str, data: Dict = None):
             if progress_callback:
@@ -292,6 +341,9 @@ class DecisionPipeline:
 
         # ── Build final report ───────────────────────────────────
         report = self._build_report(ctx)
+
+        # ── Store in cache ───────────────────────────────────────
+        self._cache_set(cache_key, report)
 
         await _progress(
             "done", 1.0, "Analysis complete!",
@@ -453,6 +505,11 @@ class DecisionPipeline:
             extractor = ClaimExtractor()
             import asyncio
             claims = await asyncio.to_thread(extractor.extract, ctx.packet.text, ctx.packet.lang.value)
+
+            # ── Throttle claims to top 3 to prevent rate limiting ──
+            if len(claims) > 3:
+                logger.info(f"Throttling claims from {len(claims)} to 3 for speed")
+                claims = claims[:3]
 
             await progress_fn(
                 "verifying", 0.60,

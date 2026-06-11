@@ -20,28 +20,59 @@ class TextClassifier:
 
     LABELS = ["real", "misleading", "fake"]
 
+    # ── Class-level model cache (singleton per process) ──────
+    _shared_pipeline = None
+    _shared_pipeline_loaded = False
+
     def __init__(self):
         self._model = None
         self._tokenizer = None
         self._pipeline = None
 
+    def _get_gemini_client(self):
+        """Lazy-initialize Google Gemini client."""
+        try:
+            from backend.config import get_settings
+            settings = get_settings()
+            key = settings.GEMINI_API_KEY
+            if key and key != "your_gemini_api_key" and len(key) > 10:
+                from google import genai
+                return genai.Client(api_key=key)
+        except Exception as e:
+            logger.warning(f"Failed to initialize Gemini client in TextClassifier: {e}")
+        return None
+
     def _load_model(self):
-        """Lazy-load the classification pipeline."""
-        if self._pipeline is not None:
+        """Lazy-load the classification pipeline (cached at class level)."""
+        # Use class-level cache so model loads once per process
+        if TextClassifier._shared_pipeline_loaded:
+            self._pipeline = TextClassifier._shared_pipeline
             return
+
+        import os
+        # If running on Render or low-memory environment, do not load Hugging Face models (prevents OOM crashes)
+        if os.getenv("LOW_MEMORY") == "true" or os.getenv("RENDER") == "true":
+            logger.info("Low memory or Render environment detected. Skipping Hugging Face model loading for TextClassifier.")
+            TextClassifier._shared_pipeline_loaded = True
+            self._pipeline = None
+            return
+
         try:
             from transformers import pipeline as hf_pipeline
 
             # Use a fast distilbert zero-shot classifier as fallback
             # In production, replace with fine-tuned XLM-RoBERTa checkpoint if high latency is acceptable
-            self._pipeline = hf_pipeline(
+            TextClassifier._shared_pipeline = hf_pipeline(
                 "zero-shot-classification",
                 model="typeform/distilbert-base-uncased-mnli",
                 device=-1,  # CPU
             )
-            logger.info("DistilBERT text classifier loaded.")
+            TextClassifier._shared_pipeline_loaded = True
+            self._pipeline = TextClassifier._shared_pipeline
+            logger.info("DistilBERT text classifier loaded (cached at class level).")
         except Exception as e:
             logger.error(f"Failed to load text classifier: {e}")
+            TextClassifier._shared_pipeline_loaded = True  # Don't retry on failure
             self._pipeline = None
 
     def classify(self, text: str, lang: str = "en") -> TextClassificationResult:
@@ -63,6 +94,72 @@ class TextClassifier:
             )
 
         try:
+            # Try Gemini API zero-shot classification first if key is available (almost zero memory, very accurate)
+            gemini_client = self._get_gemini_client()
+            if gemini_client:
+                try:
+                    import json
+                    import re
+                    from backend.config import GEMINI_MODEL
+                    from google.genai import types
+
+                    # Define candidate labels in English to be parsed deterministically
+                    prompt = f"""You are an AI misinformation classifier. Classify the following text into one of these categories:
+- real: Verified factual news or content
+- misleading: Contains some truth but is out of context, exaggerated, or biased
+- fake: Fabricated, demonstrably false, or completely untrue content
+
+TEXT: {text[:800]}
+LANGUAGE: {lang}
+
+Respond with ONLY valid JSON:
+{{"label": "real"|"misleading"|"fake", "confidence": 0.0-1.0}}"""
+
+                    response = gemini_client.models.generate_content(
+                        model=GEMINI_MODEL,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            max_output_tokens=100,
+                            temperature=0.1,
+                        ),
+                    )
+                    res_text = response.text.strip()
+                    if "```json" in res_text:
+                        res_text = res_text.split("```json")[1].split("```")[0].strip()
+                    elif "```" in res_text:
+                        res_text = res_text.split("```")[1].split("```")[0].strip()
+
+                    json_match = re.search(r'\{[^{}]*"label"[^{}]*\}', res_text, re.DOTALL)
+                    if json_match:
+                        res_text = json_match.group(0)
+
+                    res = json.loads(res_text)
+                    label = res.get("label", "real").lower()
+                    if label not in ("real", "misleading", "fake"):
+                        label = "real"
+                    confidence = float(res.get("confidence", 0.8))
+
+                    # Combine with heuristic score as secondary signal
+                    h_score = self._calculate_heuristic_score(text)
+                    
+                    # Nudge confidence based on heuristic alignment
+                    if label == "fake" and h_score > 0.5:
+                        confidence = min(0.98, confidence + 0.05)
+                    elif label == "real" and h_score < 0.4:
+                        confidence = min(0.98, confidence + 0.05)
+
+                    explanation_tokens = self._extract_key_tokens(text, label)
+                    explanation_tokens.append("API-based classification (Gemini)")
+
+                    logger.info(f"Gemini text classifier result: label='{label}', confidence={confidence:.4f}")
+                    return TextClassificationResult(
+                        label=label,
+                        confidence=round(confidence, 4),
+                        explanation_tokens=explanation_tokens,
+                    )
+                except Exception as e:
+                    logger.warning(f"Gemini text classification failed, falling back to local/heuristic: {e}")
+
             self._load_model()
             if self._pipeline is None:
                 return self._fallback_classify(text)

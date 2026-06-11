@@ -16,30 +16,42 @@ logger = logging.getLogger(__name__)
 class ClaimExtractor:
     """Extract verifiable factual claims from text."""
 
+    # ── Class-level model cache (singleton per process) ──────
+    _shared_nlp = None
+    _shared_nlp_loaded = False
+
     def __init__(self):
         self._nlp = None
         self._nlp_loaded = False
 
     def _load_nlp(self, lang: str = "en"):
-        """Lazy-load spaCy model."""
+        """Lazy-load spaCy model (cached at class level)."""
         if self._nlp_loaded:
+            return
+        # Use class-level cache so model loads once per process
+        if ClaimExtractor._shared_nlp_loaded:
+            self._nlp = ClaimExtractor._shared_nlp
+            self._nlp_loaded = True
             return
         try:
             import spacy
 
             # Use multilingual model for all languages
             try:
-                self._nlp = spacy.load("xx_ent_wiki_sm")
+                ClaimExtractor._shared_nlp = spacy.load("xx_ent_wiki_sm")
             except OSError:
                 try:
-                    self._nlp = spacy.load("en_core_web_sm")
+                    ClaimExtractor._shared_nlp = spacy.load("en_core_web_sm")
                 except OSError:
                     logger.warning("No spaCy model found. Using rule-based extraction.")
-                    self._nlp = None
+                    ClaimExtractor._shared_nlp = None
 
+            ClaimExtractor._shared_nlp_loaded = True
+            self._nlp = ClaimExtractor._shared_nlp
             self._nlp_loaded = True
         except ImportError:
             logger.warning("spaCy not available. Using rule-based extraction.")
+            ClaimExtractor._shared_nlp_loaded = True
             self._nlp_loaded = True
 
     def extract(self, text: str, lang: str = "en") -> List[Claim]:

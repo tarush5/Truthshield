@@ -39,6 +39,19 @@ class RAGStore:
                 self.vectorizer = TfidfVectorizer(stop_words='english')
             return
 
+        import os
+        # If running on Render or low-memory environment, do not load heavy PyTorch models (prevents OOM crashes)
+        if os.getenv("LOW_MEMORY") == "true" or os.getenv("RENDER") == "true":
+            logger.info("Low memory or Render environment detected. Skipping RAG Store dense sentence embedding model loading.")
+            RAGStore._model_loaded = True
+            RAGStore._cached_tokenizer = None
+            RAGStore._cached_model = None
+            self.tokenizer = None
+            self.model = None
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            self.vectorizer = TfidfVectorizer(stop_words='english')
+            return
+
         try:
             import torch
             from transformers import AutoTokenizer, AutoModel

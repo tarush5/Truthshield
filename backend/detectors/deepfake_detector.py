@@ -21,27 +21,45 @@ class DeepfakeDetector:
 
     THRESHOLD = 0.5  # Above this = likely deepfake
 
+    # ── Class-level model cache (singleton per process) ──────
+    _shared_model = None
+    _shared_transform = None
+    _shared_model_loaded = False
+
     def __init__(self):
         self._model = None
+        self._transform = None
         self._face_cascade = None
 
     def _load_model(self):
-        """Lazy-load the deepfake detection model."""
-        if self._model is not None:
+        """Lazy-load the deepfake detection model (cached at class level)."""
+        # Use class-level cache so model loads once per process
+        if DeepfakeDetector._shared_model_loaded:
+            self._model = DeepfakeDetector._shared_model
+            self._transform = DeepfakeDetector._shared_transform
             return
+
+        import os
+        # If running on Render or low-memory environment, do not load heavy PyTorch models (prevents OOM crashes)
+        if os.getenv("LOW_MEMORY") == "true" or os.getenv("RENDER") == "true":
+            logger.info("Low memory or Render environment detected. Skipping EfficientNet-B4 deepfake model loading.")
+            DeepfakeDetector._shared_model_loaded = True
+            self._model = None
+            return
+
         try:
             import torch
             from torchvision import models, transforms
 
             # Load EfficientNet-B4 (use pretrained ImageNet weights as base)
             # In production, load fine-tuned FaceForensics++ weights
-            self._model = models.efficientnet_b4(weights="IMAGENET1K_V1")
-            self._model.classifier[1] = torch.nn.Linear(
-                self._model.classifier[1].in_features, 2  # real vs fake
+            DeepfakeDetector._shared_model = models.efficientnet_b4(weights="IMAGENET1K_V1")
+            DeepfakeDetector._shared_model.classifier[1] = torch.nn.Linear(
+                DeepfakeDetector._shared_model.classifier[1].in_features, 2  # real vs fake
             )
-            self._model.eval()
+            DeepfakeDetector._shared_model.eval()
 
-            self._transform = transforms.Compose([
+            DeepfakeDetector._shared_transform = transforms.Compose([
                 transforms.Resize((380, 380)),
                 transforms.ToTensor(),
                 transforms.Normalize(
@@ -49,9 +67,13 @@ class DeepfakeDetector:
                     std=[0.229, 0.224, 0.225],
                 ),
             ])
-            logger.info("EfficientNet-B4 deepfake detector loaded.")
+            DeepfakeDetector._shared_model_loaded = True
+            self._model = DeepfakeDetector._shared_model
+            self._transform = DeepfakeDetector._shared_transform
+            logger.info("EfficientNet-B4 deepfake detector loaded (cached at class level).")
         except Exception as e:
             logger.error(f"Failed to load deepfake model: {e}")
+            DeepfakeDetector._shared_model_loaded = True  # Don't retry on failure
             self._model = None
 
     def _load_face_detector(self):

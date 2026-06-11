@@ -69,7 +69,10 @@ class ResultAggregator:
 
     def aggregate(self, context: "PipelineContext") -> AggregatedResult:
         """
-        Aggregate all pipeline signals into a unified result.
+        Aggregate all pipeline signals into a unified result using weighted trust score:
+        
+        Trust Score = 0.50 × Fact Check + 0.20 × Source Credibility 
+                    + 0.15 × ML Model + 0.15 × Gemini Reasoning
 
         Args:
             context: PipelineContext with all detector and verdict results
@@ -81,50 +84,54 @@ class ResultAggregator:
         signal_correlations: Dict[str, float] = {}
         risk_factors: List[str] = []
 
-        # ── 1. Compute component scores ──────────────────────────
-        base_score = self._score_text_classifier(
-            context.text_classification, component_scores, risk_factors
-        )
-        deepfake_penalty = self._score_deepfake(
-            context.deepfake_result, component_scores, risk_factors
-        )
-        voice_penalty = self._score_voice_clone(
-            context.voice_clone_result, component_scores, risk_factors
-        )
-        ai_penalty = self._score_ai_content(
-            context.ai_content_result, component_scores, risk_factors
+        # ── 1. Fact Check Score (50% weight) ─────────────────────
+        fact_check_score = self._compute_fact_check_score(
+            context, component_scores, risk_factors
         )
 
-        # ── 2. Detect signal correlations ────────────────────────
+        # ── 2. Source Credibility Score (20% weight) ─────────────
+        source_credibility_score = self._compute_source_credibility_score(
+            context, component_scores, risk_factors
+        )
+
+        # ── 3. ML Model Score (15% weight) ───────────────────────
+        ml_model_score = self._compute_ml_model_score(
+            context, component_scores, risk_factors
+        )
+
+        # ── 4. Gemini/LLM Reasoning Score (15% weight) ──────────
+        reasoning_score = self._compute_reasoning_score(
+            context, component_scores, risk_factors
+        )
+
+        # ── 5. Weighted combination ──────────────────────────────
+        weighted_score = (
+            0.50 * fact_check_score
+            + 0.20 * source_credibility_score
+            + 0.15 * ml_model_score
+            + 0.15 * reasoning_score
+        )
+
+        # ── 6. Signal correlations (adjustments) ─────────────────
         correlation_adjustment = self._compute_signal_correlations(
             context, signal_correlations, risk_factors
         )
+        weighted_score += correlation_adjustment
 
-        # ── 3. Claim verdict compounding ─────────────────────────
-        verdict_penalty = self._compute_verdict_penalty(
-            context, risk_factors
-        )
-
-        # ── 4. Compute raw trust score ───────────────────────────
-        raw_score = base_score - deepfake_penalty - voice_penalty - ai_penalty
-        raw_score += correlation_adjustment
-        raw_score -= verdict_penalty
-
-        # ── 5. Crisis amplification ──────────────────────────────
+        # ── 7. Crisis amplification ──────────────────────────────
         if context.is_crisis:
-            crisis_penalty = 0.08
-            raw_score -= crisis_penalty
+            weighted_score -= 0.08
             risk_factors.append(
                 "CRISIS FLAG: Content is spreading rapidly — higher scrutiny applied"
             )
 
-        # ── 6. Clamp and convert ─────────────────────────────────
-        trust_score = int(round(max(0.0, min(1.0, raw_score)) * 100))
+        # ── 8. Clamp and convert ─────────────────────────────────
+        trust_score = int(round(max(0.0, min(1.0, weighted_score)) * 100))
 
-        # ── 7. Determine verdict ─────────────────────────────────
+        # ── 9. Determine verdict ─────────────────────────────────
         verdict = self._determine_verdict(trust_score, context)
 
-        # ── 8. Confidence scoring ────────────────────────────────
+        # ── 10. Confidence scoring ───────────────────────────────
         confidence_profile = self._confidence_scorer.compute(context)
 
         result = AggregatedResult(
@@ -138,117 +145,181 @@ class ResultAggregator:
 
         logger.info(
             f"Aggregated result: trust_score={trust_score}, verdict={verdict}, "
-            f"correlations={len(signal_correlations)}, risks={len(risk_factors)}, "
-            f"confidence_band={confidence_profile.confidence_band}"
+            f"weighted=[FC={fact_check_score:.2f}, SC={source_credibility_score:.2f}, "
+            f"ML={ml_model_score:.2f}, LLM={reasoning_score:.2f}], "
+            f"correlations={len(signal_correlations)}, risks={len(risk_factors)}"
         )
 
         return result
 
     # ───────────────────────────────────────────────────────────
-    # Component scoring
+    # Weighted component scoring
     # ───────────────────────────────────────────────────────────
 
-    def _score_text_classifier(
+    def _compute_fact_check_score(
         self,
-        tc: Optional[TextClassificationResult],
+        context: "PipelineContext",
         scores: Dict[str, float],
         risks: List[str],
     ) -> float:
-        """Score the text classifier output. Returns base score (0–1)."""
-        if tc is None or tc.label == "unknown":
-            return 0.5  # Neutral baseline
+        """
+        Fact Check Score (50% weight).
+        FALSE=0%, MISLEADING=40%, UNVERIFIED=70%, TRUE=100%.
+        """
+        if not context.claim_verdicts:
+            scores["fact_check"] = 70.0  # Default: unverified
+            return 0.70
 
-        # Confidence floor: if confidence is too low, the classifier is guessing
-        # Treat it as neutral to avoid anchoring the result on noise
-        if tc.confidence < 0.40:
+        verdict_map = {
+            "FALSE": 0.0,
+            "MISLEADING": 0.40,
+            "UNVERIFIED": 0.70,
+            "TRUE": 1.0,
+            "PARTIALLY_TRUE": 0.55,
+        }
+
+        claim_scores = []
+        false_count = 0
+        for cv in context.claim_verdicts:
+            v = cv.verdict.value.upper()
+            claim_score = verdict_map.get(v, 0.70)
+            # Weight by confidence
+            claim_scores.append(claim_score * cv.confidence + (1 - cv.confidence) * 0.70)
+            if v == "FALSE":
+                false_count += 1
+
+        avg = sum(claim_scores) / len(claim_scores) if claim_scores else 0.70
+
+        if false_count > 0:
             risks.append(
-                f"Text classifier confidence too low ({tc.confidence:.0%}) — treating as neutral"
-            )
-            scores["text_classifier"] = 50.0
-            return 0.5  # Neutral baseline
-
-        if tc.label == "real":
-            base = 0.6 + tc.confidence * 0.4  # 0.6 → 1.0
-        elif tc.label == "misleading":
-            base = 0.5 + (0.5 - tc.confidence) * 0.2  # ~0.4 → 0.5
-            risks.append(
-                f"Text classifier flags content as MISLEADING ({tc.confidence:.0%} confidence)"
-            )
-        else:  # fake
-            base = 0.4 - tc.confidence * 0.4  # 0.0 → 0.4
-            risks.append(
-                f"Text classifier flags content as FAKE ({tc.confidence:.0%} confidence)"
+                f"{false_count}/{len(context.claim_verdicts)} claims verified as FALSE"
             )
 
-        scores["text_classifier"] = round(base * 100, 1)
-        return base
+        scores["fact_check"] = round(avg * 100, 1)
+        return avg
 
-    def _score_deepfake(
+    def _compute_source_credibility_score(
         self,
-        df: Optional[DeepfakeResult],
+        context: "PipelineContext",
         scores: Dict[str, float],
         risks: List[str],
     ) -> float:
-        """Score deepfake detector. Returns penalty (0–0.4)."""
-        if df is None:
-            return 0.0
+        """
+        Source Credibility Score (20% weight).
+        Average domain credibility of retrieved evidence.
+        """
+        if not context.evidence_map:
+            scores["source_credibility"] = 50.0
+            return 0.50
 
-        penalty = df.confidence * 0.4
-        scores["deepfake_detector"] = round((1.0 - df.confidence) * 100, 1)
+        all_scores = []
+        for claim_text, evidence_list in context.evidence_map.items():
+            for ev in evidence_list:
+                if hasattr(ev, "source_score"):
+                    all_scores.append(ev.source_score)
 
-        if df.is_deepfake:
-            risks.append(
-                f"Deepfake detected in visual content ({df.confidence:.0%} confidence)"
-            )
-        if df.needs_human_review:
-            risks.append("Visual content flagged for human review")
+        if not all_scores:
+            scores["source_credibility"] = 50.0
+            return 0.50
 
-        return penalty
+        avg = sum(all_scores) / len(all_scores)
+        scores["source_credibility"] = round(avg * 100, 1)
 
-    def _score_voice_clone(
+        if avg < 0.4:
+            risks.append(f"Low source credibility ({avg:.0%} average)")
+
+        return avg
+
+    def _compute_ml_model_score(
         self,
-        vc: Optional[VoiceCloneResult],
+        context: "PipelineContext",
         scores: Dict[str, float],
         risks: List[str],
     ) -> float:
-        """Score voice clone detector. Returns penalty (0–0.3)."""
-        if vc is None:
-            return 0.0
+        """
+        ML Model Score (15% weight).
+        Weighted average of text classifier, deepfake, voice clone, and AI detection.
+        """
+        ml_scores = []
 
-        penalty = vc.anomaly_score * 0.3
-        scores["voice_detector"] = round((1.0 - vc.anomaly_score) * 100, 1)
+        # Text classifier
+        tc = context.text_classification
+        if tc and tc.label != "unknown" and tc.confidence >= 0.40:
+            if tc.label == "real":
+                tc_score = 0.6 + tc.confidence * 0.4
+            elif tc.label == "misleading":
+                tc_score = 0.5 - tc.confidence * 0.2
+                risks.append(f"Text classifier: MISLEADING ({tc.confidence:.0%})")
+            else:  # fake
+                tc_score = 0.4 - tc.confidence * 0.4
+                risks.append(f"Text classifier: FAKE ({tc.confidence:.0%})")
+            ml_scores.append(tc_score)
+            scores["text_classifier"] = round(tc_score * 100, 1)
 
-        if vc.is_cloned:
-            risks.append(
-                f"Voice cloning detected ({vc.confidence:.0%} confidence)"
-            )
+        # Deepfake
+        df = context.deepfake_result
+        if df:
+            df_score = 1.0 - df.confidence
+            ml_scores.append(df_score)
+            scores["deepfake_detector"] = round(df_score * 100, 1)
+            if df.is_deepfake:
+                risks.append(f"Deepfake detected ({df.confidence:.0%})")
 
-        return penalty
+        # Voice clone
+        vc = context.voice_clone_result
+        if vc:
+            vc_score = 1.0 - vc.anomaly_score
+            ml_scores.append(vc_score)
+            scores["voice_detector"] = round(vc_score * 100, 1)
+            if vc.is_cloned:
+                risks.append(f"Voice cloning detected ({vc.confidence:.0%})")
 
-    def _score_ai_content(
+        # AI content
+        ai = context.ai_content_result
+        if ai:
+            ai_score = 1.0 - ai.ai_generated_probability
+            ml_scores.append(ai_score)
+            scores["ai_content_detector"] = round(ai_score * 100, 1)
+            if ai.ai_generated_probability > 0.7:
+                risks.append(f"AI-generated content ({ai.ai_generated_probability:.0%})")
+
+        if not ml_scores:
+            scores["ml_model"] = 50.0
+            return 0.50
+
+        avg = sum(ml_scores) / len(ml_scores)
+        scores["ml_model"] = round(avg * 100, 1)
+        return avg
+
+    def _compute_reasoning_score(
         self,
-        ai: Optional[AIContentResult],
+        context: "PipelineContext",
         scores: Dict[str, float],
         risks: List[str],
     ) -> float:
-        """Score AI content detector. Returns penalty (0–0.3)."""
-        if ai is None:
-            return 0.0
+        """
+        Gemini/LLM Reasoning Score (15% weight).
+        Based on claim verdict confidence scores from LLM reasoning.
+        """
+        if not context.claim_verdicts:
+            scores["reasoning"] = 50.0
+            return 0.50
 
-        prob = ai.ai_generated_probability
-        penalty = prob * 0.3
-        scores["ai_content_detector"] = round((1.0 - prob) * 100, 1)
+        confidences = [cv.confidence for cv in context.claim_verdicts if cv.confidence > 0]
+        if not confidences:
+            scores["reasoning"] = 50.0
+            return 0.50
 
-        if prob > 0.7:
-            risks.append(
-                f"Content is likely AI-generated ({prob:.0%} probability)"
-            )
-        elif prob > 0.4:
-            risks.append(
-                f"Moderate AI-generation signal detected ({prob:.0%} probability)"
-            )
+        # Higher confidence in verdicts = better reasoning quality
+        avg_confidence = sum(confidences) / len(confidences)
+        # Combine with verdict direction
+        true_count = sum(1 for cv in context.claim_verdicts if cv.verdict.value.upper() == "TRUE")
+        total = len(context.claim_verdicts)
+        truth_ratio = true_count / total if total else 0.5
 
-        return penalty
+        reasoning_score = 0.5 * avg_confidence + 0.5 * truth_ratio
+        scores["reasoning"] = round(reasoning_score * 100, 1)
+        return reasoning_score
 
     # ───────────────────────────────────────────────────────────
     # Signal correlation

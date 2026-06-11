@@ -21,25 +21,48 @@ class VoiceCloneDetector:
 
     CLONE_THRESHOLD = 0.5
 
+    # ── Class-level model cache (singleton per process) ──────
+    _shared_encoder = None
+    _shared_encoder_loaded = False
+
     def __init__(self):
         self._encoder = None
         self._is_loaded = False
 
     def _load_models(self):
-        """Lazy-load speaker verification models."""
+        """Lazy-load speaker verification models (cached at class level)."""
         if self._is_loaded:
             return
+        # Use class-level cache so model loads once per process
+        if VoiceCloneDetector._shared_encoder_loaded:
+            self._encoder = VoiceCloneDetector._shared_encoder
+            self._is_loaded = True
+            return
+
+        import os
+        # If running on Render or low-memory environment, do not load heavy SpeechBrain models (prevents OOM crashes)
+        if os.getenv("LOW_MEMORY") == "true" or os.getenv("RENDER") == "true":
+            logger.info("Low memory or Render environment detected. Skipping ECAPA-TDNN voice clone model loading.")
+            VoiceCloneDetector._shared_encoder_loaded = True
+            self._encoder = None
+            self._is_loaded = True
+            return
+
         try:
             from speechbrain.inference.speaker import EncoderClassifier
 
-            self._encoder = EncoderClassifier.from_hparams(
+            VoiceCloneDetector._shared_encoder = EncoderClassifier.from_hparams(
                 source="speechbrain/spkrec-ecapa-voxceleb",
                 run_opts={"device": "cpu"},
             )
+            VoiceCloneDetector._shared_encoder_loaded = True
+            self._encoder = VoiceCloneDetector._shared_encoder
             self._is_loaded = True
-            logger.info("ECAPA-TDNN voice clone detector loaded.")
+            logger.info("ECAPA-TDNN voice clone detector loaded (cached at class level).")
         except Exception as e:
             logger.warning(f"Voice clone models unavailable: {e}")
+            VoiceCloneDetector._shared_encoder_loaded = True  # Don't retry
+            self._is_loaded = True
 
     def extract_embedding(self, audio_path: str) -> Optional[np.ndarray]:
         """Extract speaker embedding from audio."""

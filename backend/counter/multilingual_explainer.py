@@ -60,7 +60,7 @@ class MultilingualExplainer:
         self, content_summary: str, verdict: str, evidence_summary: str = ""
     ) -> Explanation:
         """
-        Generate explanations in all three supported languages.
+        Generate explanations in all three supported languages in a single LLM call.
 
         Args:
             content_summary: Brief description of the analyzed content
@@ -70,6 +70,12 @@ class MultilingualExplainer:
         Returns:
             Explanation with text in en, hi, ta
         """
+        # Try single-query multilingual generation (3x faster than sequential)
+        result = self._generate_all_languages(content_summary, verdict, evidence_summary)
+        if result:
+            return result
+
+        # Fallback to sequential generation if single-query fails
         explanations = {}
         for lang_code, lang_name in self.LANG_NAMES.items():
             text = self._generate_explanation(
@@ -82,6 +88,84 @@ class MultilingualExplainer:
             text_hi=explanations.get("hi", ""),
             text_ta=explanations.get("ta", ""),
         )
+
+    def _generate_all_languages(
+        self, content_summary: str, verdict: str, evidence_summary: str
+    ) -> Optional[Explanation]:
+        """Generate explanations in all 3 languages in a single LLM call."""
+        system_prompt = """You are a fact-checker. Explain why content is flagged in simple language.
+Keep each explanation under 100 words. Use no jargon. Do not mention that you are an AI.
+
+Respond with ONLY a JSON object (no markdown, no code fences):
+{
+    "en": "English explanation",
+    "hi": "Hindi explanation",
+    "ta": "Tamil explanation"
+}"""
+        user_message = f"""Content: {content_summary[:500]}
+Verdict: {verdict}
+Key Evidence: {evidence_summary[:300] if evidence_summary else 'No specific evidence available.'}
+
+Generate simple explanations in English, Hindi, and Tamil."""
+
+        # Try Gemini first
+        gemini = self._get_gemini_client()
+        if gemini:
+            try:
+                from backend.config import GEMINI_MODEL
+                from google.genai import types
+                response = gemini.models.generate_content(
+                    model=GEMINI_MODEL,
+                    contents=user_message,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_prompt,
+                        temperature=0.2,
+                    )
+                )
+                return self._parse_multilingual_response(response.text.strip(), verdict)
+            except Exception as e:
+                logger.warning(f"Gemini multilingual generation failed: {e}")
+
+        # Try Claude
+        claude = self._get_claude_client()
+        if claude:
+            try:
+                response = claude.messages.create(
+                    model=CLAUDE_MODEL,
+                    max_tokens=600,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_message}],
+                )
+                return self._parse_multilingual_response(response.content[0].text.strip(), verdict)
+            except Exception as e:
+                logger.warning(f"Claude multilingual generation failed: {e}")
+
+        return None
+
+    def _parse_multilingual_response(self, response_text: str, verdict: str) -> Optional[Explanation]:
+        """Parse a multilingual JSON response into an Explanation."""
+        try:
+            # Strip markdown code fences if present
+            text = response_text
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0].strip()
+            elif "```" in text:
+                text = text.split("```")[1].split("```")[0].strip()
+            
+            result = json.loads(text)
+            en = result.get("en", "")
+            hi = result.get("hi", "")
+            ta = result.get("ta", "")
+            
+            if en:  # At minimum we need English
+                return Explanation(
+                    text_en=en,
+                    text_hi=hi or self._fallback_explanation(verdict, "hi"),
+                    text_ta=ta or self._fallback_explanation(verdict, "ta"),
+                )
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.warning(f"Failed to parse multilingual response: {e}")
+        return None
 
     def _generate_explanation(
         self,

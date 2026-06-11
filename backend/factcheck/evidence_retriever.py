@@ -53,6 +53,30 @@ class EvidenceRetriever:
 
     MAX_EVIDENCE_PER_CLAIM = 12
 
+    # ── Class-level persistent HTTP session (Keep-Alive + connection pooling) ──
+    _session = None
+
+    @classmethod
+    def _get_session(cls) -> requests.Session:
+        """Get or create a persistent requests.Session with connection pooling."""
+        if cls._session is None:
+            cls._session = requests.Session()
+            cls._session.headers.update({
+                "User-Agent": "TruthShield/2.0",
+                "Accept": "application/json, text/html, */*",
+                "Connection": "keep-alive",
+            })
+            # Configure connection pooling
+            adapter = requests.adapters.HTTPAdapter(
+                pool_connections=10,
+                pool_maxsize=20,
+                max_retries=1,
+            )
+            cls._session.mount("https://", adapter)
+            cls._session.mount("http://", adapter)
+            logger.info("Persistent HTTP session created with connection pooling.")
+        return cls._session
+
     # ──────────────────────────────────────────────────────────
     # Public API
     # ──────────────────────────────────────────────────────────
@@ -253,7 +277,7 @@ class EvidenceRetriever:
         data = {"q": query}
         results = []
         try:
-            resp = requests.post(url, headers=headers, data=data, timeout=6)
+            resp = self._get_session().post(url, headers=headers, data=data, timeout=3)
             if resp.status_code != 200:
                 logger.warning(f"DDG Lite fallback returned status code {resp.status_code}")
                 return []
@@ -294,7 +318,7 @@ class EvidenceRetriever:
         url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
         results = []
         try:
-            resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=6)
+            resp = self._get_session().get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=3)
             if resp.status_code != 200 or feedparser is None:
                 return []
 
@@ -335,11 +359,10 @@ class EvidenceRetriever:
                 "format": "json",
                 "srlimit": 2,
             }
-            resp = requests.get(
+            resp = self._get_session().get(
                 "https://en.wikipedia.org/w/api.php",
                 params=params,
-                headers={"User-Agent": "TruthShield/2.0"},
-                timeout=5,
+                timeout=3,
             )
             data = resp.json()
 
@@ -359,10 +382,9 @@ class EvidenceRetriever:
                         "titles": page_title,
                         "format": "json",
                     }
-                    ext_resp = requests.get(
+                    ext_resp = self._get_session().get(
                         "https://en.wikipedia.org/w/api.php",
                         params=extract_params,
-                        headers={"User-Agent": "TruthShield/2.0"},
                         timeout=3,
                     )
                     ext_data = ext_resp.json()
@@ -406,11 +428,10 @@ class EvidenceRetriever:
                 "format": "json",
                 "limit": 2
             }
-            resp = requests.get(
+            resp = self._get_session().get(
                 "https://www.wikidata.org/w/api.php",
                 params=search_params,
-                headers={"User-Agent": "TruthShield/2.0"},
-                timeout=5
+                timeout=3,
             )
             if resp.status_code != 200:
                 return []
@@ -453,10 +474,10 @@ class EvidenceRetriever:
             if key and len(key) > 5:
                 params["key"] = key
 
-            resp = requests.get(
+            resp = self._get_session().get(
                 "https://factchecktools.googleapis.com/v1alpha1/claims:search",
                 params=params,
-                timeout=5,
+                timeout=3,
             )
             if resp.status_code != 200:
                 logger.debug(f"Google Fact Check API skipped or status code {resp.status_code}")
@@ -501,7 +522,7 @@ class EvidenceRetriever:
 
         for name, url in feeds:
             try:
-                resp = requests.get(url, headers={"User-Agent": "TruthShield/2.0"}, timeout=5)
+                resp = self._get_session().get(url, timeout=3)
                 if resp.status_code != 200:
                     continue
 

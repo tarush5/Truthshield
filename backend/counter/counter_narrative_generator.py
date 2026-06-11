@@ -5,7 +5,7 @@ Generate fact-grounded counter-narratives in multiple languages via Claude.
 
 import json
 import logging
-from typing import List
+from typing import List, Optional
 
 from backend.config import CLAUDE_MAX_TOKENS, CLAUDE_MODEL, get_settings
 from backend.models.schemas import ClaimVerdict, CounterNarrative
@@ -64,7 +64,7 @@ class CounterNarrativeGenerator:
         self, original_text: str, claim_verdicts: List[ClaimVerdict]
     ) -> CounterNarrative:
         """
-        Generate counter-narrative in all three languages.
+        Generate counter-narrative in all three languages in a single LLM call.
 
         Args:
             original_text: The original content text
@@ -84,6 +84,17 @@ class CounterNarrativeGenerator:
                 evidence_text += f"  [Source {len(all_sources)+1}] {ev.title} ({ev.url}): {ev.snippet[:150]}\n"
                 all_sources.append(ev.url)
 
+        # Try single-query multilingual generation (3x faster)
+        result = self._generate_all_languages(original_text, evidence_text)
+        if result:
+            return CounterNarrative(
+                summary_en=result.get("en", ""),
+                summary_hi=result.get("hi", ""),
+                summary_ta=result.get("ta", ""),
+                sources_cited=list(set(all_sources)),
+            )
+
+        # Fallback to sequential generation
         summaries = {}
         for lang_code, lang_name in self.LANG_NAMES.items():
             summary, sources = self._generate_single(
@@ -97,6 +108,74 @@ class CounterNarrativeGenerator:
             summary_ta=summaries.get("ta", ""),
             sources_cited=list(set(all_sources)),
         )
+
+    def _generate_all_languages(self, original_text: str, evidence_text: str) -> Optional[dict]:
+        """Generate counter-narratives in all 3 languages in a single LLM call."""
+        system_prompt = """Generate concise, factual counter-narratives grounded only in verified evidence.
+Do not add unsupported claims. Cite sources inline using [Source N] markers.
+
+Respond with ONLY a JSON object (no markdown, no code fences):
+{
+    "en": "English counter-narrative with [Source N] citations",
+    "hi": "Hindi counter-narrative with [Source N] citations",
+    "ta": "Tamil counter-narrative with [Source N] citations"
+}"""
+        user_message = f"""ORIGINAL CONTENT:
+{original_text[:1000]}
+
+VERIFIED EVIDENCE AND VERDICTS:
+{evidence_text[:2000]}
+
+Generate factual counter-narratives in English, Hindi, and Tamil."""
+
+        # Try Gemini first
+        gemini = self._get_gemini_client()
+        if gemini:
+            try:
+                from backend.config import GEMINI_MODEL
+                from google.genai import types
+                response = gemini.models.generate_content(
+                    model=GEMINI_MODEL,
+                    contents=user_message,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_prompt,
+                        temperature=0.2,
+                    )
+                )
+                return self._parse_multilingual_cn_response(response.text.strip())
+            except Exception as e:
+                logger.warning(f"Gemini multilingual CN generation failed: {e}")
+
+        # Try Claude
+        claude = self._get_claude_client()
+        if claude:
+            try:
+                response = claude.messages.create(
+                    model=CLAUDE_MODEL,
+                    max_tokens=CLAUDE_MAX_TOKENS,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_message}],
+                )
+                return self._parse_multilingual_cn_response(response.content[0].text.strip())
+            except Exception as e:
+                logger.warning(f"Claude multilingual CN generation failed: {e}")
+
+        return None
+
+    def _parse_multilingual_cn_response(self, response_text: str) -> Optional[dict]:
+        """Parse a multilingual JSON response into a dict with en/hi/ta keys."""
+        try:
+            text = response_text
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0].strip()
+            elif "```" in text:
+                text = text.split("```")[1].split("```")[0].strip()
+            result = json.loads(text)
+            if "en" in result:
+                return result
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.warning(f"Failed to parse multilingual CN response: {e}")
+        return None
 
     def _generate_single(
         self,

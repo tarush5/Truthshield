@@ -153,6 +153,9 @@ export default function Analyze() {
             });
             clearInterval(interval);
 
+            if (response.status === 401 || response.status === 403) {
+              throw new Error('Authentication required. Please log in to analyze claims.');
+            }
             if (!response.ok) throw new Error(`Analysis failed: ${response.statusText}`);
 
             const data = await response.json();
@@ -163,7 +166,11 @@ export default function Analyze() {
             setTimeout(() => navigate(`/report/${data.id}`), 1800);
           } catch (httpErr) {
             console.error('HTTP fallback also failed:', httpErr);
-            setError('Connection failed. Please check if the backend is running.');
+            if (httpErr.message && httpErr.message.includes('Authentication required')) {
+              setError(httpErr.message);
+            } else {
+              setError('Connection failed. Please check if the backend is running.');
+            }
             setAnalyzing(false);
             setCurrentStage(null);
             setProgress(0);
@@ -209,6 +216,9 @@ export default function Analyze() {
 
       clearInterval(interval);
 
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Authentication required. Please log in to analyze claims.');
+      }
       if (!response.ok) throw new Error(`Analysis failed: ${response.statusText}`);
 
       const data = await response.json();

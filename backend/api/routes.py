@@ -332,10 +332,12 @@ async def oauth_verify(payload: dict, db: Session = Depends(get_db)):
     if settings.SUPABASE_JWT_SECRET and supabase_token:
         try:
             from jose import jwt as jose_jwt
+            header = jose_jwt.get_unverified_header(supabase_token)
+            alg = header.get("alg", "HS256")
             token_payload = jose_jwt.decode(
                 supabase_token,
                 settings.SUPABASE_JWT_SECRET,
-                algorithms=[settings.JWT_ALGORITHM],
+                algorithms=[alg, "HS256", "RS256"],
                 options={"verify_aud": False},
             )
             # Ensure email in token matches email in payload

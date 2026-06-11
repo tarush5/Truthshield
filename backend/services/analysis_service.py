@@ -66,6 +66,7 @@ class AnalysisService:
                 risk_factors_json=json.dumps(report.risk_factors) if report.risk_factors else None,
                 signal_correlations_json=json.dumps(report.signal_correlations) if report.signal_correlations else None,
                 confidence_profile_json=json.dumps(report.confidence_profile) if report.confidence_profile else None,
+                verdict_reasons_json=json.dumps(report.verdict_reasons) if report.verdict_reasons else None,
                 processing_time_seconds=report.processing_time_seconds or 0.0,
             )
             db.add(db_report)

@@ -44,6 +44,7 @@ class AggregatedResult(BaseModel):
     signal_correlations: Dict[str, float] = Field(default_factory=dict)
     risk_factors: List[str] = Field(default_factory=list)
     confidence_profile: Optional[ConfidenceProfile] = None
+    verdict_reasons: List[str] = Field(default_factory=list)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -69,22 +70,22 @@ class ResultAggregator:
 
     def aggregate(self, context: "PipelineContext") -> AggregatedResult:
         """
-        Aggregate all pipeline signals into a unified result using weighted trust score:
+        Aggregate all pipeline signals into a unified result using the weighted trust score:
         
-        Trust Score = 0.50 × Fact Check + 0.20 × Source Credibility 
-                    + 0.15 × ML Model + 0.15 × Gemini Reasoning
+        Trust Score = 0.40 * Fact Match + 0.25 * Evidence Strength 
+                    + 0.20 * Source Credibility + 0.15 * Stance Score
 
         Args:
             context: PipelineContext with all detector and verdict results
 
         Returns:
-            AggregatedResult with trust_score, verdict, correlations, risk factors
+            AggregatedResult with trust_score, verdict, component_scores, correlations, risk factors
         """
         component_scores: Dict[str, float] = {}
         signal_correlations: Dict[str, float] = {}
         risk_factors: List[str] = []
 
-        # ── 1. Fact Check Score (50% weight) ─────────────────────
+        # ── 1. Fact Check Score (40% weight) ─────────────────────
         fact_check_score = self._compute_fact_check_score(
             context, component_scores, risk_factors
         )
@@ -94,41 +95,17 @@ class ResultAggregator:
             context, component_scores, risk_factors
         )
 
-        # ── 3. ML Model Score (15% weight) ───────────────────────
+        # ── 3. ML Model Score (needed for fallback & risk factors) ───────────────────────
         ml_model_score = self._compute_ml_model_score(
             context, component_scores, risk_factors
         )
 
-        # ── 4. Gemini/LLM Reasoning Score (15% weight) ──────────
+        # ── 4. Gemini/LLM Reasoning Score ──────────────────
         reasoning_score = self._compute_reasoning_score(
             context, component_scores, risk_factors
         )
 
-        # ── 5. Weighted combination ──────────────────────────────
-        weighted_score = (
-            0.50 * fact_check_score
-            + 0.20 * source_credibility_score
-            + 0.15 * ml_model_score
-            + 0.15 * reasoning_score
-        )
-
-        # ── 6. Signal correlations (adjustments) ─────────────────
-        correlation_adjustment = self._compute_signal_correlations(
-            context, signal_correlations, risk_factors
-        )
-        weighted_score += correlation_adjustment
-
-        # ── 7. Crisis amplification ──────────────────────────────
-        if context.is_crisis:
-            weighted_score -= 0.08
-            risk_factors.append(
-                "CRISIS FLAG: Content is spreading rapidly — higher scrutiny applied"
-            )
-
-        # ── 8. Clamp and convert ─────────────────────────────────
-        trust_score = int(round(max(0.0, min(1.0, weighted_score)) * 100))
-
-        # ── 9. Compute support and refute scores for verdict determination ──
+        # ── 5. Compute support, refute, and stance scores ────────
         support_scores = []
         refute_scores = []
 
@@ -148,15 +125,18 @@ class ResultAggregator:
                 v = cv.verdict.value.upper() if hasattr(cv.verdict, "value") else str(cv.verdict).upper()
                 
                 # Claim verdict signals
-                if v == "TRUE":
+                if v in ("TRUE", "VERIFIED", "LIKELY TRUE"):
                     cv_support = cv.confidence
                     cv_refute = 0.0
-                elif v == "FALSE":
+                elif v in ("FALSE", "LIKELY FALSE"):
                     cv_support = 0.0
                     cv_refute = cv.confidence
-                elif v == "MISLEADING":
-                    cv_support = cv.confidence * 0.3
-                    cv_refute = cv.confidence * 0.7
+                elif v in ("MISLEADING", "PARTIALLY TRUE", "PARTIALLY_TRUE"):
+                    cv_support = cv.confidence * 0.5
+                    cv_refute = cv.confidence * 0.3
+                elif v == "MIXED EVIDENCE":
+                    cv_support = cv.confidence * 0.4
+                    cv_refute = cv.confidence * 0.4
                 else:  # UNVERIFIED
                     cv_support = 0.0
                     cv_refute = 0.0
@@ -176,9 +156,10 @@ class ResultAggregator:
             support_score = sum(support_scores) / len(support_scores)
             refute_score = sum(refute_scores) / len(refute_scores)
 
-        # ── 10. Expose multi-dimensional components for the frontend ──
-        component_scores["fact_match"] = round(fact_check_score * 100, 1)
-        
+        # Stance Score (ratio of supporting vs refuting evidence)
+        stance_score = support_score / (support_score + refute_score) if (support_score + refute_score) > 0.0 else 0.5
+
+        # ── 6. Compute Evidence Strength ──────────────────────────
         all_ev = []
         stance_sig = 0
         for cv in context.claim_verdicts:
@@ -191,17 +172,133 @@ class ResultAggregator:
         avg_conf = sum(cv.confidence for cv in context.claim_verdicts) / len(context.claim_verdicts) if context.claim_verdicts else 0.5
         ev_strength_val = (avg_conf * 0.6 + stance_ratio * 0.4)
         source_count_factor = min(1.0, len(all_ev) / 4.0) if all_ev else 0.5
-        ev_strength_val = ev_strength_val * 0.8 + source_count_factor * 0.2
-        component_scores["evidence_strength"] = round(max(0.1, min(1.0, ev_strength_val)) * 100, 1)
-        
-        manip_risk = round((1.0 - ml_model_score) * 100, 1)
-        component_scores["manipulation_risk"] = manip_risk
-        component_scores["bias_risk"] = manip_risk
+        evidence_strength = max(0.1, min(1.0, ev_strength_val * 0.8 + source_count_factor * 0.2))
+
+        # ── 7. Weighted combination (40/25/20/15 Trust Score formula) ──
+        weighted_score = (
+            0.40 * fact_check_score
+            + 0.25 * evidence_strength
+            + 0.20 * source_credibility_score
+            + 0.15 * stance_score
+        )
+
+        # ── 8. Signal correlations (adjustments) ─────────────────
+        correlation_adjustment = self._compute_signal_correlations(
+            context, signal_correlations, risk_factors
+        )
+        weighted_score += correlation_adjustment
+
+        # ── 9. Crisis amplification ──────────────────────────────
+        if context.is_crisis:
+            weighted_score -= 0.08
+            risk_factors.append(
+                "CRISIS FLAG: Content is spreading rapidly — higher scrutiny applied"
+            )
+
+        # ── 10. Clamp and convert ─────────────────────────────────
+        trust_score = int(round(max(0.0, min(1.0, weighted_score)) * 100))
 
         # ── 11. Determine verdict ────────────────────────────────
         verdict = self._determine_verdict(trust_score, context, support_score, refute_score)
 
-        # ── 12. Confidence scoring ───────────────────────────────
+        # ── 11b. Calibrate trust score based on verdict bounds ────
+        if verdict == "VERIFIED":
+            trust_score = max(trust_score, 85)
+        elif verdict == "FALSE":
+            trust_score = min(trust_score, 25)
+        elif verdict == "LIKELY TRUE":
+            trust_score = max(65, min(trust_score, 84))
+        elif verdict == "LIKELY FALSE":
+            trust_score = max(15, min(trust_score, 44))
+        elif verdict in ("PARTIALLY TRUE", "MIXED EVIDENCE"):
+            trust_score = max(45, min(trust_score, 64))
+        else: # INSUFFICIENT EVIDENCE
+            trust_score = max(25, min(trust_score, 55))
+
+        # ── 12. Expose exact 4D signal vectors for the frontend chart ──
+        component_scores = {
+            "fact_match": round(fact_check_score * 100, 1),
+            "source_credibility": round(source_credibility_score * 100, 1),
+            "evidence_strength": round(evidence_strength * 100, 1),
+            "manipulation_risk": round((1.0 - ml_model_score) * 100, 1),
+        }
+
+        # ── 13. Dynamically generate verdict reasons ──────────────
+        verdict_reasons = []
+        
+        # 1. Fact Check Match Bypass / API match
+        has_bypass_match = False
+        for cv in context.claim_verdicts:
+            if "Fact Check Match Found" in (cv.reasoning or ""):
+                has_bypass_match = True
+                verdict_reasons.append("Confirmed by Fact Check API / database match")
+                break
+        
+        # 2. Independent source counts
+        supports_count = 0
+        refutes_count = 0
+        for ev in all_ev:
+            stance = getattr(ev, "stance", "NEUTRAL")
+            if stance == "SUPPORTS":
+                supports_count += 1
+            elif stance == "REFUTES":
+                refutes_count += 1
+
+        if not has_bypass_match:
+            if supports_count >= 2:
+                verdict_reasons.append(f"Supported by {supports_count} independent sources")
+            elif supports_count == 1:
+                verdict_reasons.append("Supported by 1 independent source")
+                
+            if refutes_count >= 2:
+                verdict_reasons.append(f"Contradicted by {refutes_count} sources")
+            elif refutes_count == 1:
+                verdict_reasons.append("Contradicted by 1 source")
+
+        # 3. High credibility news matches
+        high_cred_sources = []
+        for ev in all_ev:
+            domain = ""
+            try:
+                from urllib.parse import urlparse
+                domain = urlparse(ev.url).netloc.lower()
+            except Exception:
+                pass
+            if any(known in domain for known in ["reuters.com", "apnews.com", "bbc.com", "bbc.co.uk", "who.int", "un.org"]):
+                high_cred_sources.append(domain)
+        
+        if high_cred_sources:
+            unique_sources = list(set(high_cred_sources))
+            sources_str = ", ".join(unique_sources[:2])
+            verdict_reasons.append(f"High-credibility source ({sources_str}) matches claim")
+
+        # 4. Deepfake check
+        df = context.deepfake_result
+        if df:
+            if df.is_deepfake:
+                verdict_reasons.append(f"Visual deepfake anomaly detected (confidence: {df.confidence:.0%})")
+            else:
+                verdict_reasons.append("No contradicting visual deepfake or anomalies detected")
+        else:
+            verdict_reasons.append("No contradicting visual deepfake or anomalies detected")
+
+        # 5. Voice clone check
+        vc = context.voice_clone_result
+        if vc:
+            if vc.is_cloned:
+                verdict_reasons.append(f"Voice clone pattern detected (anomaly: {vc.anomaly_score:.0%})")
+            else:
+                verdict_reasons.append("Voice authenticity verified (no cloning detected)")
+        else:
+            verdict_reasons.append("Voice authenticity verified (no cloning detected)")
+                
+        # 6. AI text generation check
+        ai = context.ai_content_result
+        if ai:
+            if ai.ai_generated_probability > 0.7:
+                verdict_reasons.append(f"High probability of AI-generated text ({ai.ai_generated_probability:.0%})")
+
+        # ── 14. Confidence scoring ───────────────────────────────
         confidence_profile = self._confidence_scorer.compute(context)
 
         result = AggregatedResult(
@@ -211,12 +308,13 @@ class ResultAggregator:
             signal_correlations=signal_correlations,
             risk_factors=risk_factors,
             confidence_profile=confidence_profile,
+            verdict_reasons=verdict_reasons,
         )
 
         logger.info(
             f"Aggregated result: trust_score={trust_score}, verdict={verdict}, "
             f"weighted=[FC={fact_check_score:.2f}, SC={source_credibility_score:.2f}, "
-            f"ML={ml_model_score:.2f}, LLM={reasoning_score:.2f}], "
+            f"ES={evidence_strength:.2f}, SS={stance_score:.2f}], "
             f"correlations={len(signal_correlations)}, risks={len(risk_factors)}"
         )
 
@@ -527,25 +625,36 @@ class ResultAggregator:
         """Determine overall verdict from support and refute scores."""
         # If no support/refute scores are provided, derive them from trust_score
         if support_score == 0.0 and refute_score == 0.0:
-            if trust_score >= 75:
+            if trust_score >= 85:
                 support_score = trust_score / 100.0
                 refute_score = 0.0
-            elif trust_score <= 35:
+            elif trust_score >= 65:
+                support_score = trust_score / 100.0
+                refute_score = 0.0
+            elif trust_score >= 45:
+                support_score = trust_score / 100.0
+                refute_score = 0.0
+            elif trust_score <= 15:
+                support_score = 0.0
+                refute_score = (100.0 - trust_score) / 100.0
+            elif trust_score <= 45:
                 support_score = 0.0
                 refute_score = (100.0 - trust_score) / 100.0
             else:
                 support_score = 0.0
                 refute_score = 0.0
 
-        if support_score >= 0.80:
+        if support_score >= 0.85:
             return "VERIFIED"
-        elif support_score >= 0.55:
-            return "LIKELY TRUE"
-        elif refute_score >= 0.80:
+        elif refute_score >= 0.85:
             return "FALSE"
+        elif support_score >= 0.65:
+            return "LIKELY TRUE"
         elif refute_score >= 0.55:
             return "LIKELY FALSE"
-        elif support_score >= 0.25 and refute_score >= 0.25:
+        elif support_score >= 0.45:
+            return "PARTIALLY TRUE"
+        elif support_score >= 0.20 and refute_score >= 0.20:
             return "MIXED EVIDENCE"
         else:
             return "INSUFFICIENT EVIDENCE"

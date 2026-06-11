@@ -441,6 +441,7 @@ def run_async_analysis_in_background(
             db_report.risk_factors_json = json.dumps(report.risk_factors) if report.risk_factors else None
             db_report.signal_correlations_json = json.dumps(report.signal_correlations) if report.signal_correlations else None
             db_report.confidence_profile_json = json.dumps(report.confidence_profile) if report.confidence_profile else None
+            db_report.verdict_reasons_json = json.dumps(report.verdict_reasons) if report.verdict_reasons else None
             db_report.processing_time_seconds = report.processing_time_seconds or 0.0
 
             # Save evidence
@@ -697,6 +698,13 @@ async def get_report(report_id: str, db: Session = Depends(get_db)):
             except Exception as e:
                 logger.warning(f"Failed to deserialize confidence_profile: {e}")
 
+        verdict_reasons = []
+        if hasattr(db_report, "verdict_reasons_json") and db_report.verdict_reasons_json:
+            try:
+                verdict_reasons = json.loads(db_report.verdict_reasons_json)
+            except Exception as e:
+                logger.warning(f"Failed to deserialize verdict_reasons: {e}")
+
         # Fallback for old records: reconstruct a claim if none exist in claims_json but there is evidence in the DB
         if not claims and db_report.evidence:
             from backend.models.schemas import Claim
@@ -735,6 +743,7 @@ async def get_report(report_id: str, db: Session = Depends(get_db)):
             risk_factors=risk_factors,
             signal_correlations=signal_correlations,
             confidence_profile=confidence_profile,
+            verdict_reasons=verdict_reasons,
             processing_time_seconds=db_report.processing_time_seconds or 0.0,
         )
     return report

@@ -126,6 +126,41 @@ class VerdictEngine:
             except Exception as e:
                 logger.warning(f"RAG retrieval skipped or failed: {e}")
 
+        # Check if there is an exact/matching fact-check review in the evidence to bypass LLM
+        if evidence:
+            for ev in evidence:
+                if ev.source_score >= 0.90:
+                    text_to_check = (ev.title + " " + ev.snippet).lower()
+                    rating_match = re.search(
+                        r"(?:rating|verdict|claim reviewed.*?rating):\s*(true|false|misleading|pants on fire|mostly false|mostly true|half true|unverified|insufficient)",
+                        text_to_check, re.IGNORECASE
+                    )
+                    if rating_match:
+                        rating_str = rating_match.group(1).lower()
+                        
+                        # Map rating to standard Verdict
+                        if rating_str in ("true", "mostly true"):
+                            mapped_verdict = Verdict.TRUE
+                            ev.stance = "SUPPORTS"
+                        elif rating_str in ("false", "pants on fire", "mostly false"):
+                            mapped_verdict = Verdict.FALSE
+                            ev.stance = "REFUTES"
+                        elif rating_str in ("half true", "misleading"):
+                            mapped_verdict = Verdict.MISLEADING
+                            ev.stance = "REFUTES"
+                        else:
+                            mapped_verdict = Verdict.UNVERIFIED
+                            ev.stance = "INSUFFICIENT"
+                        
+                        logger.info(f"Instant fact-check match found in evidence: {ev.title} (rating: {rating_str}) - Bypassing LLM")
+                        return ClaimVerdict(
+                            claim=claim,
+                            verdict=mapped_verdict,
+                            reasoning=f"Fact Check Match Found: The claim was directly reviewed by {ev.title.split(':')[0].replace(' RSS', '').replace(' Fact Check', '')} and rated as {rating_str.upper()}.",
+                            confidence=0.98,
+                            evidence=evidence,
+                        )
+
         # 1. Try Gemini Flash (fastest — ~1-2s with built-in Google Search)
         gemini = self._get_gemini_client()
         if gemini:

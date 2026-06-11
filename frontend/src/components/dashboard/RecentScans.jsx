@@ -9,6 +9,7 @@ const VERDICT_BADGE = {
   TRUE:                    'badge-success',
   VERIFIED:                'badge-success',
   'LIKELY TRUE':           'badge-success opacity-85',
+  'PARTIALLY TRUE':        'badge-warning',
   FALSE:                   'badge-danger',
   'LIKELY FALSE':          'badge-danger opacity-85',
   MISLEADING:              'badge-warning',

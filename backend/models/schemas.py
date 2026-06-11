@@ -185,6 +185,7 @@ class AnalysisReport(BaseModel):
     signal_correlations: Dict[str, float] = Field(default_factory=dict)
     risk_factors: List[str] = Field(default_factory=list)
     confidence_profile: Optional[Dict[str, Any]] = None
+    verdict_reasons: List[str] = Field(default_factory=list)
 
 
 class FeedbackRequest(BaseModel):

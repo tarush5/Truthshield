@@ -85,6 +85,7 @@ def analyze_content_task(
             db_report.risk_factors_json = json.dumps(report.risk_factors) if report.risk_factors else None
             db_report.signal_correlations_json = json.dumps(report.signal_correlations) if report.signal_correlations else None
             db_report.confidence_profile_json = json.dumps(report.confidence_profile) if report.confidence_profile else None
+            db_report.verdict_reasons_json = json.dumps(report.verdict_reasons) if report.verdict_reasons else None
             db_report.processing_time_seconds = report.processing_time_seconds or 0.0
 
             # Save any retrieved evidence

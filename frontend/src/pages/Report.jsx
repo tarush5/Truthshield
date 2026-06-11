@@ -113,6 +113,7 @@ export default function Report() {
 
   const getVerdictStyle = (verdict) => {
     const v = (verdict || '').toUpperCase();
+    if (v === 'PARTIALLY TRUE') return 'badge-warning';
     if (v === 'VERIFIED' || v.includes('TRUE') || v.includes('AUTHENTIC')) return 'badge-success';
     if (v === 'LIKELY TRUE') return 'badge-success opacity-85';
     if (v === 'FALSE') return 'badge-danger';
@@ -242,6 +243,30 @@ export default function Report() {
                   </div>
                 ))}
               </div>
+              </motion.div>
+            </InteractiveCard>
+          )}
+
+          {/* Audit Trail Checklist */}
+          {report.verdict_reasons && report.verdict_reasons.length > 0 && (
+            <InteractiveCard className="border border-white/5 bg-[#071124]/30 backdrop-blur-xl">
+              <motion.div
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="p-5 space-y-4"
+              >
+                <h3 className="section-label">Audit Trail Checklist</h3>
+                <div className="space-y-3 font-sans">
+                  {report.verdict_reasons.map((reason, idx) => (
+                    <div key={idx} className="flex items-start gap-2.5 text-xs text-white/75">
+                      <div className="mt-0.5 shrink-0 flex items-center justify-center w-4 h-4 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.2)]">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </div>
+                      <span className="leading-tight">{reason}</span>
+                    </div>
+                  ))}
+                </div>
               </motion.div>
             </InteractiveCard>
           )}

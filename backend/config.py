@@ -121,13 +121,15 @@ def get_settings() -> Settings:
 
 # ── Source Credibility Scores ─────────────────────────────────
 SOURCE_CREDIBILITY = {
-    "gov.in": 0.9,
-    "gov.uk": 0.9,
-    "gov": 0.85,
-    "reuters.com": 0.85,
-    "apnews.com": 0.85,
-    "bbc.com": 0.8,
-    "bbc.co.uk": 0.8,
+    "gov.in": 1.0,
+    "gov.uk": 1.0,
+    "gov": 1.0,
+    "reuters.com": 0.95,
+    "apnews.com": 0.95,
+    "bbc.com": 0.92,
+    "bbc.co.uk": 0.92,
+    "who.int": 0.98,
+    "un.org": 0.98,
     "thehindu.com": 0.8,
     "ndtv.com": 0.7,
     "indianexpress.com": 0.75,

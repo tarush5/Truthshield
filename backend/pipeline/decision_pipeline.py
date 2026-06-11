@@ -118,6 +118,7 @@ class PipelineContext:
         self.component_scores: Dict[str, float] = {}
         self.signal_correlations: Dict[str, float] = {}
         self.risk_factors: List[str] = []
+        self.verdict_reasons: List[str] = []
         self.confidence_profile_data: Optional[Dict[str, Any]] = None
 
         # ── Stage 5: Respond output ──────────────────────────────
@@ -601,6 +602,7 @@ class DecisionPipeline:
             ctx.component_scores = result.component_scores
             ctx.signal_correlations = result.signal_correlations
             ctx.risk_factors = result.risk_factors
+            ctx.verdict_reasons = result.verdict_reasons
 
             if result.confidence_profile:
                 ctx.confidence_profile_data = result.confidence_profile.model_dump()
@@ -740,6 +742,7 @@ class DecisionPipeline:
             signal_correlations=ctx.signal_correlations,
             risk_factors=ctx.risk_factors,
             confidence_profile=ctx.confidence_profile_data,
+            verdict_reasons=ctx.verdict_reasons,
         )
 
     def _build_error_report(

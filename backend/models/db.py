@@ -156,6 +156,7 @@ class Report(Base):
     risk_factors_json = Column(Text, nullable=True)
     signal_correlations_json = Column(Text, nullable=True)
     confidence_profile_json = Column(Text, nullable=True)
+    verdict_reasons_json = Column(Text, nullable=True)
     processing_time_seconds = Column(Float, nullable=True, default=0.0)
 
     evidence = relationship("EvidenceDB", back_populates="report", cascade="all, delete-orphan")
@@ -264,6 +265,7 @@ def init_db():
             ("risk_factors_json", "TEXT"),
             ("signal_correlations_json", "TEXT"),
             ("confidence_profile_json", "TEXT"),
+            ("verdict_reasons_json", "TEXT"),
             ("processing_time_seconds", "REAL"),
         ]
         with engine.connect() as conn:

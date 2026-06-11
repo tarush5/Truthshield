@@ -54,14 +54,14 @@ class SourceRanker:
                 return score
 
         # Check TLD-based scoring
-        if domain.endswith(".gov") or domain.endswith(".gov.in"):
-            return 0.85
+        if domain.endswith(".gov") or domain.endswith(".gov.in") or domain.endswith(".gov.uk"):
+            return 1.0
         elif domain.endswith(".edu") or domain.endswith(".ac.in"):
-            return 0.75
+            return 0.85
         elif domain.endswith(".org"):
-            return 0.55
+            return 0.65
         elif domain.endswith(".mil"):
-            return 0.8
+            return 0.90
 
         return self.DEFAULT_SCORE
 

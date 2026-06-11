@@ -83,6 +83,8 @@ class EvidenceRetriever:
 
     async def retrieve(self, claim: Claim) -> List[Evidence]:
         """Fetch evidence from all sources in parallel, dedup, and return."""
+        search_query = self._formulate_search_query(claim.text)
+        
         wiki_query = (
             claim.entity
             if getattr(claim, "entity", None)
@@ -99,19 +101,19 @@ class EvidenceRetriever:
             import os
             is_render = os.getenv("RENDER") == "true" or os.getenv("LOW_MEMORY") == "true"
             
-            results_task = asyncio.to_thread(self._ddg_combined_search, claim.text)
+            results_task = asyncio.to_thread(self._ddg_combined_search, search_query)
             
             if is_render:
                 # On Render, we bypass DDGS library entirely (meaning no thread safety issues),
                 # so we can safely run both searches in parallel.
-                query = f"{claim.text} site:snopes.com OR site:politifact.com OR site:factcheck.org OR site:boomlive.in OR site:fullfact.org"
+                query = f"{search_query} site:snopes.com OR site:politifact.com OR site:factcheck.org OR site:boomlive.in OR site:fullfact.org"
                 fc_task = asyncio.to_thread(self._ddg_combined_search, query)
                 results, fc_results = await asyncio.gather(results_task, fc_task)
             else:
                 results = await results_task
                 if len(results) >= 3:
                     return results
-                query = f"{claim.text} site:snopes.com OR site:politifact.com OR site:factcheck.org OR site:boomlive.in OR site:fullfact.org"
+                query = f"{search_query} site:snopes.com OR site:politifact.com OR site:factcheck.org OR site:boomlive.in OR site:fullfact.org"
                 fc_results = await asyncio.to_thread(self._ddg_combined_search, query)
                 
             return results + fc_results
@@ -123,10 +125,10 @@ class EvidenceRetriever:
             return await asyncio.to_thread(self._search_wikidata, wiki_query)
 
         async def run_google_factcheck():
-            return await asyncio.to_thread(self._google_factcheck, claim.text)
+            return await asyncio.to_thread(self._google_factcheck, search_query)
 
         async def run_rss_factcheck():
-            return await asyncio.to_thread(self._rss_fact_check_feeds, claim.text)
+            return await asyncio.to_thread(self._rss_fact_check_feeds, search_query)
 
         tasks = [
             asyncio.create_task(run_ddg_both()),
@@ -623,6 +625,39 @@ class EvidenceRetriever:
     # ──────────────────────────────────────────────────────────
     # Helpers
     # ──────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _formulate_search_query(text: str) -> str:
+        """Formulate a clean, compact search query from a potentially long claim text."""
+        if not text:
+            return ""
+        if len(text.split()) <= 4:
+            return text
+            
+        # Remove common punctuation
+        clean = re.sub(r"[^\w\s\u0900-\u097F\u0B80-\u0BFF]", " ", text)
+        words = clean.split()
+        
+        # Filter out stopwords (very basic list for speed)
+        stopwords = {
+            "who", "was", "also", "with", "from", "that", "this", "then", "them", 
+            "their", "there", "have", "been", "were", "about", "above", "after",
+            "he", "she", "they", "we", "you", "i", "me", "him", "her", "us", "his", "her",
+            "और", "तथा", "तथापि", "लेकिन", "कि", "यह", "वह", "है", "हैं", "था", "थे",
+            "மற்றும்", "ஆனால்", "அது", "இந்த", "அவர்", "இருந்தது", "உள்ளது"
+        }
+        
+        filtered = [w for w in words if w.lower() not in stopwords and len(w) > 2]
+        
+        # Take the top 7 keywords/entities
+        if len(filtered) > 7:
+            # Prioritize capitalized words (entities) in English
+            english_entities = [w for w in filtered if w[0].isupper() and w.isalpha()]
+            other_words = [w for w in filtered if w not in english_entities]
+            combined = english_entities[:4] + other_words[:3]
+            return " ".join(combined[:7])
+            
+        return " ".join(filtered)
 
     @staticmethod
     def _extract_search_terms(text: str) -> str:

@@ -341,8 +341,24 @@ Analyze this claim and provide your verdict as JSON."""
             trigrams = get_ngrams(words, 3)
             return words + bigrams + trigrams
 
+        def _get_content_words(text: str) -> set:
+            # Tokenize and keep words >= 3 chars that are not common English/Hindi/Tamil stopwords
+            words = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9\u0900-\u097F\u0B80-\u0BFF]{3,}\b", text)]
+            stopwords = {
+                "the", "and", "for", "that", "this", "with", "from", "was", "were", "been",
+                "has", "have", "had", "are", "its", "their", "his", "her", "who", "whom",
+                "which", "they", "she", "him", "them", "your", "our", "about", "there", "their",
+                "not", "but", "what", "when", "where", "how", "why", "will", "would", "shall",
+                "should", "can", "could", "may", "might", "must", "other", "some", "such",
+                "into", "than", "then", "these", "those", "upon", "about", "did", "does", "done",
+                "और", "तथा", "तथापि", "लेकिन", "कि", "यह", "वह", "है", "हैं", "था", "थे",
+                "மற்றும்", "ஆனால்", "அது", "இந்த", "அவர்", "இருந்தது", "உள்ளது"
+            }
+            return set(w for w in words if w not in stopwords)
+
         claim_terms = get_all_terms(claim.text) or ["unknown"]
         claim_words_set = set(get_words(claim.text))
+        claim_content_words = _get_content_words(claim.text)
         corpus = [claim_terms]
         for ev in evidence:
             corpus.append(get_all_terms(ev.title + " " + ev.snippet))
@@ -426,16 +442,20 @@ Analyze this claim and provide your verdict as JSON."""
             E.g., User: "Earth orbits the Sun" vs Reviewed: "Photos prove sun is close
             and orbiting Earth" → these are OPPOSITE claims (subject-object swap).
             """
-            uc_lower = " " + user_claim.lower() + " "
-            rc_lower = " " + reviewed_claim.lower() + " "
-            uc_words = set(get_words(user_claim))
-            rc_words = set(get_words(reviewed_claim))
+            uc_content = _get_content_words(user_claim)
+            rc_content = _get_content_words(reviewed_claim)
             
-            overlap = uc_words & rc_words
+            # Stem/normalize by taking first 4 chars of each content word to handle singular/plural and verb inflections
+            uc_stems = {w[:4] for w in uc_content}
+            rc_stems = {w[:4] for w in rc_content}
+            
+            overlap = uc_stems & rc_stems
             if not overlap:
-                return True  # can't tell; assume aligned
+                return False
             
             # ── Check 1: Explicit negation/contradiction indicators ──
+            uc_lower = " " + user_claim.lower() + " "
+            rc_lower = " " + reviewed_claim.lower() + " "
             contradiction_indicators = [
                 "do not prove", "does not prove", "not prove", "disprove",
                 "doesn't", "don't", "cannot", "won't", "isn't", "aren't",
@@ -453,12 +473,10 @@ Analyze this claim and provide your verdict as JSON."""
             prove_match = re.search(r"(?:prove|proves|proving|show|shows)\s+(?:that\s+)?(.{10,100})", rc_lower)
             if prove_match:
                 proven_assertion = prove_match.group(1)
-                # If the proven assertion uses different subject-object order, not aligned
-                proven_words = set(get_words(proven_assertion))
-                if proven_words & uc_words:
-                    # There's overlap in topic - but does the directionality match?
-                    # If the proven assertion is substantially different from user claim, not aligned
-                    proven_sim = len(proven_words & uc_words) / max(len(uc_words), 1)
+                proven_content = _get_content_words(proven_assertion)
+                proven_stems = {w[:4] for w in proven_content}
+                if proven_stems & uc_stems:
+                    proven_sim = len(proven_stems & uc_stems) / max(len(uc_stems), 1)
                     if proven_sim < 0.5:
                         return False
             
@@ -473,7 +491,7 @@ Analyze this claim and provide your verdict as JSON."""
                         return False
             
             # ── Check 4: Low word overlap → different claims ──
-            overlap_ratio = len(overlap) / max(len(uc_words), len(rc_words), 1)
+            overlap_ratio = len(overlap) / max(len(uc_stems), len(rc_stems), 1)
             if overlap_ratio < 0.25:
                 return False
             
@@ -504,6 +522,22 @@ Analyze this claim and provide your verdict as JSON."""
             # Consider relevant if cosine >= 0.02 OR keyword overlap >= 30%
             if sim < 0.02 and keyword_overlap < 0.30:
                 continue
+
+            # Check content word overlap to filter out general background/topic-only noise
+            ev_content_words = _get_content_words(ev_text_raw)
+            overlap_words = claim_content_words & ev_content_words
+            overlap_ratio = len(overlap_words) / max(len(claim_content_words), 1)
+            
+            # If claim has multiple content words, require at least 2 content words overlap and ratio >= 0.30
+            # If it is a very short claim (<= 2 content words), require at least 1 content word overlap
+            if len(claim_content_words) >= 3:
+                if len(overlap_words) < 2 or overlap_ratio < 0.30:
+                    logger.debug(f"Skipping background evidence '{ev.title[:30]}' due to low content word overlap ({len(overlap_words)} words, {overlap_ratio:.2f} ratio)")
+                    continue
+            else:
+                if len(overlap_words) < 1:
+                    logger.debug(f"Skipping background evidence '{ev.title[:30]}' due to 0 content word overlap")
+                    continue
 
             relevant += 1
             max_sim = max(max_sim, sim)
@@ -556,14 +590,40 @@ Analyze this claim and provide your verdict as JSON."""
                 elif has_false and has_true:
                     raw_polarity = "mixed"
 
-            # ── Step 2: Negation-aware alignment check ──
+            # ── Step 2: Call the defined alignment checker to handle opposite/unrelated fact-checks ──
+            reviewed_claim = _extract_reviewed_claim(ev_text_raw)
+            if reviewed_claim:
+                aligned = _claims_are_aligned(claim.text, reviewed_claim)
+                if not aligned:
+                    # If they are not aligned, check if they are opposites or completely different
+                    uc_words = set(get_words(claim.text))
+                    rc_words = set(get_words(reviewed_claim))
+                    overlap = uc_words & rc_words
+                    rc_overlap_ratio = len(overlap) / max(len(uc_words), len(rc_words), 1)
+                    
+                    if rc_overlap_ratio >= 0.25:
+                        # They are talking about the same topic but are opposite claims.
+                        # Refuting the opposite claim supports our claim.
+                        # Confirming the opposite claim refutes our claim.
+                        if raw_polarity == "false":
+                            raw_polarity = "true"
+                            logger.info(f"Flipped polarity to 'true': reviewed claim '{reviewed_claim}' is opposite to user claim '{claim.text}' and rated false.")
+                        elif raw_polarity == "true":
+                            raw_polarity = "false"
+                            logger.info(f"Flipped polarity to 'false': reviewed claim '{reviewed_claim}' is opposite to user claim '{claim.text}' and rated true.")
+                    else:
+                        # Unrelated/different rumor rating. Ignore it!
+                        raw_polarity = None
+                        logger.info(f"Ignored rating from reviewed claim '{reviewed_claim}' because it is unrelated to user claim '{claim.text}' (overlap={rc_overlap_ratio:.2f}).")
+
+            # ── Step 3: Negation-aware alignment check for user's claim ──
             # If the user's claim is negative (e.g. "does not cure"), a refutation
             # of the positive rumor ("cures is FALSE") actually supports the user's claim.
             if user_claim_has_negation and raw_polarity in ("false", "true"):
                 raw_polarity = "true" if raw_polarity == "false" else "false"
                 logger.info(f"Flipped raw polarity to {raw_polarity} because user's claim is negative: '{claim.text}'")
 
-            # ── Step 3: Apply polarity to scoring ──
+            # ── Step 4: Apply polarity to scoring ──
             source_label = ev.title[:60]
 
             if raw_polarity == "false":
@@ -578,6 +638,11 @@ Analyze this claim and provide your verdict as JSON."""
                 contra += impact * 0.8
                 support += impact * 0.5
                 signals.append(f"Mixed signals from '{source_label}'")
+            elif sim >= 0.15 and ev.source_score >= 0.50:
+                # Add corroboration support when similarity is high and there are no negative keywords
+                support += impact * 1.2
+                signals.append(f"Corroborated by '{source_label}'")
+                source_names["support"].append(source_label)
             elif sim >= 0.05 and ev.source_score >= 0.60:
                 support += impact * 0.3
 

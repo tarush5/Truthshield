@@ -160,7 +160,7 @@ class VerdictEngine:
     ) -> Optional[ClaimVerdict]:
         """Use Gemini 2.5 Flash with Google Search grounding. Falls back to 2.0 Flash on 503."""
         # Try primary model first, then fallback model
-        models_to_try = [GEMINI_MODEL, "gemini-3.1-flash-lite"]
+        models_to_try = [GEMINI_MODEL, "gemini-1.5-flash"]
         
         for model_name in models_to_try:
             for attempt in range(2):
@@ -486,6 +486,8 @@ Analyze this claim and provide your verdict as JSON."""
         relevant = 0
         source_names = {"support": [], "refute": []}
 
+        user_claim_has_negation = any(w in get_words(claim.text.lower()) for w in negation_words)
+
         for ev in evidence:
             ev_text_raw = ev.title + " " + ev.snippet
             ev_text = " " + ev_text_raw.lower() + " "
@@ -554,26 +556,12 @@ Analyze this claim and provide your verdict as JSON."""
                 elif has_false and has_true:
                     raw_polarity = "mixed"
 
-            # ── Step 2: Context-aware alignment check ──
-            # If this is a fact-check article, determine whether the claim
-            # being fact-checked matches the user's claim or is opposite.
-            is_factcheck = any(fc in (ev.url or "").lower() for fc in [
-                "snopes.com", "politifact.com", "factcheck.org", "boomlive.in",
-                "fullfact.org", "factcheck", "fact-check", "fact check"
-            ]) or "fact check" in ev.title.lower()
-
-            if is_factcheck and raw_polarity in ("false", "misleading"):
-                # Extract what claim was reviewed/debunked
-                reviewed_claim = _extract_reviewed_claim(ev_text)
-                if reviewed_claim:
-                    aligned = _claims_are_aligned(claim.text, reviewed_claim)
-                    if not aligned:
-                        # The fact-check debunks the OPPOSITE of the user's claim
-                        # → this actually SUPPORTS the user's claim
-                        raw_polarity = "true"  # Flip!
-                        logger.info(
-                            f"Context flip: FC debunks '{reviewed_claim[:60]}' which opposes user's claim → SUPPORT"
-                        )
+            # ── Step 2: Negation-aware alignment check ──
+            # If the user's claim is negative (e.g. "does not cure"), a refutation
+            # of the positive rumor ("cures is FALSE") actually supports the user's claim.
+            if user_claim_has_negation and raw_polarity in ("false", "true"):
+                raw_polarity = "true" if raw_polarity == "false" else "false"
+                logger.info(f"Flipped raw polarity to {raw_polarity} because user's claim is negative: '{claim.text}'")
 
             # ── Step 3: Apply polarity to scoring ──
             source_label = ev.title[:60]

@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 class EvidenceRetriever:
     """Retrieve evidence from 7 free/robust sources concurrently."""
 
-    MAX_EVIDENCE_PER_CLAIM = 10
+    MAX_EVIDENCE_PER_CLAIM = 12
 
     # ──────────────────────────────────────────────────────────
     # Public API

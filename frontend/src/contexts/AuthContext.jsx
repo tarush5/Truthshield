@@ -1,8 +1,45 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../utils/supabase/client';
-import { API_BASE } from '../config';
+import { API_BASE, isBackendError, BACKEND_UNREACHABLE_MSG } from '../config';
 
 const AuthContext = createContext(null);
+
+/**
+ * Wraps a fetch call with proper error handling:
+ * - Detects network/backend-unreachable errors and shows a clear message
+ * - Parses JSON error detail from the backend
+ */
+async function safeFetch(url, options = {}) {
+  let res;
+  try {
+    res = await fetch(url, options);
+  } catch (err) {
+    if (isBackendError(err)) {
+      throw new Error(BACKEND_UNREACHABLE_MSG);
+    }
+    throw err;
+  }
+
+  if (!res.ok) {
+    // Try to extract detail from backend JSON response
+    let detail = '';
+    try {
+      const body = await res.json();
+      detail = body.detail || '';
+    } catch {
+      // not JSON
+    }
+
+    if (res.status === 404) {
+      throw new Error(
+        detail || 'API endpoint not found (404). Make sure the backend server is running and VITE_API_URL is configured.'
+      );
+    }
+    throw new Error(detail || `Request failed with status ${res.status}`);
+  }
+
+  return res.json();
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -34,30 +71,21 @@ export function AuthProvider({ children }) {
 
   // Sign in with OTP via backend auth
   const signInWithOtp = useCallback(async (email) => {
-    const res = await fetch(`${API_BASE}/auth/otp`, {
+    await safeFetch(`${API_BASE}/auth/otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to send OTP');
-    }
     return true;
   }, []);
 
   // Verify OTP via backend auth
   const verifyOtp = useCallback(async (email, token) => {
-    const res = await fetch(`${API_BASE}/auth/verify`, {
+    const data = await safeFetch(`${API_BASE}/auth/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, token }),
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Invalid OTP code');
-    }
-    const data = await res.json();
     setSession({ access_token: data.access_token });
     setUser(data.user);
     localStorage.setItem('token', data.access_token);
@@ -78,16 +106,11 @@ export function AuthProvider({ children }) {
 
   // Sign up with Password
   const signUpWithPassword = useCallback(async (email, password) => {
-    const res = await fetch(`${API_BASE}/auth/signup`, {
+    const data = await safeFetch(`${API_BASE}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Sign up failed');
-    }
-    const data = await res.json();
     setSession({ access_token: data.access_token });
     setUser(data.user);
     localStorage.setItem('token', data.access_token);
@@ -97,16 +120,11 @@ export function AuthProvider({ children }) {
 
   // Sign in with Password
   const signInWithPassword = useCallback(async (email, password) => {
-    const res = await fetch(`${API_BASE}/auth/signin`, {
+    const data = await safeFetch(`${API_BASE}/auth/signin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Sign in failed');
-    }
-    const data = await res.json();
     setSession({ access_token: data.access_token });
     setUser(data.user);
     localStorage.setItem('token', data.access_token);
@@ -116,15 +134,10 @@ export function AuthProvider({ children }) {
 
   // Sign in as Demo
   const signInAsDemo = useCallback(async () => {
-    const res = await fetch(`${API_BASE}/auth/demo`, {
+    const data = await safeFetch(`${API_BASE}/auth/demo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Demo login failed');
-    }
-    const data = await res.json();
     setSession({ access_token: data.access_token });
     setUser(data.user);
     localStorage.setItem('token', data.access_token);
@@ -174,11 +187,9 @@ export function AuthProvider({ children }) {
     const token = session?.access_token || localStorage.getItem('token');
     if (!token) return [];
     try {
-      const res = await fetch(`${API_BASE}/organizations`, {
+      const data = await safeFetch(`${API_BASE}/organizations`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return [];
-      const data = await res.json();
       return Array.isArray(data) ? data : (data.organizations || []);
     } catch {
       return [];
@@ -188,7 +199,7 @@ export function AuthProvider({ children }) {
   // Create workspace
   const createOrganization = useCallback(async (name) => {
     const token = session?.access_token || localStorage.getItem('token');
-    const res = await fetch(`${API_BASE}/organizations`, {
+    const data = await safeFetch(`${API_BASE}/organizations`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -196,11 +207,7 @@ export function AuthProvider({ children }) {
       },
       body: JSON.stringify({ name }),
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to create workspace');
-    }
-    return res.json();
+    return data;
   }, [session]);
 
   const value = {

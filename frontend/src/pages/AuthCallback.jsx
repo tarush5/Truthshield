@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Shield } from 'lucide-react';
+import { Loader2, Shield, AlertCircle } from 'lucide-react';
 import { supabase } from '../utils/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
-import { API_BASE } from '../config';
+import { API_BASE, isBackendError, BACKEND_UNREACHABLE_MSG } from '../config';
 
 /**
  * OAuth callback handler — exchanges the URL hash/code for a Supabase session
@@ -31,18 +31,36 @@ export default function AuthCallback() {
         }
         
         // POST to local backend to obtain local JWT
-        const response = await fetch(`${API_BASE}/auth/oauth-verify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: session.user.email,
-            supabase_token: session.access_token,
-          }),
-        });
+        let response;
+        try {
+          response = await fetch(`${API_BASE}/auth/oauth-verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: session.user.email,
+              supabase_token: session.access_token,
+            }),
+          });
+        } catch (fetchErr) {
+          if (isBackendError(fetchErr)) {
+            throw new Error(BACKEND_UNREACHABLE_MSG);
+          }
+          throw fetchErr;
+        }
         
         if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.detail || 'Failed to verify session with backend.');
+          let detail = '';
+          try {
+            const errBody = await response.json();
+            detail = errBody.detail || '';
+          } catch { /* not JSON */ }
+          
+          if (response.status === 404) {
+            throw new Error(
+              detail || 'Backend API not found (404). Ensure the backend is running and VITE_API_URL is set.'
+            );
+          }
+          throw new Error(detail || 'Failed to verify session with backend.');
         }
         
         const data = await response.json();
@@ -57,7 +75,7 @@ export default function AuthCallback() {
         console.error('OAuth callback exchange error:', err);
         if (active) {
           setError(err.message || 'Authentication failed. Please try again.');
-          setTimeout(() => navigate('/login', { replace: true }), 2500);
+          setTimeout(() => navigate('/login', { replace: true }), 4000);
         }
       }
     }
@@ -71,12 +89,18 @@ export default function AuthCallback() {
 
   return (
     <div className="min-h-[calc(100vh-5rem)] flex items-center justify-center">
-      <div className="text-center">
+      <div className="text-center max-w-md mx-auto px-4">
         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500 to-cyan-500 flex items-center justify-center mx-auto mb-6 shadow-xl shadow-brand-500/25 glow-pulse">
           <Shield className="w-8 h-8 text-white" />
         </div>
         {error ? (
-          <p className="text-red-400 text-sm max-w-md mx-auto px-4">{error}</p>
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 p-4 rounded-lg bg-red-500/10 border border-red-500/25 text-left">
+              <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+            <p className="text-xs text-white/30">Redirecting to login...</p>
+          </div>
         ) : (
           <>
             <Loader2 className="w-6 h-6 text-brand-400 animate-spin mx-auto mb-3" />

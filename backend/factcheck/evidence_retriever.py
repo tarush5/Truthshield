@@ -96,11 +96,24 @@ class EvidenceRetriever:
 
         # We set up concurrent tasks for our sources
         async def run_ddg_both():
-            # Run general search first
-            results = await asyncio.to_thread(self._ddg_combined_search, claim.text)
-            # Run fact-check specific search second (sequentially to prevent duckduckgo_search library deadlocks)
-            query = f"{claim.text} site:snopes.com OR site:politifact.com OR site:factcheck.org OR site:boomlive.in OR site:fullfact.org"
-            fc_results = await asyncio.to_thread(self._ddg_combined_search, query)
+            import os
+            is_render = os.getenv("RENDER") == "true" or os.getenv("LOW_MEMORY") == "true"
+            
+            results_task = asyncio.to_thread(self._ddg_combined_search, claim.text)
+            
+            if is_render:
+                # On Render, we bypass DDGS library entirely (meaning no thread safety issues),
+                # so we can safely run both searches in parallel.
+                query = f"{claim.text} site:snopes.com OR site:politifact.com OR site:factcheck.org OR site:boomlive.in OR site:fullfact.org"
+                fc_task = asyncio.to_thread(self._ddg_combined_search, query)
+                results, fc_results = await asyncio.gather(results_task, fc_task)
+            else:
+                results = await results_task
+                if len(results) >= 3:
+                    return results
+                query = f"{claim.text} site:snopes.com OR site:politifact.com OR site:factcheck.org OR site:boomlive.in OR site:fullfact.org"
+                fc_results = await asyncio.to_thread(self._ddg_combined_search, query)
+                
             return results + fc_results
 
         async def run_wikipedia():
@@ -153,7 +166,10 @@ class EvidenceRetriever:
                     urls_to_scrape.append(ev.url)
 
         # Run Deep Page Scraping on the top 2 candidate URLs in parallel concurrently
-        if urls_to_scrape:
+        # Skip this on Render/low-memory environments to avoid high response latency
+        import os
+        is_render = os.getenv("RENDER") == "true" or os.getenv("LOW_MEMORY") == "true"
+        if urls_to_scrape and not is_render:
             try:
                 # Wrap each scrape in a thread and run concurrently via asyncio.gather
                 async def scrape_single_url(url):
@@ -213,10 +229,13 @@ class EvidenceRetriever:
         """Combined web and news search via ddgs package, falling back to custom scrapers if blocked."""
         results = []
 
-        # 1. Try official DDGS package first
-        if DDGS is not None:
+        import os
+        is_render = os.getenv("RENDER") == "true" or os.getenv("LOW_MEMORY") == "true"
+
+        # 1. Try official DDGS package first (skipped on Render to prevent cloud IP rate limit timeouts)
+        if DDGS is not None and not is_render:
             try:
-                with DDGS(timeout=4) as ddgs:
+                with DDGS(timeout=2) as ddgs:
                     # Text Search
                     try:
                         for r in ddgs.text(query, max_results=4):
@@ -255,8 +274,8 @@ class EvidenceRetriever:
             except Exception as e:
                 logger.warning(f"DDGS instance initialization failed: {e}")
 
-        # 2. Fall back to custom DDG Lite HTML scraper if no results found
-        if not results:
+        # 2. Fall back to custom DDG Lite HTML scraper if no results found (skipped on Render)
+        if not results and not is_render:
             logger.info(f"Official DDG search returned 0 results. Triggering DDG Lite scraper fallback for: '{query}'")
             results.extend(self._ddg_lite_search(query))
 

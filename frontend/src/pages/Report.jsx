@@ -16,10 +16,16 @@ import InteractiveCard from '../components/InteractiveCard';
 
 
 const COMPONENT_COLORS = {
-  text: '#38bdf8',       // Ice blue
-  deepfake: '#ef4444',   // Red/Rose
-  voice: '#a78bfa',      // Aurora purple
-  ai_content: '#22d3ee', // Aurora cyan
+  source_credibility: '#10b981', // Emerald green
+  fact_match: '#3b82f6',         // Royal blue
+  evidence_strength: '#8b5cf6',  // Aurora purple/violet
+  manipulation_risk: '#f59e0b',  // Amber/orange
+  bias_risk: '#ef4444',          // Red
+  // Backwards compatibility
+  text: '#38bdf8',
+  deepfake: '#ef4444',
+  voice: '#a78bfa',
+  ai_content: '#22d3ee',
 };
 
 const fadeUp = {
@@ -107,9 +113,12 @@ export default function Report() {
 
   const getVerdictStyle = (verdict) => {
     const v = (verdict || '').toUpperCase();
-    if (v.includes('TRUE') || v.includes('AUTHENTIC')) return 'badge-success';
-    if (v.includes('FALSE')) return 'badge-danger';
-    if (v.includes('MISLEADING')) return 'badge-warning';
+    if (v === 'VERIFIED' || v.includes('TRUE') || v.includes('AUTHENTIC')) return 'badge-success';
+    if (v === 'LIKELY TRUE') return 'badge-success opacity-85';
+    if (v === 'FALSE') return 'badge-danger';
+    if (v === 'LIKELY FALSE') return 'badge-danger opacity-85';
+    if (v === 'MIXED EVIDENCE' || v.includes('MISLEADING')) return 'badge-warning';
+    if (v === 'INSUFFICIENT EVIDENCE' || v.includes('UNVERIFIED') || v.includes('ERROR')) return 'badge-info';
     return 'badge-info';
   };
 

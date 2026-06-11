@@ -116,6 +116,7 @@ class Evidence(BaseModel):
     url: str
     snippet: str
     source_score: float = 0.5
+    stance: str = "NEUTRAL"
 
 
 class ClaimVerdict(BaseModel):

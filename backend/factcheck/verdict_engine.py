@@ -37,7 +37,8 @@ Respond with ONLY valid JSON, no other text:
 {
     "verdict": "TRUE" | "FALSE" | "MISLEADING" | "UNVERIFIED",
     "reasoning": "Clear 2-3 sentence explanation citing specific evidence sources",
-    "confidence": 0.0 to 1.0
+    "confidence": 0.0 to 1.0,
+    "stances": ["SUPPORTS" | "REFUTES" | "NEUTRAL" | "INSUFFICIENT" for each evidence item in order]
 }
 
 Rules:
@@ -184,7 +185,7 @@ EVIDENCE:
 CRISIS FLAG: {'YES' if is_crisis else 'NO'}
 
 Return ONLY valid JSON:
-{{"verdict": "TRUE"|"FALSE"|"MISLEADING"|"UNVERIFIED", "reasoning": "2-3 sentences citing sources", "confidence": 0.0-1.0}}"""
+{{"verdict": "TRUE"|"FALSE"|"MISLEADING"|"UNVERIFIED", "reasoning": "2-3 sentences citing sources", "confidence": 0.0-1.0, "stances": ["SUPPORTS"|"REFUTES"|"NEUTRAL"|"INSUFFICIENT" for each evidence item in order]}}"""
 
                     response = client.models.generate_content(
                         model=model_name,
@@ -217,6 +218,12 @@ Return ONLY valid JSON:
                         verdict = Verdict.UNVERIFIED
 
                     logger.info(f"Gemini verdict: {verdict_str} (conf={result.get('confidence', 0.5)}) [model={model_name}, attempt {attempt+1}]")
+
+                    # Map stances
+                    stances = result.get("stances", [])
+                    for idx, ev in enumerate(evidence[:6]):
+                        if idx < len(stances):
+                            ev.stance = stances[idx].upper()
 
                     return ClaimVerdict(
                         claim=claim,
@@ -293,6 +300,12 @@ Analyze this claim and provide your verdict as JSON."""
                 verdict = Verdict(verdict_str)
             except ValueError:
                 verdict = Verdict.UNVERIFIED
+
+            # Map stances
+            stances = result.get("stances", [])
+            for idx, ev in enumerate(evidence):
+                if idx < len(stances):
+                    ev.stance = stances[idx].upper()
 
             return ClaimVerdict(
                 claim=claim,
@@ -590,61 +603,48 @@ Analyze this claim and provide your verdict as JSON."""
                 elif has_false and has_true:
                     raw_polarity = "mixed"
 
-            # ── Step 2: Call the defined alignment checker to handle opposite/unrelated fact-checks ──
-            reviewed_claim = _extract_reviewed_claim(ev_text_raw)
-            if reviewed_claim:
-                aligned = _claims_are_aligned(claim.text, reviewed_claim)
-                if not aligned:
-                    # If they are not aligned, check if they are opposites or completely different
-                    uc_words = set(get_words(claim.text))
-                    rc_words = set(get_words(reviewed_claim))
-                    overlap = uc_words & rc_words
-                    rc_overlap_ratio = len(overlap) / max(len(uc_words), len(rc_words), 1)
-                    
-                    if rc_overlap_ratio >= 0.25:
-                        # They are talking about the same topic but are opposite claims.
-                        # Refuting the opposite claim supports our claim.
-                        # Confirming the opposite claim refutes our claim.
-                        if raw_polarity == "false":
-                            raw_polarity = "true"
-                            logger.info(f"Flipped polarity to 'true': reviewed claim '{reviewed_claim}' is opposite to user claim '{claim.text}' and rated false.")
-                        elif raw_polarity == "true":
-                            raw_polarity = "false"
-                            logger.info(f"Flipped polarity to 'false': reviewed claim '{reviewed_claim}' is opposite to user claim '{claim.text}' and rated true.")
-                    else:
-                        # Unrelated/different rumor rating. Ignore it!
-                        raw_polarity = None
-                        logger.info(f"Ignored rating from reviewed claim '{reviewed_claim}' because it is unrelated to user claim '{claim.text}' (overlap={rc_overlap_ratio:.2f}).")
-
-            # ── Step 3: Negation-aware alignment check for user's claim ──
-            # If the user's claim is negative (e.g. "does not cure"), a refutation
-            # of the positive rumor ("cures is FALSE") actually supports the user's claim.
-            if user_claim_has_negation and raw_polarity in ("false", "true"):
-                raw_polarity = "true" if raw_polarity == "false" else "false"
-                logger.info(f"Flipped raw polarity to {raw_polarity} because user's claim is negative: '{claim.text}'")
-
-            # ── Step 4: Apply polarity to scoring ──
+            # ── Step 2: Determine stance using negation-aware polarity alignment ──
+            # Check if evidence has any negation/contradiction indicator
+            ev_has_negation = any(w in get_words(ev_text_raw.lower()) for w in negation_words)
+            
+            # If the evidence has a false rating, or the evidence title/snippet has negation/debunking keywords,
+            # then it represents a negative/refuting signal towards a positive rumor.
+            is_refuting_positive = (raw_polarity == "false") or ev_has_negation or (raw_polarity == "misleading")
+            
             source_label = ev.title[:60]
-
-            if raw_polarity == "false":
-                contra += impact * 2.5
-                signals.append(f"Refuted by '{source_label}'")
-                source_names["refute"].append(source_label)
-            elif raw_polarity == "true":
-                support += impact * 1.5
-                signals.append(f"Supported by '{source_label}'")
-                source_names["support"].append(source_label)
-            elif raw_polarity == "mixed" or raw_polarity == "misleading":
-                contra += impact * 0.8
-                support += impact * 0.5
-                signals.append(f"Mixed signals from '{source_label}'")
-            elif sim >= 0.15 and ev.source_score >= 0.50:
-                # Add corroboration support when similarity is high and there are no negative keywords
-                support += impact * 1.2
-                signals.append(f"Corroborated by '{source_label}'")
-                source_names["support"].append(source_label)
-            elif sim >= 0.05 and ev.source_score >= 0.60:
-                support += impact * 0.3
+            
+            if user_claim_has_negation:
+                if is_refuting_positive:
+                    ev.stance = "SUPPORTS"
+                    support += impact * 1.5
+                    signals.append(f"Supported by '{source_label}'")
+                    source_names["support"].append(source_label)
+                else:
+                    ev.stance = "REFUTES"
+                    contra += impact * 2.5
+                    signals.append(f"Refuted by '{source_label}'")
+                    source_names["refute"].append(source_label)
+            else:
+                if is_refuting_positive:
+                    ev.stance = "REFUTES"
+                    contra += impact * 2.5
+                    signals.append(f"Refuted by '{source_label}'")
+                    source_names["refute"].append(source_label)
+                elif raw_polarity == "true" or (sim >= 0.15 and ev.source_score >= 0.50):
+                    ev.stance = "SUPPORTS"
+                    support += impact * 1.5
+                    signals.append(f"Supported by '{source_label}'")
+                    source_names["support"].append(source_label)
+                elif raw_polarity == "mixed":
+                    ev.stance = "NEUTRAL"
+                    contra += impact * 0.8
+                    support += impact * 0.5
+                    signals.append(f"Mixed signals from '{source_label}'")
+                elif sim >= 0.05 and ev.source_score >= 0.60:
+                    ev.stance = "NEUTRAL"
+                    support += impact * 0.3
+                else:
+                    ev.stance = "INSUFFICIENT"
 
         # ── Decision ──
         parts = []

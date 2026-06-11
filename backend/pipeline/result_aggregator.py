@@ -128,10 +128,80 @@ class ResultAggregator:
         # ── 8. Clamp and convert ─────────────────────────────────
         trust_score = int(round(max(0.0, min(1.0, weighted_score)) * 100))
 
-        # ── 9. Determine verdict ─────────────────────────────────
-        verdict = self._determine_verdict(trust_score, context)
+        # ── 9. Compute support and refute scores for verdict determination ──
+        support_scores = []
+        refute_scores = []
 
-        # ── 10. Confidence scoring ───────────────────────────────
+        if not context.claim_verdicts:
+            # Fallback based on ML Model score cleanliness
+            if ml_model_score >= 0.70:
+                support_score = ml_model_score
+                refute_score = 0.0
+            elif ml_model_score <= 0.40:
+                support_score = 0.0
+                refute_score = 1.0 - ml_model_score
+            else:
+                support_score = 0.0
+                refute_score = 0.0
+        else:
+            for cv in context.claim_verdicts:
+                v = cv.verdict.value.upper() if hasattr(cv.verdict, "value") else str(cv.verdict).upper()
+                
+                # Claim verdict signals
+                if v == "TRUE":
+                    cv_support = cv.confidence
+                    cv_refute = 0.0
+                elif v == "FALSE":
+                    cv_support = 0.0
+                    cv_refute = cv.confidence
+                elif v == "MISLEADING":
+                    cv_support = cv.confidence * 0.3
+                    cv_refute = cv.confidence * 0.7
+                else:  # UNVERIFIED
+                    cv_support = 0.0
+                    cv_refute = 0.0
+
+                # Evidence stance signals
+                supports_ev = [e for e in cv.evidence if getattr(e, "stance", "NEUTRAL") == "SUPPORTS"]
+                refutes_ev = [e for e in cv.evidence if getattr(e, "stance", "NEUTRAL") == "REFUTES"]
+                total_ev = len(cv.evidence)
+                
+                ev_support = len(supports_ev) / total_ev if total_ev > 0 else 0.0
+                ev_refute = len(refutes_ev) / total_ev if total_ev > 0 else 0.0
+                
+                # Combine claim and evidence signals
+                support_scores.append(cv_support * 0.6 + ev_support * 0.4)
+                refute_scores.append(cv_refute * 0.6 + ev_refute * 0.4)
+                
+            support_score = sum(support_scores) / len(support_scores)
+            refute_score = sum(refute_scores) / len(refute_scores)
+
+        # ── 10. Expose multi-dimensional components for the frontend ──
+        component_scores["fact_match"] = round(fact_check_score * 100, 1)
+        
+        all_ev = []
+        stance_sig = 0
+        for cv in context.claim_verdicts:
+            for ev in cv.evidence:
+                all_ev.append(ev)
+                if getattr(ev, "stance", "NEUTRAL") in ("SUPPORTS", "REFUTES"):
+                    stance_sig += 1
+        
+        stance_ratio = (stance_sig / len(all_ev)) if all_ev else 0.5
+        avg_conf = sum(cv.confidence for cv in context.claim_verdicts) / len(context.claim_verdicts) if context.claim_verdicts else 0.5
+        ev_strength_val = (avg_conf * 0.6 + stance_ratio * 0.4)
+        source_count_factor = min(1.0, len(all_ev) / 4.0) if all_ev else 0.5
+        ev_strength_val = ev_strength_val * 0.8 + source_count_factor * 0.2
+        component_scores["evidence_strength"] = round(max(0.1, min(1.0, ev_strength_val)) * 100, 1)
+        
+        manip_risk = round((1.0 - ml_model_score) * 100, 1)
+        component_scores["manipulation_risk"] = manip_risk
+        component_scores["bias_risk"] = manip_risk
+
+        # ── 11. Determine verdict ────────────────────────────────
+        verdict = self._determine_verdict(trust_score, context, support_score, refute_score)
+
+        # ── 12. Confidence scoring ───────────────────────────────
         confidence_profile = self._confidence_scorer.compute(context)
 
         result = AggregatedResult(
@@ -451,25 +521,31 @@ class ResultAggregator:
         self,
         trust_score: int,
         context: "PipelineContext",
+        support_score: float = 0.0,
+        refute_score: float = 0.0,
     ) -> str:
-        """Determine overall verdict from trust score and context."""
-        # Crisis content uses tighter thresholds
-        if context.is_crisis:
-            if trust_score >= 80:
-                return "LIKELY AUTHENTIC"
-            elif trust_score >= 60:
-                return "UNCERTAIN — VERIFY"
-            elif trust_score >= 40:
-                return "LIKELY MISLEADING"
+        """Determine overall verdict from support and refute scores."""
+        # If no support/refute scores are provided, derive them from trust_score
+        if support_score == 0.0 and refute_score == 0.0:
+            if trust_score >= 75:
+                support_score = trust_score / 100.0
+                refute_score = 0.0
+            elif trust_score <= 35:
+                support_score = 0.0
+                refute_score = (100.0 - trust_score) / 100.0
             else:
-                return "LIKELY FALSE"
+                support_score = 0.0
+                refute_score = 0.0
 
-        # Standard thresholds
-        if trust_score >= 75:
-            return "LIKELY AUTHENTIC"
-        elif trust_score >= 55:
-            return "UNCERTAIN — VERIFY"
-        elif trust_score >= 35:
-            return "LIKELY MISLEADING"
-        else:
+        if support_score >= 0.80:
+            return "VERIFIED"
+        elif support_score >= 0.55:
+            return "LIKELY TRUE"
+        elif refute_score >= 0.80:
+            return "FALSE"
+        elif refute_score >= 0.55:
             return "LIKELY FALSE"
+        elif support_score >= 0.25 and refute_score >= 0.25:
+            return "MIXED EVIDENCE"
+        else:
+            return "INSUFFICIENT EVIDENCE"

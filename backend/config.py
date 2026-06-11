@@ -82,7 +82,14 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> List[str]:
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+        origins = {origin.strip() for origin in self.CORS_ORIGINS.split(",")}
+        # Always include FRONTEND_URL and known production origins
+        if self.FRONTEND_URL:
+            origins.add(self.FRONTEND_URL.rstrip("/"))
+        origins.add("https://truthshield-five.vercel.app")
+        origins.add("http://localhost:5173")
+        origins.add("http://localhost:3000")
+        return list(origins)
 
     @property
     def max_upload_bytes(self) -> int:

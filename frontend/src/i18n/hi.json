@@ -52,9 +52,15 @@
   },
   "verdicts": {
     "TRUE": "सत्य",
+    "VERIFIED": "सत्यापित",
+    "LIKELY TRUE": "संभवतः सत्य",
+    "PARTIALLY TRUE": "आंशिक रूप से सत्य",
     "FALSE": "असत्य",
+    "LIKELY FALSE": "संभवतः असत्य",
     "MISLEADING": "भ्रामक",
-    "UNVERIFIED": "असत्यापित"
+    "MIXED EVIDENCE": "मिश्रित प्रमाण",
+    "UNVERIFIED": "असत्यापित",
+    "INSUFFICIENT EVIDENCE": "अपर्याप्त प्रमाण"
   },
   "languages": {
     "en": "अंग्रेज़ी",

@@ -23,11 +23,13 @@ class SourceRanker:
         Score a single source URL.
 
         Scoring tiers:
-            Government (.gov.in)     = 0.9
-            Major news outlets       = 0.7-0.85
-            Fact-checking sites      = 0.8-0.85
-            Wikipedia                = 0.65
-            Unknown                  = 0.3
+            Government (.gov/.gov.in)  = 1.0
+            Military (.mil)            = 0.90
+            Academic (.edu/.ac.in)     = 0.85
+            Major news outlets         = 0.7-0.95
+            Fact-checking sites        = 0.8-0.85
+            Wikipedia                  = 0.65
+            Unknown                    = 0.3
             Known disinfo            = 0.0
 
         Args:

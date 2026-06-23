@@ -52,9 +52,15 @@
   },
   "verdicts": {
     "TRUE": "உண்மை",
+    "VERIFIED": "சரிபார்க்கப்பட்டது",
+    "LIKELY TRUE": "உண்மையாக இருக்கக்கூடும்",
+    "PARTIALLY TRUE": "பகுதியளவு உண்மை",
     "FALSE": "பொய்",
+    "LIKELY FALSE": "பொய்யாக இருக்கக்கூடும்",
     "MISLEADING": "தவறாக வழிநடத்தும்",
-    "UNVERIFIED": "சரிபார்க்கப்படாதது"
+    "MIXED EVIDENCE": "கலப்பு ஆதாரங்கள்",
+    "UNVERIFIED": "சரிபார்க்கப்படாதது",
+    "INSUFFICIENT EVIDENCE": "போதுமான ஆதாரங்கள் இல்லை"
   },
   "languages": {
     "en": "ஆங்கிலம்",

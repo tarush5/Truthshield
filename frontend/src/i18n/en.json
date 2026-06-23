@@ -52,9 +52,15 @@
   },
   "verdicts": {
     "TRUE": "True",
+    "VERIFIED": "Verified",
+    "LIKELY TRUE": "Likely True",
+    "PARTIALLY TRUE": "Partially True",
     "FALSE": "False",
+    "LIKELY FALSE": "Likely False",
     "MISLEADING": "Misleading",
-    "UNVERIFIED": "Unverified"
+    "MIXED EVIDENCE": "Mixed Evidence",
+    "UNVERIFIED": "Unverified",
+    "INSUFFICIENT EVIDENCE": "Insufficient Evidence"
   },
   "languages": {
     "en": "English",

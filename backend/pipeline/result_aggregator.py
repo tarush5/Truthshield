@@ -331,7 +331,7 @@ class ResultAggregator:
         risks: List[str],
     ) -> float:
         """
-        Fact Check Score (50% weight).
+        Fact Check Score (40% weight in trust formula).
         FALSE=0%, MISLEADING=40%, UNVERIFIED=70%, TRUE=100%.
         """
         if not context.claim_verdicts:

@@ -194,44 +194,92 @@ class VerdictEngine:
     def _gemini_evaluate(
         self, client, claim: Claim, evidence: List[Evidence], is_crisis: bool,
     ) -> Optional[ClaimVerdict]:
-        """Use Gemini 2.5 Flash with Google Search grounding. Falls back to 2.0 Flash on 503."""
+        """Use Gemini with Google Search grounding for real-time web verification.
+        
+        KEY IMPROVEMENT: Enables the google_search tool so Gemini can verify claims
+        against live web data, not just pre-retrieved snippets. This dramatically
+        improves accuracy for current events and factual claims.
+        """
         # Try primary model first, then fallback model
-        models_to_try = [GEMINI_MODEL, "gemini-1.5-flash"]
+        models_to_try = [GEMINI_MODEL, "gemini-2.0-flash", "gemini-1.5-flash"]
         
         for model_name in models_to_try:
             for attempt in range(2):
                 try:
                     from google.genai import types
 
-                    # Build evidence context
+                    # Build evidence context — include more detail (500 chars per item)
                     ev_lines = []
-                    for i, ev in enumerate(evidence[:6]):
-                        ev_lines.append(f"[{i+1}] {ev.title} ({ev.url})\n    {ev.snippet[:250]}")
-                    evidence_block = "\n".join(ev_lines) if ev_lines else "No external evidence provided."
+                    for i, ev in enumerate(evidence[:8]):
+                        stance_hint = f" [Stance: {ev.stance}]" if getattr(ev, 'stance', None) else ""
+                        ev_lines.append(
+                            f"[{i+1}] {ev.title} (Score: {ev.source_score:.2f}){stance_hint}\n"
+                            f"    URL: {ev.url}\n"
+                            f"    Content: {ev.snippet[:500]}"
+                        )
+                    evidence_block = "\n\n".join(ev_lines) if ev_lines else "No external evidence provided."
 
-                    prompt = f"""Fact-check this claim using the evidence provided below.
+                    prompt = f"""You are TruthShield, an expert fact-checking AI. Your job is to determine whether the following claim is TRUE or FALSE based on evidence.
 
-CLAIM: {claim.text}
+CLAIM TO VERIFY: "{claim.text}"
 ENTITY: {claim.entity or 'N/A'}
 
-EVIDENCE:
+RETRIEVED EVIDENCE:
 {evidence_block}
 
-CRISIS FLAG: {'YES' if is_crisis else 'NO'}
+INSTRUCTIONS:
+1. FIRST, use your own knowledge and the Google Search tool to independently verify the claim.
+2. THEN, cross-reference with the retrieved evidence above.
+3. Check specific facts: dates, numbers, names, locations, event outcomes.
+4. A claim is TRUE if the core assertion is factually accurate.
+5. A claim is FALSE if the core assertion is demonstrably wrong.
+6. A claim is MISLEADING if it contains some truth but is deceptive or misrepresents context.
+7. Only use UNVERIFIED if you genuinely cannot find any information about this claim.
+8. For each evidence item, determine if it SUPPORTS, REFUTES, or is NEUTRAL/INSUFFICIENT.
+
+IMPORTANT:
+- Do NOT default to UNVERIFIED. If you can find ANY information about this topic, make a determination.
+- If the claim is about a well-known fact or recent event, verify it and give TRUE or FALSE.
+- Be precise about numbers, dates, and specific details.
 
 Return ONLY valid JSON:
-{{"verdict": "TRUE"|"FALSE"|"MISLEADING"|"UNVERIFIED", "reasoning": "2-3 sentences citing sources", "confidence": 0.0-1.0, "stances": ["SUPPORTS"|"REFUTES"|"NEUTRAL"|"INSUFFICIENT" for each evidence item in order]}}"""
+{{"verdict": "TRUE"|"FALSE"|"MISLEADING"|"UNVERIFIED", "reasoning": "2-3 sentences citing specific evidence and facts", "confidence": 0.0-1.0, "stances": ["SUPPORTS"|"REFUTES"|"NEUTRAL"|"INSUFFICIENT" for each evidence item]}}"""
+
+                    # Configure with Google Search grounding tool for real-time verification
+                    try:
+                        google_search_tool = types.Tool(
+                            google_search=types.GoogleSearch()
+                        )
+                        config = types.GenerateContentConfig(
+                            max_output_tokens=GEMINI_MAX_TOKENS,
+                            temperature=0.05,  # Very low temperature for factual accuracy
+                            tools=[google_search_tool],
+                        )
+                    except Exception:
+                        # Fallback: no grounding tool (older SDK versions)
+                        config = types.GenerateContentConfig(
+                            max_output_tokens=GEMINI_MAX_TOKENS,
+                            temperature=0.05,
+                        )
 
                     response = client.models.generate_content(
                         model=model_name,
                         contents=prompt,
-                        config=types.GenerateContentConfig(
-                            max_output_tokens=GEMINI_MAX_TOKENS,
-                            temperature=0.1,
-                        ),
+                        config=config,
                     )
 
                     text = response.text.strip()
+
+                    # Check if Google Search grounding was used
+                    grounding_used = False
+                    try:
+                        if hasattr(response, 'candidates') and response.candidates:
+                            candidate = response.candidates[0]
+                            if hasattr(candidate, 'grounding_metadata') and candidate.grounding_metadata:
+                                grounding_used = True
+                                logger.info("Gemini used Google Search grounding for verification")
+                    except Exception:
+                        pass
 
                     # Extract JSON from response
                     if "```json" in text:
@@ -252,11 +300,21 @@ Return ONLY valid JSON:
                     except ValueError:
                         verdict = Verdict.UNVERIFIED
 
-                    logger.info(f"Gemini verdict: {verdict_str} (conf={result.get('confidence', 0.5)}) [model={model_name}, attempt {attempt+1}]")
+                    confidence = float(result.get("confidence", 0.5))
+                    
+                    # Boost confidence when Google Search grounding was used
+                    if grounding_used and confidence < 0.95:
+                        confidence = min(0.95, confidence + 0.10)
+
+                    logger.info(
+                        f"Gemini verdict: {verdict_str} (conf={confidence:.2f}, "
+                        f"grounded={'YES' if grounding_used else 'NO'}) "
+                        f"[model={model_name}, attempt {attempt+1}]"
+                    )
 
                     # Map stances
                     stances = result.get("stances", [])
-                    for idx, ev in enumerate(evidence[:6]):
+                    for idx, ev in enumerate(evidence[:8]):
                         if idx < len(stances):
                             ev.stance = stances[idx].upper()
 
@@ -264,7 +322,7 @@ Return ONLY valid JSON:
                         claim=claim,
                         verdict=verdict,
                         reasoning=result.get("reasoning", ""),
-                        confidence=float(result.get("confidence", 0.5)),
+                        confidence=confidence,
                         evidence=evidence,
                     )
 
@@ -275,12 +333,11 @@ Return ONLY valid JSON:
                     error_str = str(e)
                     if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "503" in error_str or "UNAVAILABLE" in error_str:
                         if attempt < 1:
-                            wait_time = 1.0  # Quick 1s retry
+                            wait_time = 1.5
                             logger.warning(f"Gemini {model_name} rate-limited (attempt {attempt+1}), retrying in {wait_time}s...")
                             time.sleep(wait_time)
                             continue
                         else:
-                            # Try next model
                             logger.warning(f"Gemini {model_name} unavailable after retries, trying next model...")
                             break
                     else:

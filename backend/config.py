@@ -38,7 +38,8 @@ class Settings(BaseSettings):
     DISCORD_GUILD_IDS: str = Field(default="")
 
     GOOGLE_FACTCHECK_API_KEY: str = Field(default="", description="Google Fact Check Tools API Key")
-    EVIDENCE_TIMEOUT: int = Field(default=5, description="Evidence retriever timeout in seconds")
+    BRAVE_API_KEY: str = Field(default="", description="Brave Search API Key (free 2000/month)")
+    EVIDENCE_TIMEOUT: int = Field(default=12, description="Evidence retriever timeout in seconds")
 
     # ── Database ──────────────────────────────────────────────
     DATABASE_URL: str = Field(
@@ -120,34 +121,90 @@ def get_settings() -> Settings:
 
 
 # ── Source Credibility Scores ─────────────────────────────────
+# Score range: 0.0 (completely unreliable) to 1.0 (authoritative government source)
 SOURCE_CREDIBILITY = {
+    # ── Tier 1: Government & Official Organizations (0.95-1.0) ──
     "gov.in": 1.0,
     "gov.uk": 1.0,
+    "gov.au": 1.0,
     "gov": 1.0,
-    "reuters.com": 0.95,
-    "apnews.com": 0.95,
-    "bbc.com": 0.92,
-    "bbc.co.uk": 0.92,
     "who.int": 0.98,
     "un.org": 0.98,
-    "thehindu.com": 0.8,
-    "ndtv.com": 0.7,
-    "indianexpress.com": 0.75,
-    "nytimes.com": 0.8,
-    "theguardian.com": 0.75,
-    "wikipedia.org": 0.65,
-    "snopes.com": 0.95,
-    "factcheck.org": 0.95,
+    "unicef.org": 0.98,
+    "worldbank.org": 0.97,
+    "imf.org": 0.97,
+    "nasa.gov": 0.98,
+    "cdc.gov": 0.98,
+    "nih.gov": 0.98,
+    "europa.eu": 0.95,
+    "pib.gov.in": 1.0,  # Press Information Bureau India
+
+    # ── Tier 2: Fact-Checking Organizations (0.93-0.96) ──
+    "snopes.com": 0.96,
+    "factcheck.org": 0.96,
+    "politifact.com": 0.96,
+    "fullfact.org": 0.96,
+    "factcheck.afp.com": 0.95,
     "altnews.in": 0.95,
     "boomlive.in": 0.95,
-    "fullfact.org": 0.95,
-    "factcheck.afp.com": 0.95,
-    "politifact.com": 0.95,
-    "smhoaxslayer.com": 0.85,
-    "vishvasnews.com": 0.85,
-    "washingtonpost.com": 0.8,
-    "cnn.com": 0.7,
-    "aljazeera.com": 0.75,
+    "vishvasnews.com": 0.93,
+    "smhoaxslayer.com": 0.90,
+    "thequint.com/news/webqoof": 0.93,
+    "checkyourfact.com": 0.90,
+    "leadstories.com": 0.90,
+    "africacheck.org": 0.93,
+    "maldita.es": 0.93,
+
+    # ── Tier 3: Wire Services (0.93-0.95) ──
+    "reuters.com": 0.95,
+    "apnews.com": 0.95,
+    "afp.com": 0.93,
+    "pti.in": 0.93,           # Press Trust of India
+    "ians.in": 0.90,          # Indo-Asian News Service
+
+    # ── Tier 4: Major International News (0.80-0.92) ──
+    "bbc.com": 0.92,
+    "bbc.co.uk": 0.92,
+    "nytimes.com": 0.88,
+    "washingtonpost.com": 0.85,
+    "theguardian.com": 0.85,
+    "economist.com": 0.88,
+    "ft.com": 0.88,           # Financial Times
+    "nature.com": 0.95,       # Nature journal
+    "science.org": 0.95,      # Science journal
+    "lancet.com": 0.95,       # The Lancet
+    "bmj.com": 0.93,          # British Medical Journal
+    "pubmed.ncbi.nlm.nih.gov": 0.95,
+    "scholar.google.com": 0.80,
+
+    # ── Tier 5: Major Regional/National News (0.70-0.82) ──
+    "thehindu.com": 0.82,
+    "indianexpress.com": 0.80,
+    "ndtv.com": 0.75,
+    "livemint.com": 0.78,
+    "scroll.in": 0.75,
+    "thewire.in": 0.75,
+    "aljazeera.com": 0.78,
+    "dw.com": 0.80,           # Deutsche Welle
+    "france24.com": 0.78,
+    "abc.net.au": 0.82,       # Australian Broadcasting Corporation
+    "cbc.ca": 0.82,           # Canadian Broadcasting Corporation
+    "npr.org": 0.82,
+    "pbs.org": 0.82,
+    "cnn.com": 0.72,
+    "cnbc.com": 0.75,
+    "bloomberg.com": 0.82,
+
+    # ── Tier 6: Encyclopedias & Knowledge Bases (0.60-0.75) ──
+    "wikipedia.org": 0.65,
+    "britannica.com": 0.80,
+    "wikidata.org": 0.75,
+
+    # ── Tier 7: Sports & Specialized (0.70-0.85) ──
+    "espncricinfo.com": 0.85,
+    "icc-cricket.com": 0.90,
+    "fifa.com": 0.90,
+    "olympics.com": 0.90,
 }
 
 KNOWN_DISINFO_DOMAINS = [

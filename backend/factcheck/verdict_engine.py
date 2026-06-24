@@ -24,7 +24,7 @@ from typing import List, Optional
 
 from backend.config import (
     CLAUDE_MAX_TOKENS, CLAUDE_MODEL,
-    GEMINI_MODEL, GEMINI_MAX_TOKENS,
+    GEMINI_MODEL, GEMINI_MAX_TOKENS, GEMINI_FALLBACK_MODELS,
     get_settings,
 )
 from backend.models.schemas import Claim, ClaimVerdict, Evidence, Verdict
@@ -59,6 +59,43 @@ class VerdictEngine:
         self._claude_client = None
         self._gemini_checked = False
         self._claude_checked = False
+
+    # ──────────────────────────────────────────────────────────
+    # Claim alignment helpers (used by bypass gate + TF-IDF)
+    # ──────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _get_content_words(text: str) -> set:
+        """Tokenize and return content words (stopwords removed) for semantic comparison."""
+        words = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9\u0900-\u097F\u0B80-\u0BFF]{3,}\b", text)]
+        stopwords = {
+            "the", "and", "for", "that", "this", "with", "from", "was", "were", "been",
+            "has", "have", "had", "are", "its", "their", "his", "her", "who", "whom",
+            "which", "they", "she", "him", "them", "your", "our", "about", "there",
+            "not", "but", "what", "when", "where", "how", "why", "will", "would", "shall",
+            "should", "can", "could", "may", "might", "must", "other", "some", "such",
+            "into", "than", "then", "these", "those", "upon", "did", "does", "done",
+            "fact", "check", "claim", "reviewed", "rating", "false", "true",
+            "video", "photo", "image", "photos", "videos", "images",
+        }
+        return set(w for w in words if w not in stopwords)
+
+    @staticmethod
+    def _extract_reviewed_claim(ev_text: str) -> Optional[str]:
+        """Extract the claim being reviewed from a fact-check snippet."""
+        patterns = [
+            r"claim reviewed:\s*(.+?)(?:\s*[\u2014\u2013\-]+\s*rating:)",
+            r"claim reviewed:\s*([^.]{10,120})",
+            r"fact check:\s*([^.]{10,120}?)(?:\s*claim|\s*$)",
+        ]
+        for pat in patterns:
+            m = re.search(pat, ev_text, re.IGNORECASE)
+            if m:
+                result = m.group(1).strip()
+                result = re.sub(r'\s*[\u2014\u2013\-]+\s*rating:.*$', '', result, flags=re.IGNORECASE)
+                if len(result) > 10:
+                    return result
+        return None
 
     # ──────────────────────────────────────────────────────────
     # Client initialization
@@ -127,6 +164,9 @@ class VerdictEngine:
                 logger.warning(f"RAG retrieval skipped or failed: {e}")
 
         # Check if there is an exact/matching fact-check review in the evidence to bypass LLM
+        # CRITICAL: We must verify the fact-check is about the SAME claim as the user's,
+        # not just a topically-related article. E.g., a fact-check about a "viral video
+        # of Chandrayaan-3" is NOT the same as a claim about "India landing on the Moon".
         if evidence:
             for ev in evidence:
                 if ev.source_score >= 0.90:
@@ -137,7 +177,40 @@ class VerdictEngine:
                     )
                     if rating_match:
                         rating_str = rating_match.group(1).lower()
-                        
+
+                        # ── Claim alignment gate ──
+                        # Extract what claim the fact-check is actually reviewing
+                        reviewed_claim = self._extract_reviewed_claim(text_to_check)
+                        if reviewed_claim:
+                            # Check content-word overlap between user claim and reviewed claim
+                            user_words = self._get_content_words(claim.text)
+                            reviewed_words = self._get_content_words(reviewed_claim)
+                            if user_words and reviewed_words:
+                                overlap = user_words & reviewed_words
+                                overlap_ratio = len(overlap) / max(len(user_words), 1)
+                                if overlap_ratio < 0.40:
+                                    logger.info(
+                                        f"Fact-check bypass SKIPPED: reviewed claim '{reviewed_claim[:80]}' "
+                                        f"does not match user claim (overlap={overlap_ratio:.2f}). "
+                                        f"Proceeding to LLM/TF-IDF evaluation."
+                                    )
+                                    continue  # Skip this evidence — it's about a different claim
+                        else:
+                            # No explicit "Claim Reviewed" found — do a simpler title check
+                            # The title often starts with the fact-check org, then the claim
+                            ev_title_words = self._get_content_words(ev.title)
+                            user_words = self._get_content_words(claim.text)
+                            if user_words and ev_title_words:
+                                overlap = user_words & ev_title_words
+                                overlap_ratio = len(overlap) / max(len(user_words), 1)
+                                if overlap_ratio < 0.35:
+                                    logger.info(
+                                        f"Fact-check bypass SKIPPED: title '{ev.title[:80]}' "
+                                        f"has low overlap with user claim ({overlap_ratio:.2f}). "
+                                        f"Proceeding to LLM/TF-IDF evaluation."
+                                    )
+                                    continue
+
                         # Map rating to standard Verdict
                         if rating_str in ("true", "mostly true"):
                             mapped_verdict = Verdict.TRUE
@@ -201,10 +274,10 @@ class VerdictEngine:
         improves accuracy for current events and factual claims.
         """
         # Try primary model first, then fallback model
-        models_to_try = [GEMINI_MODEL, "gemini-2.0-flash", "gemini-1.5-flash"]
+        models_to_try = GEMINI_FALLBACK_MODELS
         
         for model_name in models_to_try:
-            for attempt in range(2):
+            for attempt in range(3):
                 try:
                     from google.genai import types
 
@@ -332,8 +405,8 @@ Return ONLY valid JSON:
                 except Exception as e:
                     error_str = str(e)
                     if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "503" in error_str or "UNAVAILABLE" in error_str:
-                        if attempt < 1:
-                            wait_time = 1.5
+                        if attempt < 2:
+                            wait_time = 3.0 * (2 ** attempt)  # 3s, 6s exponential backoff
                             logger.warning(f"Gemini {model_name} rate-limited (attempt {attempt+1}), retrying in {wait_time}s...")
                             time.sleep(wait_time)
                             continue
@@ -447,19 +520,7 @@ Analyze this claim and provide your verdict as JSON."""
             return words + bigrams + trigrams
 
         def _get_content_words(text: str) -> set:
-            # Tokenize and keep words >= 3 chars that are not common English/Hindi/Tamil stopwords
-            words = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9\u0900-\u097F\u0B80-\u0BFF]{3,}\b", text)]
-            stopwords = {
-                "the", "and", "for", "that", "this", "with", "from", "was", "were", "been",
-                "has", "have", "had", "are", "its", "their", "his", "her", "who", "whom",
-                "which", "they", "she", "him", "them", "your", "our", "about", "there", "their",
-                "not", "but", "what", "when", "where", "how", "why", "will", "would", "shall",
-                "should", "can", "could", "may", "might", "must", "other", "some", "such",
-                "into", "than", "then", "these", "those", "upon", "about", "did", "does", "done",
-                "और", "तथा", "तथापि", "लेकिन", "कि", "यह", "वह", "है", "हैं", "था", "थे",
-                "மற்றும்", "ஆனால்", "அது", "இந்த", "அவர்", "இருந்தது", "உள்ளது"
-            }
-            return set(w for w in words if w not in stopwords)
+            return VerdictEngine._get_content_words(text)
 
         claim_terms = get_all_terms(claim.text) or ["unknown"]
         claim_words_set = set(get_words(claim.text))
@@ -521,24 +582,7 @@ Analyze this claim and provide your verdict as JSON."""
         # ── Context-aware helper: detect if a fact-check is about the SAME
         #    claim as the user's or about an OPPOSITE/DIFFERENT claim ──
         def _extract_reviewed_claim(ev_text: str) -> Optional[str]:
-            """Try to extract the claim being reviewed from a fact-check snippet."""
-            patterns = [
-                # "Claim Reviewed: X — Rating: false" (handles all dash types including unicode)
-                r"claim reviewed:\s*(.+?)(?:\s*[\u2014\u2013\-]+\s*rating:)",
-                # "Claim Reviewed: X" (simpler - just grab everything after "Claim Reviewed:")
-                r"claim reviewed:\s*([^.]{10,120})",
-                # "Fact check: X" from title
-                r"fact check:\s*([^.]{10,120}?)(?:\s*claim|\s*$)",
-            ]
-            for pat in patterns:
-                m = re.search(pat, ev_text, re.IGNORECASE)
-                if m:
-                    result = m.group(1).strip()
-                    # Clean up trailing punctuation and rating fragments
-                    result = re.sub(r'\s*[\u2014\u2013\-]+\s*rating:.*$', '', result, flags=re.IGNORECASE)
-                    if len(result) > 10:
-                        return result
-            return None
+            return VerdictEngine._extract_reviewed_claim(ev_text)
 
         def _claims_are_aligned(user_claim: str, reviewed_claim: str) -> bool:
             """Determine if the fact-check reviewed claim is semantically aligned

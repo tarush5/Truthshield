@@ -123,7 +123,9 @@ Respond with ONLY valid JSON:
                             temperature=0.1,
                         ),
                     )
-                    res_text = response.text.strip()
+                    res_text = (response.text or "").strip()
+                    if not res_text:
+                        raise ValueError("Gemini returned empty response")
                     if "```json" in res_text:
                         res_text = res_text.split("```json")[1].split("```")[0].strip()
                     elif "```" in res_text:

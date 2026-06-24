@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     EFFICIENTNET_MODEL: str = Field(default="efficientnet-b4")
 
     # ── App Settings ──────────────────────────────────────────
-    APP_ENV: str = Field(default="development")
+    APP_ENV: str = Field(default="development")  # Use 'production' on Render/deployment
     APP_HOST: str = Field(default="0.0.0.0")
     APP_PORT: int = Field(default_factory=lambda: int(os.environ.get("PORT", 8000)))
     FRONTEND_URL: str = Field(default="http://localhost:5173")
@@ -232,7 +232,8 @@ CLAUDE_MODEL = "claude-sonnet-4-6"
 CLAUDE_MAX_TOKENS = 1024
 
 # ── Gemini Model Config ──────────────────────────────────────
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"]
 GEMINI_MAX_TOKENS = 1024
 
 # ── Supported Languages ──────────────────────────────────────

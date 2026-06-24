@@ -712,7 +712,7 @@ class EvidenceRetriever:
             resp = self._get_session().get(
                 "https://api.gdeltproject.org/api/v2/doc/doc",
                 params=params,
-                timeout=5,
+                timeout=8,
             )
             if resp.status_code != 200:
                 return []

@@ -274,34 +274,60 @@ html.light body {
 html.light .glass-card,
 html.light .glass-card-hover,
 html.light .glass-card-interactive {
-  background: rgba(255, 255, 255, 0.65);
-  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(148, 163, 184, 0.15);
   color: #1e293b;
-  box-shadow: 0 10px 30px -10px rgba(148, 163, 184, 0.2);
+  box-shadow: 0 10px 30px -10px rgba(148, 163, 184, 0.15);
 }
 html.light .glass-card-hover:hover,
 html.light .glass-card-interactive:hover {
-  background: rgba(255, 255, 255, 0.85);
-  border-color: rgba(14, 165, 233, 0.25);
-  box-shadow: 0 15px 40px -10px rgba(148, 163, 184, 0.3);
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(14, 165, 233, 0.3);
+  box-shadow: 0 15px 40px -10px rgba(148, 163, 184, 0.25);
 }
 html.light .bg-surface-900 {
   background-color: #f1f5f9 !important;
 }
 html.light .border-white\/5,
-html.light .border-white\/10 {
+html.light .border-white\/10,
+html.light .border-white\/15,
+html.light .border-white\/20 {
   border-color: rgba(148, 163, 184, 0.12) !important;
 }
 html.light .bg-white\/5 {
   background-color: rgba(148, 163, 184, 0.05) !important;
+}
+html.light .bg-white\/10 {
+  background-color: rgba(148, 163, 184, 0.08) !important;
+}
+html.light .bg-white\/15 {
+  background-color: rgba(148, 163, 184, 0.12) !important;
+}
+html.light .bg-white\/20 {
+  background-color: rgba(148, 163, 184, 0.16) !important;
+}
+html.light .bg-white\/\[0\.005\],
+html.light .bg-white\/\[0\.01\],
+html.light .bg-white\/\[0\.02\],
+html.light .bg-white\/\[0\.03\],
+html.light .bg-white\/\[0\.04\] {
+  background-color: rgba(148, 163, 184, 0.03) !important;
 }
 html.light .text-white\/30,
 html.light .text-white\/40 {
   color: rgba(71, 85, 105, 0.5) !important;
 }
 html.light .text-white\/50,
-html.light .text-white\/60 {
+html.light .text-white\/60,
+html.light .text-white\/70 {
   color: rgba(71, 85, 105, 0.75) !important;
+}
+html.light .text-white\/85,
+html.light .text-white\/90 {
+  color: #1e293b !important;
+}
+html.light .text-white:not(.keep-white):not(.btn-primary *):not(.btn-primary-lg *):not(.bg-gradient-to-br *):not(.bg-brand-500 *):not(.bg-emerald-500 *):not(.bg-red-500 *) {
+  color: #0f172a !important;
 }
 html.light nav {
   background-color: rgba(255, 255, 255, 0.8) !important;
@@ -328,6 +354,62 @@ html.light .sidebar-nav-item.active {
   color: #0ea5e9;
   background: rgba(14, 165, 233, 0.08);
   border-color: rgba(14, 165, 233, 0.15);
+}
+
+/* Hardcoded hex backgrounds overrides */
+html.light .bg-\[\#030712\]\/40 {
+  background-color: rgba(255, 255, 255, 0.65) !important;
+}
+html.light .bg-\[\#071124\]\/45 {
+  background-color: rgba(255, 255, 255, 0.75) !important;
+}
+html.light .bg-\[\#071124\]\/50 {
+  background-color: rgba(241, 245, 249, 0.7) !important;
+}
+html.light .bg-\[\#071124\]\/30 {
+  background-color: rgba(255, 255, 255, 0.45) !important;
+}
+html.light .bg-\[\#0c1a2e\]\/95 {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+}
+html.light .bg-\[\#0c1223\] {
+  background-color: #f1f5f9 !important;
+}
+html.light .bg-\[\#020617\] {
+  background-color: #f8fafc !important;
+}
+
+/* Sky/blue/cyan accent colors in light mode */
+html.light .text-sky-300 { color: #0284c7 !important; }
+html.light .text-sky-400 { color: #0369a1 !important; }
+html.light .text-cyan-400 { color: #0891b2 !important; }
+html.light .text-purple-400 { color: #7c3aed !important; }
+
+html.light .text-slate-100 { color: #0f172a !important; }
+html.light .text-slate-200 { color: #1e293b !important; }
+html.light .text-slate-300 { color: #334155 !important; }
+html.light .text-slate-400 { color: #475569 !important; }
+
+/* Interactive Input Fields and buttons in light mode */
+html.light .input-field {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  color: #1e293b !important;
+  border-color: rgba(148, 163, 184, 0.25) !important;
+}
+html.light .input-field::placeholder {
+  color: rgba(71, 85, 105, 0.4) !important;
+}
+html.light .btn-secondary,
+html.light .btn-secondary-lg {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  color: #334155 !important;
+  border-color: rgba(148, 163, 184, 0.25) !important;
+}
+html.light .btn-secondary:hover,
+html.light .btn-secondary-lg:hover {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  border-color: rgba(14, 165, 233, 0.35) !important;
+  color: #0f172a !important;
 }
 
 /* ── Cybernetic Electrifying Custom Styles ── */

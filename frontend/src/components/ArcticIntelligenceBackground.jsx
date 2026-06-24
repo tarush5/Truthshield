@@ -150,13 +150,19 @@ export default function ArcticIntelligenceBackground() {
 
     const renderLightningBolt = (bolt) => {
       const { nodeA, nodeB, width: w } = bolt;
+      const isLight = document.documentElement.classList.contains('light');
       ctx.save();
-      ctx.globalCompositeOperation = 'screen';
-      
-      // Blue/cyan electric glow
-      ctx.shadowBlur = 16;
-      ctx.shadowColor = '#06b6d4';
-      ctx.strokeStyle = '#e0f2fe';
+      if (isLight) {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#0ea5e9';
+        ctx.strokeStyle = '#0284c7';
+      } else {
+        ctx.globalCompositeOperation = 'screen';
+        ctx.shadowBlur = 16;
+        ctx.shadowColor = '#06b6d4';
+        ctx.strokeStyle = '#e0f2fe';
+      }
       ctx.lineWidth = w * (0.4 + Math.random() * 0.8);
       
       ctx.beginPath();
@@ -185,8 +191,14 @@ export default function ArcticIntelligenceBackground() {
     };
 
     const draw = () => {
-      // Clear with deep navy space background
-      ctx.fillStyle = '#020617';
+      const isLight = document.documentElement.classList.contains('light');
+
+      // Clear background
+      if (isLight) {
+        ctx.fillStyle = '#f1f5f9';
+      } else {
+        ctx.fillStyle = '#020617';
+      }
       ctx.fillRect(0, 0, width, height);
 
       // ── Layer 1: Atmospheric Gradients ──
@@ -194,9 +206,15 @@ export default function ArcticIntelligenceBackground() {
         width / 2, height / 3, 10,
         width / 2, height / 2, Math.max(width, height)
       );
-      centerGlow.addColorStop(0, '#071124');
-      centerGlow.addColorStop(0.5, '#040b1a');
-      centerGlow.addColorStop(1, '#020617');
+      if (isLight) {
+        centerGlow.addColorStop(0, 'rgba(186, 230, 253, 0.25)'); // sky-200
+        centerGlow.addColorStop(0.5, 'rgba(226, 232, 240, 0.4)'); // slate-200
+        centerGlow.addColorStop(1, '#f1f5f9');
+      } else {
+        centerGlow.addColorStop(0, '#071124');
+        centerGlow.addColorStop(0.5, '#040b1a');
+        centerGlow.addColorStop(1, '#020617');
+      }
       ctx.fillStyle = centerGlow;
       ctx.fillRect(0, 0, width, height);
 
@@ -205,7 +223,11 @@ export default function ArcticIntelligenceBackground() {
       
       const drawAuroraWave = (offsetY, amp, waveCount, color1, color2, alpha) => {
         ctx.save();
-        ctx.globalCompositeOperation = 'screen';
+        if (isLight) {
+          ctx.globalCompositeOperation = 'source-over';
+        } else {
+          ctx.globalCompositeOperation = 'screen';
+        }
         
         // Draw multiple paths layered to create depth
         for (let w = 0; w < waveCount; w++) {
@@ -225,7 +247,11 @@ export default function ArcticIntelligenceBackground() {
           const grad = ctx.createLinearGradient(0, offsetY - amp, 0, height);
           grad.addColorStop(0, `${color1}, ${alpha * (1 - w * 0.2)})`);
           grad.addColorStop(0.5, `${color2}, ${alpha * 0.4 * (1 - w * 0.2)})`);
-          grad.addColorStop(1, 'rgba(2, 6, 23, 0)');
+          if (isLight) {
+            grad.addColorStop(1, 'rgba(241, 245, 249, 0)');
+          } else {
+            grad.addColorStop(1, 'rgba(2, 6, 23, 0)');
+          }
           
           ctx.fillStyle = grad;
           ctx.fill();
@@ -238,9 +264,9 @@ export default function ArcticIntelligenceBackground() {
         height * 0.65, 
         80, 
         3, 
-        'rgba(34, 211, 238', // Cyan
-        'rgba(14, 165, 233', // Ice blue
-        0.07
+        isLight ? 'rgba(8, 145, 178' : 'rgba(34, 211, 238',
+        isLight ? 'rgba(2, 132, 199' : 'rgba(14, 165, 233',
+        isLight ? 0.03 : 0.07
       );
 
       // Secondary purple wave (higher up)
@@ -248,9 +274,9 @@ export default function ArcticIntelligenceBackground() {
         height * 0.45, 
         60, 
         2, 
-        'rgba(139, 92, 246', // Purple
-        'rgba(34, 211, 238', // Cyan
-        0.05
+        isLight ? 'rgba(109, 40, 217' : 'rgba(139, 92, 246',
+        isLight ? 'rgba(8, 145, 178' : 'rgba(34, 211, 238',
+        isLight ? 0.025 : 0.05
       );
 
       // ── Layer 3: Mouse-Reactive Lighting Spotlight ──
@@ -259,13 +285,22 @@ export default function ArcticIntelligenceBackground() {
           mouse.x, mouse.y, 0,
           mouse.x, mouse.y, mouse.radius
         );
-        // Soft icy-blue spotlight
-        mouseGlow.addColorStop(0, 'rgba(125, 211, 252, 0.08)');
-        mouseGlow.addColorStop(0.5, 'rgba(139, 92, 246, 0.03)');
-        mouseGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        if (isLight) {
+          mouseGlow.addColorStop(0, 'rgba(14, 165, 233, 0.06)');
+          mouseGlow.addColorStop(0.5, 'rgba(109, 40, 217, 0.02)');
+          mouseGlow.addColorStop(1, 'rgba(241, 245, 249, 0)');
+        } else {
+          mouseGlow.addColorStop(0, 'rgba(125, 211, 252, 0.08)');
+          mouseGlow.addColorStop(0.5, 'rgba(139, 92, 246, 0.03)');
+          mouseGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        }
         
         ctx.save();
-        ctx.globalCompositeOperation = 'screen';
+        if (isLight) {
+          ctx.globalCompositeOperation = 'source-over';
+        } else {
+          ctx.globalCompositeOperation = 'screen';
+        }
         ctx.fillStyle = mouseGlow;
         ctx.beginPath();
         ctx.arc(mouse.x, mouse.y, mouse.radius, 0, Math.PI * 2);
@@ -286,12 +321,20 @@ export default function ArcticIntelligenceBackground() {
         const scale = 1 + Math.sin(p.pulseVal) * 0.25;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size * scale, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(125, 211, 252, 0.25)'; // Ice blue
+        if (isLight) {
+          ctx.fillStyle = 'rgba(14, 165, 233, 0.15)'; // Sky-500 alpha
+        } else {
+          ctx.fillStyle = 'rgba(125, 211, 252, 0.25)'; // Ice blue
+        }
         ctx.fill();
 
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size * 0.4, 0, Math.PI * 2);
-        ctx.fillStyle = '#7dd3fc';
+        if (isLight) {
+          ctx.fillStyle = '#0284c7'; // Sky-600
+        } else {
+          ctx.fillStyle = '#7dd3fc';
+        }
         ctx.fill();
       });
 
@@ -305,9 +348,13 @@ export default function ArcticIntelligenceBackground() {
           const dist = Math.sqrt(dx * dx + dy * dy);
 
           if (dist < CONNECTION_DIST) {
-            const alpha = (1 - dist / CONNECTION_DIST) * 0.06;
+            const alpha = (1 - dist / CONNECTION_DIST) * (isLight ? 0.05 : 0.06);
             ctx.beginPath();
-            ctx.strokeStyle = `rgba(125, 211, 252, ${alpha})`;
+            if (isLight) {
+              ctx.strokeStyle = `rgba(14, 165, 233, ${alpha})`;
+            } else {
+              ctx.strokeStyle = `rgba(125, 211, 252, ${alpha})`;
+            }
             ctx.lineWidth = 0.5;
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(p2.x, p2.y);
@@ -376,7 +423,11 @@ export default function ArcticIntelligenceBackground() {
 
         ctx.beginPath();
         ctx.arc(flake.x, flake.y, flake.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(248, 250, 252, ${flake.opacity})`; // Snow color
+        if (isLight) {
+          ctx.fillStyle = `rgba(148, 163, 184, ${flake.opacity * 0.35})`; // Slate dust/data-flow particles
+        } else {
+          ctx.fillStyle = `rgba(248, 250, 252, ${flake.opacity})`; // Snow color
+        }
         ctx.fill();
       });
 

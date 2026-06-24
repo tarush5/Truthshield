@@ -55,6 +55,10 @@ export default function TrendChart({ data, onRangeChange, loading = false }) {
   // Determine x-axis data key (backend returns 'day' for weekly trend)
   const xAxisKey = data.length > 0 && 'day' in data[0] ? 'day' : 'date';
 
+  const isLight = document.documentElement.classList.contains('light');
+  const strokeColor = isLight ? 'rgba(71, 85, 105, 0.45)' : 'rgba(255,255,255,0.15)';
+  const gridColor = isLight ? 'rgba(148, 163, 184, 0.12)' : 'rgba(255,255,255,0.04)';
+
   return (
     <InteractiveCard className="border border-white/5 bg-[#030712]/40 backdrop-blur-xl">
       <motion.div
@@ -112,20 +116,20 @@ export default function TrendChart({ data, onRangeChange, loading = false }) {
 
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="rgba(255,255,255,0.04)"
+                stroke={gridColor}
                 vertical={false}
               />
 
               <XAxis
                 dataKey={xAxisKey}
-                stroke="rgba(255,255,255,0.15)"
+                stroke={strokeColor}
                 fontSize={11}
                 tickLine={false}
                 axisLine={false}
                 dy={8}
               />
               <YAxis
-                stroke="rgba(255,255,255,0.15)"
+                stroke={strokeColor}
                 fontSize={11}
                 tickLine={false}
                 axisLine={false}

@@ -123,6 +123,13 @@ export default function Report() {
     return 'badge-info';
   };
 
+  const isLight = document.documentElement.classList.contains('light');
+  const xAxisTickColor = isLight ? 'rgba(71, 85, 105, 0.5)' : 'rgba(255,255,255,0.2)';
+  const yAxisTickColor = isLight ? 'rgba(71, 85, 105, 0.85)' : 'rgba(255,255,255,0.5)';
+  const tooltipBg = isLight ? '#ffffff' : '#071124';
+  const tooltipBorder = isLight ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255,255,255,0.08)';
+  const tooltipColor = isLight ? '#1e293b' : '#ffffff';
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-8">
       
@@ -148,45 +155,50 @@ export default function Report() {
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-white/30 font-mono flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5">
             <Clock className="w-3.5 h-3.5" />
-            {report.processing_time_seconds || 0.6}s {t('report.inference')}
+            {new Date(report.created_at).toLocaleDateString()}
           </span>
-          <button onClick={handleShare} className="btn-secondary flex items-center gap-2 text-xs py-2 px-4">
+          <button
+            onClick={handleShare}
+            className="btn-secondary flex items-center gap-2 text-xs py-1.5 px-4"
+          >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
-            {copied ? t('report.copied') : t('report.share_brief')}
+            {copied ? t('report.copied') : t('report.share_dossier')}
           </button>
         </div>
       </motion.div>
 
-      {/* Futuristic Split Screen Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* Main briefing cards */}
+      <div className="grid lg:grid-cols-3 gap-8">
         
-        {/* Left Column: Verdict / Indicators (4 cols) */}
-        <div className="lg:col-span-4 space-y-6">
+        {/* Left main: core summary & details */}
+        <div className="lg:col-span-2 space-y-8">
           
-          {/* Verdict and trust gauge */}
+          {/* Core verdict card */}
           <InteractiveCard className="border border-white/10 bg-[#030712]/40 backdrop-blur-xl">
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="p-6 space-y-6 text-center"
-            >
-            <div className="flex justify-between items-center text-xs border-b border-white/5 pb-3">
-              <span className="font-bold text-white/40 uppercase tracking-widest">{t('report.verdict_label')}</span>
-              <span className={`${getVerdictStyle(report.credibility?.verdict)}`}>
-                {t(`verdicts.${report.credibility?.verdict}`) || report.credibility?.verdict || t('verdicts.UNVERIFIED')}
-              </span>
+            <div className="p-6 md:p-8 flex flex-col md:flex-row items-center md:items-start gap-8">
+              
+              {/* Trust Gauge */}
+              <div className="shrink-0 flex flex-col items-center">
+                <TrustGauge score={report.credibility?.trust_score || 50} />
+                <span className={`badge ${getVerdictStyle(report.credibility?.verdict)} mt-4`}>
+                  {t(`verdicts.${report.credibility?.verdict}`) || report.credibility?.verdict || t('verdicts.UNVERIFIED')}
+                </span>
+              </div>
+
+              {/* Explanations */}
+              <div className="flex-1 space-y-4 text-center md:text-left">
+                <div className="space-y-1">
+                  <span className="section-label">{t('report.verdict_summary')}</span>
+                  <p className="text-sm text-white/80 leading-relaxed font-sans">
+                    {explanationText || t('report.no_explanation')}
+                  </p>
+                </div>
+              </div>
+
             </div>
 
-            <div className="flex justify-center py-2">
-              <TrustGauge score={report.credibility?.trust_score || 50} size={160} />
-            </div>
-            </motion.div>
-          </InteractiveCard>
-
-          {/* Component breakdowns */}
-          {componentData.length > 0 && (
-            <InteractiveCard className="border border-white/5 bg-[#071124]/30 backdrop-blur-xl">
+            {/* Signal scores chart */}
+            {report.credibility?.component_scores && (
               <motion.div
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -196,10 +208,10 @@ export default function Report() {
               <h3 className="section-label">{t('report.signal_vectors')}</h3>
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={componentData} layout="vertical" margin={{ left: -10, right: 10, top: 0, bottom: 0 }}>
-                  <XAxis type="number" domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
+                  <XAxis type="number" domain={[0, 100]} tick={{ fill: xAxisTickColor, fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: yAxisTickColor, fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#071124', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', color: '#fff', fontSize: '11px' }}
+                    contentStyle={{ backgroundColor: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: '8px', color: tooltipColor, fontSize: '11px' }}
                     formatter={(val) => [`${val.toFixed(0)}%`, 'Accuracy']}
                   />
                   <Bar dataKey="score" radius={[0, 4, 4, 0]} barSize={12}>
@@ -210,8 +222,8 @@ export default function Report() {
                 </BarChart>
               </ResponsiveContainer>
               </motion.div>
-            </InteractiveCard>
-          )}
+            )}
+          </InteractiveCard>
 
           {/* Timeline Process Profile */}
           {report.credibility?.confidence_profile && (

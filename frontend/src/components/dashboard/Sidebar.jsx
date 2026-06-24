@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Search, Clock, Settings,
   LogOut, ChevronLeft, ChevronRight, Shield, User
@@ -20,7 +21,9 @@ const NAV_ITEMS = [
  * @param {function} onCollapse   - Toggle collapse callback
  */
 export default function Sidebar({ activeView, onViewChange, collapsed, onCollapse }) {
-  const orgName = localStorage.getItem('active_org_name') || 'Personal Workspace';
+  const { t } = useTranslation();
+  const rawOrgName = localStorage.getItem('active_org_name') || 'Personal Workspace';
+  const orgName = rawOrgName === 'Personal Workspace' ? t('dashboard_layout.skip_to_personal') : rawOrgName;
   const userStr = localStorage.getItem('user');
   const user = userStr ? JSON.parse(userStr) : null;
   const userEmail = user?.email || 'user@example.com';
@@ -103,7 +106,7 @@ export default function Sidebar({ activeView, onViewChange, collapsed, onCollaps
             className="px-5 pt-5 pb-1"
           >
             <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/20">
-              Main Menu
+              {t('nav_sidebar.main_menu')}
             </span>
           </motion.div>
         )}
@@ -160,7 +163,7 @@ export default function Sidebar({ activeView, onViewChange, collapsed, onCollaps
                   >
                     <span className={`text-[13px] font-medium whitespace-nowrap
                       ${isActive ? 'text-white' : ''}`}>
-                      {item.label}
+                      {t('nav_sidebar.' + item.id)}
                     </span>
                     {isActive && (
                       <motion.span
@@ -168,7 +171,7 @@ export default function Sidebar({ activeView, onViewChange, collapsed, onCollaps
                         animate={{ opacity: 1 }}
                         className="text-[10px] text-white/30 whitespace-nowrap"
                       >
-                        {item.description}
+                        {t('nav_sidebar.' + item.id + '_desc')}
                       </motion.span>
                     )}
                   </motion.div>
@@ -181,7 +184,7 @@ export default function Sidebar({ activeView, onViewChange, collapsed, onCollaps
                                 border border-white/10 text-xs text-white font-medium
                                 opacity-0 group-hover:opacity-100 pointer-events-none
                                 transition-opacity whitespace-nowrap z-50 shadow-xl">
-                  {item.label}
+                  {t('nav_sidebar.' + item.id)}
                   <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 
                                   w-2 h-2 rotate-45 bg-surface-800 border-l border-b border-white/10" />
                 </div>
@@ -218,7 +221,7 @@ export default function Sidebar({ activeView, onViewChange, collapsed, onCollaps
                   className="flex-1 min-w-0 text-left"
                 >
                   <p className="text-xs text-white/70 font-medium truncate">{userEmail}</p>
-                  <p className="text-[10px] text-white/25 truncate">Click to manage</p>
+                  <p className="text-[10px] text-white/25 truncate">{t('nav_sidebar.manage')}</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -251,7 +254,7 @@ export default function Sidebar({ activeView, onViewChange, collapsed, onCollaps
                                hover:text-white hover:bg-white/[0.04] transition-all"
                   >
                     <Settings className="w-3.5 h-3.5" />
-                    Settings
+                    {t('nav_sidebar.settings')}
                   </button>
                   <button
                     onClick={handleLogout}
@@ -259,7 +262,7 @@ export default function Sidebar({ activeView, onViewChange, collapsed, onCollaps
                                hover:text-red-400 hover:bg-red-500/[0.06] transition-all"
                   >
                     <LogOut className="w-3.5 h-3.5" />
-                    Sign out
+                    {t('nav_sidebar.logout')}
                   </button>
                 </div>
               </motion.div>

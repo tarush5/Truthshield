@@ -78,7 +78,7 @@ export default function Report() {
       <div className="max-w-5xl mx-auto px-4 flex items-center justify-center min-h-[50vh] relative z-10">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-white/40 font-mono animate-pulse">Decompressing intelligence briefing...</p>
+          <p className="text-xs text-white/40 font-mono animate-pulse">{t('report.decompressing_briefing')}</p>
         </div>
       </div>
     );
@@ -89,12 +89,12 @@ export default function Report() {
       <div className="max-w-xl mx-auto px-4 text-center py-20 relative z-10 space-y-6">
         <AlertTriangle className="w-12 h-12 text-amber-500/60 mx-auto" />
         <div className="space-y-2">
-          <h2 className="text-lg font-bold text-white">Inference Report Unavailable</h2>
-          <p className="text-xs text-white/40">{error || 'The requested verification index does not exist.'}</p>
+          <h2 className="text-lg font-bold text-white">{t('report.unavailable')}</h2>
+          <p className="text-xs text-white/40">{error || t('report.unavailable_hint')}</p>
         </div>
         <div>
           <Link to="/analyze" className="btn-secondary inline-flex items-center gap-2 text-xs py-2 px-5">
-            <ArrowLeft className="w-4 h-4" /> Back to Ingestion
+            <ArrowLeft className="w-4 h-4" /> {t('report.back_to_ingestion')}
           </Link>
         </div>
       </div>
@@ -102,7 +102,7 @@ export default function Report() {
   }
 
   const componentData = Object.entries(report.credibility?.component_scores || {}).map(([key, value]) => ({
-    name: key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' '),
+    name: t(`report.scores.${key}`) || key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' '),
     score: value,
     color: COMPONENT_COLORS[key] || '#475569',
   }));
@@ -137,22 +137,22 @@ export default function Report() {
           </button>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-sky-400 uppercase tracking-widest font-mono">Verification Dossier</span>
+              <span className="text-[10px] font-bold text-sky-400 uppercase tracking-widest font-mono">{t('report.verification_dossier')}</span>
               <span className="text-white/10">|</span>
-              <span className="text-[10px] text-white/40 font-mono">ID: {report.id?.slice(0, 8)}...</span>
+              <span className="text-[10px] text-white/40 font-mono">{t('report.id')}: {report.id?.slice(0, 8)}...</span>
             </div>
-            <h1 className="text-2xl font-bold font-display text-white mt-1">AI Intelligence Briefing</h1>
+            <h1 className="text-2xl font-bold font-display text-white mt-1">{t('report.title')}</h1>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-white/30 font-mono flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5">
             <Clock className="w-3.5 h-3.5" />
-            {report.processing_time_seconds || 0.6}s inference
+            {report.processing_time_seconds || 0.6}s {t('report.inference')}
           </span>
           <button onClick={handleShare} className="btn-secondary flex items-center gap-2 text-xs py-2 px-4">
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
-            {copied ? 'Copied' : 'Share Brief'}
+            {copied ? t('report.copied') : t('report.share_brief')}
           </button>
         </div>
       </motion.div>
@@ -172,9 +172,9 @@ export default function Report() {
               className="p-6 space-y-6 text-center"
             >
             <div className="flex justify-between items-center text-xs border-b border-white/5 pb-3">
-              <span className="font-bold text-white/40 uppercase tracking-widest">Inference Verdict</span>
+              <span className="font-bold text-white/40 uppercase tracking-widest">{t('report.verdict_label')}</span>
               <span className={`${getVerdictStyle(report.credibility?.verdict)}`}>
-                {report.credibility?.verdict || 'UNVERIFIED'}
+                {t(`verdicts.${report.credibility?.verdict}`) || report.credibility?.verdict || t('verdicts.UNVERIFIED')}
               </span>
             </div>
 
@@ -193,7 +193,7 @@ export default function Report() {
                 transition={{ delay: 0.2 }}
                 className="p-5 space-y-4"
               >
-              <h3 className="section-label">Signal Vectors</h3>
+              <h3 className="section-label">{t('report.signal_vectors')}</h3>
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={componentData} layout="vertical" margin={{ left: -10, right: 10, top: 0, bottom: 0 }}>
                   <XAxis type="number" domain={[0, 100]} tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -222,7 +222,7 @@ export default function Report() {
                 transition={{ delay: 0.25 }}
                 className="p-5 space-y-4"
               >
-              <h3 className="section-label">Risk Profile</h3>
+              <h3 className="section-label">{t('report.risk_profile')}</h3>
               <div className="space-y-3.5">
                 {Object.entries(report.credibility.confidence_profile).map(([key, value]) => (
                   <div key={key} className="space-y-1">
@@ -256,7 +256,7 @@ export default function Report() {
                 transition={{ delay: 0.3 }}
                 className="p-5 space-y-4"
               >
-                <h3 className="section-label">Audit Trail Checklist</h3>
+                <h3 className="section-label">{t('report.audit_trail')}</h3>
                 <div className="space-y-3 font-sans">
                   {report.verdict_reasons.map((reason, idx) => (
                     <div key={idx} className="flex items-start gap-2.5 text-xs text-white/75">
@@ -285,7 +285,7 @@ export default function Report() {
                 transition={{ delay: 0.15 }}
                 className="p-6 space-y-3"
               >
-              <h3 className="section-label">Explainable Verdict</h3>
+              <h3 className="section-label">{t('report.explanation_header')}</h3>
               <p className="text-white/85 text-xs sm:text-sm leading-relaxed font-sans">{explanationText}</p>
               </motion.div>
             </InteractiveCard>
@@ -300,7 +300,7 @@ export default function Report() {
                 transition={{ delay: 0.2 }}
                 className="p-6 space-y-4"
               >
-              <h3 className="section-label">Ingested Material</h3>
+              <h3 className="section-label">{t('report.ingested_material')}</h3>
               <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5 max-h-40 overflow-y-auto">
                 <p className="text-xs text-white/60 leading-relaxed italic">
                   "{report.original_text}"
@@ -312,7 +312,7 @@ export default function Report() {
                 <div className="space-y-3 pt-2">
                   <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-                    Conflict Anomalies Found ({report.inconsistencies.length})
+                    {t('report.conflict_anomalies')} ({report.inconsistencies.length})
                   </span>
                   <div className="space-y-2">
                     {report.inconsistencies.map((inc, idx) => (
@@ -325,7 +325,7 @@ export default function Report() {
                         <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase shrink-0 mt-0.5 ${
                           inc.severity === 'high' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
                         }`}>
-                          {inc.severity} Severity
+                          {inc.severity} {t('report.severity')}
                         </span>
                         <span className="text-white/60 leading-normal">{inc.reason}</span>
                       </motion.div>
@@ -344,7 +344,7 @@ export default function Report() {
             transition={{ delay: 0.25 }}
             className="space-y-3"
           >
-            <h3 className="section-label">Evidence Mapping</h3>
+            <h3 className="section-label">{t('report.claims_table_header')}</h3>
             <ClaimTable claims={report.claims} />
           </motion.div>
 

@@ -14,11 +14,11 @@ import InteractiveCard from '../components/InteractiveCard';
 
 
 const PIPELINE_STAGES = [
-  { key: 'preprocessing', label: 'Extracting Claims', icon: FileSearch },
-  { key: 'detecting', label: 'Searching Evidence', icon: Eye },
-  { key: 'verifying', label: 'Ranking Sources', icon: Shield },
-  { key: 'explaining', label: 'Verifying Facts', icon: Brain },
-  { key: 'done', label: 'Generating Verdict', icon: CheckCircle2 }
+  { key: 'preprocessing', label: 'landing.stage_title_0', icon: FileSearch },
+  { key: 'detecting', label: 'landing.stage_title_1', icon: Eye },
+  { key: 'verifying', label: 'landing.stage_title_2', icon: Shield },
+  { key: 'explaining', label: 'landing.stage_title_3', icon: Brain },
+  { key: 'done', label: 'landing.stage_title_4', icon: CheckCircle2 }
 ];
 
 export default function Analyze() {
@@ -251,13 +251,13 @@ export default function Analyze() {
       >
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/20">
           <Brain className="w-3.5 h-3.5 text-sky-400" />
-          <span className="text-[10px] font-bold uppercase tracking-wider text-sky-300">Advanced AI Core Ingestion</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-sky-300">{t('analyze.badge')}</span>
         </div>
         <h1 className="text-4xl sm:text-5xl font-extrabold font-display text-white tracking-tight">
-          Verify Claim Node
+          {t('landing.demo_label')}
         </h1>
         <p className="text-sm text-white/45 max-w-xl mx-auto">
-          Submit files, text segments or source URLs directly to the pipeline. Results are cross-audited.
+          {t('analyze.subtitle')}
         </p>
       </motion.div>
 
@@ -282,7 +282,7 @@ export default function Analyze() {
               disabled={!hasInput || analyzing}
               className="btn-primary flex items-center gap-2 text-sm"
             >
-              Analyze Input
+              {t('analyze.btn_analyze')}
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -304,11 +304,11 @@ export default function Analyze() {
 
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-white">Ingestion Running</h3>
-                <p className="text-xs text-white/40 mt-0.5">Stage progression and signal mapping</p>
+                <h3 className="text-base font-bold text-white">{t('analyze.running')}</h3>
+                <p className="text-xs text-white/40 mt-0.5">{t('analyze.running_desc')}</p>
               </div>
               <button onClick={handleCancel} className="btn-secondary text-[10px] py-1 px-4 hover:border-red-500/30 hover:text-red-400 transition-colors">
-                Cancel Run
+                {t('analyze.btn_cancel')}
               </button>
             </div>
 
@@ -351,14 +351,14 @@ export default function Analyze() {
                     <span className={`text-xs font-semibold ${
                       isActive ? 'text-sky-300 font-bold' : isCompleted ? 'text-white/70' : 'text-white/30'
                     }`}>
-                      {stage.label}
+                      {t(stage.label)}
                     </span>
 
                     {isActive && (
-                      <span className="text-[10px] font-mono text-sky-400 ml-auto animate-pulse">ACTIVE</span>
+                      <span className="text-[10px] font-mono text-sky-400 ml-auto animate-pulse">{t('analyze.active')}</span>
                     )}
                     {isCompleted && (
-                      <span className="text-[10px] font-mono text-emerald-400 ml-auto font-bold">✓ DONE</span>
+                      <span className="text-[10px] font-mono text-emerald-400 ml-auto font-bold">{t('analyze.done_badge')}</span>
                     )}
                   </div>
                 );
@@ -368,7 +368,7 @@ export default function Analyze() {
             {/* Overall Progress Slider */}
             <div className="space-y-2">
               <div className="flex justify-between text-[10px] font-mono text-white/40">
-                <span>PIPELINE CAPACITY</span>
+                <span>{t('analyze.pipeline_capacity')}</span>
                 <span>{progress}%</span>
               </div>
               <div className="progress-bar">
@@ -384,8 +384,6 @@ export default function Analyze() {
           </InteractiveCard>
         )}
       </AnimatePresence>
-
-      {/* Error displays */}
       <AnimatePresence>
         {error && (
           <motion.div
@@ -396,7 +394,7 @@ export default function Analyze() {
           >
             <div className="flex items-center justify-center gap-2 text-red-400 text-xs font-bold uppercase tracking-wider">
               <AlertCircle className="w-4 h-4" />
-              Inference Failure
+              {t('analyze.failure')}
             </div>
             <p className="text-xs text-white/75">{error}</p>
             <div>
@@ -404,7 +402,7 @@ export default function Analyze() {
                 onClick={() => { setError(null); handleAnalyze(); }}
                 className="btn-secondary text-[10px] py-1.5 px-5"
               >
-                Retry Execution
+                {t('analyze.btn_retry')}
               </button>
             </div>
           </motion.div>
@@ -420,9 +418,9 @@ export default function Analyze() {
           className="grid grid-cols-1 sm:grid-cols-3 gap-4"
         >
           {[
-            { title: 'Dynamic Analysis', desc: 'Audio voice matching, deepfake detection & text integrity', icon: Eye },
-            { title: 'Localization Support', desc: 'Verified English, Hindi & Tamil semantic translation', icon: FileSearch },
-            { title: 'pgvector Cluster', desc: 'RAG fact mapping against global research consensus', icon: Brain },
+            { title: t('analyze.tech_title_0'), desc: t('analyze.tech_desc_0'), icon: Eye },
+            { title: t('analyze.tech_title_1'), desc: t('analyze.tech_desc_1'), icon: FileSearch },
+            { title: t('analyze.tech_title_2'), desc: t('analyze.tech_desc_2'), icon: Brain },
           ].map((item, i) => (
             <InteractiveCard key={i} className="border border-white/5 bg-[#071124]/30 backdrop-blur-xl">
               <div className="p-5 space-y-3">

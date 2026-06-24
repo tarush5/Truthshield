@@ -66,9 +66,9 @@ export default function UploadZone({ onFileSelect, onUrlSubmit, onTextSubmit, di
   };
 
   const modes = [
-    { id: 'upload', icon: Upload, label: 'Upload' },
-    { id: 'url', icon: Link2, label: 'URL' },
-    { id: 'text', icon: FileText, label: 'Text' },
+    { id: 'upload', icon: Upload, label: t('analyze.mode_upload') },
+    { id: 'url', icon: Link2, label: t('analyze.mode_url') },
+    { id: 'text', icon: FileText, label: t('analyze.mode_text') },
   ];
 
   return (
@@ -131,7 +131,7 @@ export default function UploadZone({ onFileSelect, onUrlSubmit, onTextSubmit, di
               })()}
               <div className="flex-1 min-w-0">
                 <p className="text-white font-medium truncate">{selectedFile.name}</p>
-                <p className="text-white/40 text-sm">{formatSize(selectedFile.size)} · {getFileType(selectedFile)}</p>
+                <p className="text-white/40 text-sm">{formatSize(selectedFile.size)} · {t('analyze.file_types.' + getFileType(selectedFile))}</p>
               </div>
               <button
                 onClick={(e) => { e.stopPropagation(); clearFile(); }}
@@ -151,7 +151,7 @@ export default function UploadZone({ onFileSelect, onUrlSubmit, onTextSubmit, di
                 {Object.entries(FILE_ICONS).map(([type, Icon]) => (
                   <div key={type} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-white/30 text-xs">
                     <Icon className="w-3.5 h-3.5" />
-                    {type}
+                    {t('analyze.file_types.' + type)}
                   </div>
                 ))}
               </div>
@@ -188,7 +188,7 @@ export default function UploadZone({ onFileSelect, onUrlSubmit, onTextSubmit, di
             className="input-field resize-none"
             disabled={disabled}
           />
-          <p className="mt-2 text-xs text-white/20 text-right">{text.length} characters</p>
+          <p className="mt-2 text-xs text-white/20 text-right">{t('analyze.characters_count', { count: text.length })}</p>
         </div>
       )}
     </div>

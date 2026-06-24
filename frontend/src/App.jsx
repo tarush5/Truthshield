@@ -136,7 +136,7 @@ function NavBar() {
                   onClick={handleLogout}
                   className="px-3.5 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-semibold transition-all border border-red-500/10"
                 >
-                  Logout
+                  {t('nav.logout') || 'Logout'}
                 </button>
               </div>
             ) : (
@@ -144,7 +144,7 @@ function NavBar() {
                 to="/login"
                 className="hidden md:block px-3.5 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-400 text-white text-xs font-semibold shadow-md shadow-brand-500/20 transition-all"
               >
-                Login
+                {t('nav.login') || 'Login'}
               </Link>
             )}
 
@@ -184,17 +184,37 @@ function NavBar() {
                   </Link>
                 ))}
 
+                {/* Mobile Language Switcher */}
+                <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1 mx-4 my-2 w-fit">
+                  {['en', 'hi', 'ta'].map((lang) => (
+                    <button
+                      key={lang}
+                      onClick={() => {
+                        i18n.changeLanguage(lang);
+                        setMobileOpen(false);
+                      }}
+                      className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-200 ${
+                        i18n.language === lang
+                          ? 'bg-brand-500 text-white shadow-sm'
+                          : 'text-white/50 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      {lang.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="border-t border-white/5 mt-3 pt-3 px-4 flex items-center justify-between">
                   {user ? (
                     <>
                       <span className="text-xs text-white/55 font-medium truncate max-w-[180px]">{user.email}</span>
                       <button onClick={handleLogout} className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 text-xs font-semibold">
-                        Logout
+                        {t('nav.logout') || 'Logout'}
                       </button>
                     </>
                   ) : (
                     <Link to="/login" onClick={() => setMobileOpen(false)} className="w-full text-center py-2.5 rounded-lg bg-brand-500 text-white text-xs font-semibold">
-                      Login
+                      {t('nav.login') || 'Login'}
                     </Link>
                   )}
                 </div>

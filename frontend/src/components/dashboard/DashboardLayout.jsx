@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Menu, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import Sidebar from './Sidebar';
 
 // Map view IDs to display titles
@@ -18,6 +19,7 @@ const VIEW_TITLES = {
  * @param {function}  onViewChange - Callback when sidebar nav changes
  */
 export default function DashboardLayout({ children, activeView, onViewChange }) {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -110,10 +112,14 @@ export default function DashboardLayout({ children, activeView, onViewChange }) 
 
               {/* Breadcrumb */}
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-white/30 font-medium">Dashboard</span>
+                <span className="text-white/30 font-medium">{t('dashboard_layout.breadcrumb')}</span>
                 <span className="text-white/15">/</span>
                 <span className="text-white font-semibold">
-                  {VIEW_TITLES[activeView] || 'Overview'}
+                  {activeView === 'overview' ? t('nav_sidebar.overview') :
+                   activeView === 'analyze' ? t('nav_sidebar.analyze') :
+                   activeView === 'history' ? t('nav_sidebar.history') :
+                   activeView === 'settings' ? t('nav_sidebar.settings') :
+                   VIEW_TITLES[activeView] || 'Overview'}
                 </span>
               </div>
             </div>
@@ -123,7 +129,7 @@ export default function DashboardLayout({ children, activeView, onViewChange }) 
                             bg-white/[0.04] border border-white/[0.06] text-white/25 
                             hover:border-white/10 transition-colors cursor-pointer w-64">
               <Search className="w-3.5 h-3.5" />
-              <span className="text-xs font-medium">Search anything...</span>
+              <span className="text-xs font-medium">{t('dashboard_layout.search_placeholder')}</span>
               <div className="ml-auto flex items-center gap-0.5">
                 <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[10px] 
                                 font-mono text-white/30">⌘</kbd>

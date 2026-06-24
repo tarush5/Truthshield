@@ -65,17 +65,17 @@ export default function ClaimTable({ claims = [] }) {
                   </span>
                   {cv.confidence > 0 && (
                     <span className="text-xs text-white/30">
-                      {Math.round(cv.confidence * 100)}% confident
+                      {Math.round(cv.confidence * 100)}% {t('report.confident')}
                     </span>
                   )}
                   {supportingSources.length > 0 && (
                     <span className="text-xs text-emerald-400 font-medium">
-                      • Supported by {supportingSources.length} source{supportingSources.length > 1 ? 's' : ''}
+                      • {t(supportingSources.length > 1 ? 'report.supported_by_plural' : 'report.supported_by', { count: supportingSources.length })}
                     </span>
                   )}
                   {refutingSources.length > 0 && (
                     <span className="text-xs text-rose-400 font-medium">
-                      • Contradicted by {refutingSources.length} source{refutingSources.length > 1 ? 's' : ''}
+                      • {t(refutingSources.length > 1 ? 'report.contradicted_by_plural' : 'report.contradicted_by', { count: refutingSources.length })}
                     </span>
                   )}
                 </div>
@@ -100,13 +100,13 @@ export default function ClaimTable({ claims = [] }) {
                 <div className="space-y-2">
                   {cv.evidence.slice(0, 5).map((ev, eIdx) => {
                     const stance = (ev.stance || 'NEUTRAL').toUpperCase();
-                    let stanceConfig = { label: 'NEUTRAL', color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.2)' };
+                    let stanceConfig = { label: t('report.stances.neutral'), color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.2)' };
                     if (stance === 'SUPPORTS') {
-                      stanceConfig = { label: 'SUPPORTS', color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)' };
+                      stanceConfig = { label: t('report.stances.supports'), color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)' };
                     } else if (stance === 'REFUTES') {
-                      stanceConfig = { label: 'REFUTES', color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)' };
+                      stanceConfig = { label: t('report.stances.refutes'), color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)' };
                     } else if (stance === 'INSUFFICIENT') {
-                      stanceConfig = { label: 'INSUFFICIENT', color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.2)' };
+                      stanceConfig = { label: t('report.stances.insufficient'), color: '#a78bfa', bg: 'rgba(167,139,250,0.1)', border: 'rgba(167,139,250,0.2)' };
                     }
 
                     return (
@@ -134,7 +134,7 @@ export default function ClaimTable({ claims = [] }) {
                             </span>
                             {ev.source_score > 0 && (
                               <span className="text-[10px] text-white/30">
-                                Credibility: {Math.round(ev.source_score * 100)}%
+                                {t('report.credibility_label')}: {Math.round(ev.source_score * 100)}%
                               </span>
                             )}
                           </div>

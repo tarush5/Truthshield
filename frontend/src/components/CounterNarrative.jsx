@@ -16,6 +16,10 @@ export default function CounterNarrative({ narrative }) {
 
   const [activeLang, setActiveLang] = useState(i18n.language || 'en');
 
+  React.useEffect(() => {
+    setActiveLang(i18n.language || 'en');
+  }, [i18n.language]);
+
   const handleCopy = async (text, lang) => {
     try {
       await navigator.clipboard.writeText(text);

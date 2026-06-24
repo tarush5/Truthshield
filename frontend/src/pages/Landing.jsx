@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import InteractiveCard from '../components/InteractiveCard';
 
 import { 
@@ -146,17 +147,28 @@ function IntelligenceSphere() {
 /* ─────────── Landing Page ─────────── */
 export default function Landing() {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState('text');
   const [inputText, setInputText] = useState("Breaking: Scientific journal claims quantum computer model completely cracks standard blockchain encryption keys.");
+
+  useEffect(() => {
+    if (i18n.language === 'hi') {
+      setInputText("ताज़ा खबर: वैज्ञानिक पत्रिका का दावा है कि क्वांटम कंप्यूटर मॉडल मानक ब्लॉकचेन एन्क्रिप्शन कुंजी को पूरी तरह से क्रैक कर देता है।");
+    } else if (i18n.language === 'ta') {
+      setInputText("முக்கிய செய்தி: குவாண்டம் கணினி மாதிரி நிலையான பிளாக்செயின் குறியாக்க விசைகளை முற்றிலும் உடைக்கிறது என்று அறிவியல் இதழ் கூறுகிறது.");
+    } else {
+      setInputText("Breaking: Scientific journal claims quantum computer model completely cracks standard blockchain encryption keys.");
+    }
+  }, [i18n.language]);
   const [demoState, setDemoState] = useState('idle'); // idle | processing | result
   const [currentDemoStage, setCurrentDemoStage] = useState(0);
 
   const demoStages = [
-    'Decompressing and segmenting file streams...',
-    'Extracting metadata, source structures & claim vectors...',
-    'Cross-referencing global credibility consensus databases...',
-    'Performing cross-signal sentiment & semantic consistency runs...',
-    'Synthesizing ultimate fact verdict & counter-narrative...'
+    t('landing.stage_0') || 'Decompressing and segmenting file streams...',
+    t('landing.stage_1') || 'Extracting metadata, source structures & claim vectors...',
+    t('landing.stage_2') || 'Cross-referencing global credibility consensus databases...',
+    t('landing.stage_3') || 'Performing cross-signal sentiment & semantic consistency runs...',
+    t('landing.stage_4') || 'Synthesizing ultimate fact verdict & counter-narrative...'
   ];
 
   const handleRunDemo = () => {
@@ -199,7 +211,7 @@ export default function Landing() {
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-500/10 border border-sky-400/30 electric-glow"
             >
               <Sparkles className="w-3.5 h-3.5 text-sky-400" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-sky-300">Arctic v2.4 Live Threat Engine</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-sky-300">{t('landing.hero_badge')}</span>
             </motion.div>
 
             {/* Giant Title */}
@@ -209,8 +221,8 @@ export default function Landing() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="text-5xl sm:text-6xl lg:text-7xl font-bold font-display tracking-tight leading-[1.05] text-white"
             >
-              See Through <br/>
-              <span className="gradient-text-hero electric-text">Digital Deception.</span>
+              {t('landing.hero_title_1')} <br/>
+              <span className="gradient-text-hero electric-text">{t('landing.hero_title_2')}</span>
             </motion.h1>
 
             {/* Subheadline */}
@@ -220,8 +232,7 @@ export default function Landing() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="text-base sm:text-lg text-white/50 max-w-xl leading-relaxed font-sans text-balance"
             >
-              AI-powered misinformation intelligence across text, image, audio, video, and web. 
-              Deploy the Arctic security suite to defend truth and verify global records instantly.
+              {t('landing.hero_subtitle')}
             </motion.p>
 
             {/* CTAs */}
@@ -232,12 +243,12 @@ export default function Landing() {
               className="flex flex-wrap items-center gap-4 pt-2"
             >
               <Link to="/login" className="btn-primary-lg flex items-center gap-2 group text-sm">
-                Start Analyzing
+                {t('landing.btn_start')}
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
               <a href="#demo" className="btn-secondary-lg flex items-center gap-2 text-sm">
                 <Play className="w-4 h-4 text-sky-400 fill-sky-400/20" />
-                Watch Demo
+                {t('landing.btn_demo')}
               </a>
             </motion.div>
 
@@ -249,9 +260,9 @@ export default function Landing() {
               className="grid grid-cols-3 gap-6 pt-8 border-t border-white/5 max-w-lg"
             >
               {[
-                { val: '2.1M+', label: 'Claims Analyzed' },
-                { val: '99.4%', label: 'Audited Accuracy' },
-                { val: '0.4s', label: 'Inference Velocity' },
+                { val: '2.1M+', label: t('landing.claims_analyzed') },
+                { val: '99.4%', label: t('landing.audited_accuracy') },
+                { val: '0.4s', label: t('landing.inference_velocity') },
               ].map(metric => (
                 <div key={metric.label}>
                   <p className="text-xl font-bold font-display text-white">{metric.val}</p>
@@ -286,12 +297,12 @@ export default function Landing() {
         <div className="max-w-5xl mx-auto text-center space-y-12">
           
           <div className="space-y-4">
-            <span className="section-label">Interactive Experience</span>
+            <span className="section-label">{t('landing.interactive_experience')}</span>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-display tracking-tight text-white leading-none">
-              Deploy the Arctic Pipeline
+              {t('landing.demo_title')}
             </h2>
             <p className="text-sm sm:text-base text-white/45 max-w-lg mx-auto">
-              Paste a suspected claim vector or upload media to test TruthShield's decision layers in real-time.
+              {t('landing.demo_subtitle')}
             </p>
           </div>
 
@@ -332,24 +343,24 @@ export default function Landing() {
                     className="space-y-6 flex-1 flex flex-col justify-between"
                   >
                     <div className="space-y-3">
-                      <label className="text-xs font-semibold text-white/40 uppercase tracking-widest">Verify Claim Input</label>
+                      <label className="text-xs font-semibold text-white/40 uppercase tracking-widest">{t('landing.demo_label')}</label>
                       <textarea
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         className="input-field h-24 text-sm font-sans"
-                        placeholder="Type claims or paste news articles..."
+                        placeholder={t('analyze.text_placeholder')}
                       />
                     </div>
                     <div className="flex justify-between items-center">
                       <div className="flex gap-3 text-xs text-white/30">
-                        <span>🚀 NLP Model: Transformer 5B</span>
-                        <span>⚡ pgvector RAG: Active</span>
+                        <span>{t('landing.nlp_model')}</span>
+                        <span>{t('landing.rag_active')}</span>
                       </div>
                       <button
                         onClick={handleRunDemo}
                         className="btn-primary flex items-center gap-2 text-xs py-2 px-5"
                       >
-                        Run Pipeline
+                        {t('landing.demo_btn_run')}
                         <Zap className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -367,7 +378,7 @@ export default function Landing() {
                   >
                     <div className="space-y-2 text-center">
                       <div className="w-8 h-8 rounded-full border-2 border-sky-400 border-t-transparent animate-spin mx-auto mb-4" />
-                      <p className="text-sm font-semibold text-white/70">Processing Claim Vector</p>
+                      <p className="text-sm font-semibold text-white/70">{t('landing.processing_claim')}</p>
                       <p className="text-xs text-sky-400 font-mono animate-pulse">{demoStages[currentDemoStage]}</p>
                     </div>
                     <div className="w-full max-w-md mx-auto progress-bar">
@@ -392,7 +403,7 @@ export default function Landing() {
                   >
                     {/* Left: Score Gauge */}
                     <div className="flex flex-col items-center justify-center p-6 bg-white/[0.02] border border-white/5 rounded-xl">
-                      <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-4">Verdict Output</span>
+                      <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-4">{t('landing.demo_verdict')}</span>
                       
                       <div className="relative w-32 h-32 flex items-center justify-center mb-4">
                         <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
@@ -400,24 +411,24 @@ export default function Landing() {
                           <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ef4444" strokeWidth="6" strokeDasharray="251" strokeDashoffset="210" />
                         </svg>
                         <div className="absolute text-center">
-                          <p className="text-xs font-bold text-red-400">FALSE</p>
+                          <p className="text-xs font-bold text-red-400">{t('verdicts.FALSE')}</p>
                           <p className="text-xl font-extrabold font-display text-white">16%</p>
-                          <p className="text-[9px] text-white/30">Trust Score</p>
+                          <p className="text-[9px] text-white/30">{t('report.trust_score')}</p>
                         </div>
                       </div>
-                      <p className="text-xs text-white/50 text-center font-medium">Manipulated Fact Combination</p>
+                      <p className="text-xs text-white/50 text-center font-medium">{t('landing.manipulated_combination')}</p>
                     </div>
 
                     {/* Right: Explanations & Sources */}
                     <div className="space-y-4">
                       <div className="space-y-1">
-                        <span className="text-[10px] font-semibold text-sky-400 uppercase tracking-widest">AI Verdict Summary</span>
+                        <span className="text-[10px] font-semibold text-sky-400 uppercase tracking-widest">{t('landing.demo_verdict_summary')}</span>
                         <p className="text-xs text-white/75 leading-relaxed">
-                          Semantic matching identifies that quantum cracks on active block chain keys have not occurred. Peer-reviewed studies confirm current encryption remains unbroken by current models.
+                          {t('landing.demo_summary_desc')}
                         </p>
                       </div>
                       <div className="space-y-2">
-                        <span className="text-[10px] font-semibold text-white/40 uppercase tracking-widest">Linked Counter-Evidence</span>
+                        <span className="text-[10px] font-semibold text-white/40 uppercase tracking-widest">{t('landing.demo_evidence')}</span>
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-2 text-[11px] text-white/50 bg-white/5 p-2 rounded-lg border border-white/5">
                             <Info className="w-3.5 h-3.5 text-sky-400 shrink-0" />
@@ -431,12 +442,10 @@ export default function Landing() {
                           </div>
                         </div>
                       </div>
+                      
                       <div className="pt-2">
-                        <button
-                          onClick={handleResetDemo}
-                          className="btn-secondary text-[11px] py-1.5 px-4"
-                        >
-                          Verify Another
+                        <button onClick={handleResetDemo} className="btn-secondary text-[11px] py-1.5 px-4">
+                          {t('landing.demo_btn_another')}
                         </button>
                       </div>
                     </div>
@@ -455,12 +464,12 @@ export default function Landing() {
       <section className="relative py-24 px-4">
         <div className="max-w-6xl mx-auto space-y-16">
           <div className="text-center space-y-4">
-            <span className="section-label">Capabilities</span>
+            <span className="section-label">{t('landing.bento_badge')}</span>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-display tracking-tight text-white leading-none">
-              Arctic Security Infrastructure
+              {t('landing.bento_title')}
             </h2>
             <p className="text-sm text-white/40 max-w-lg mx-auto">
-              Precision built components that safeguard fact credibility, analyze media parameters, and block threat actors.
+              {t('landing.bento_subtitle')}
             </p>
           </div>
 
@@ -471,9 +480,9 @@ export default function Landing() {
                 <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center">
                   <Brain className="w-5 h-5 text-sky-400" />
                 </div>
-                <h3 className="text-lg font-bold text-white">Multimodal Parsing</h3>
+                <h3 className="text-lg font-bold text-white">{t('landing.bento_multimodal')}</h3>
                 <p className="text-xs text-white/50 leading-relaxed">
-                  Seamless ingestion of audio files, deepfake video streams, complex text transcripts, and public domain urls.
+                  {t('landing.bento_multimodal_desc')}
                 </p>
               </div>
             </InteractiveCard>
@@ -483,9 +492,9 @@ export default function Landing() {
                 <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
                   <Database className="w-5 h-5 text-purple-400" />
                 </div>
-                <h3 className="text-lg font-bold text-white">Semantic pgvector Matching</h3>
+                <h3 className="text-lg font-bold text-white">{t('landing.bento_rag')}</h3>
                 <p className="text-xs text-white/50 leading-relaxed">
-                  Connects directly to verified fact clusters, indexing context-heavy records in sub-second speeds using vectorized embeddings.
+                  {t('landing.bento_rag_desc')}
                 </p>
               </div>
             </InteractiveCard>
@@ -495,9 +504,9 @@ export default function Landing() {
                 <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
                   <Globe className="w-5 h-5 text-cyan-400" />
                 </div>
-                <h3 className="text-lg font-bold text-white">Global Threat Hotspots</h3>
+                <h3 className="text-lg font-bold text-white">{t('landing.bento_hotspots')}</h3>
                 <p className="text-xs text-white/50 leading-relaxed">
-                  Maps geographic vectors of disinformation in real-time. Detect coordinated bot networks and virality surges before they go viral.
+                  {t('landing.bento_hotspots_desc')}
                 </p>
               </div>
             </InteractiveCard>
@@ -507,9 +516,9 @@ export default function Landing() {
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
                   <ShieldCheck className="w-5 h-5 text-emerald-400" />
                 </div>
-                <h3 className="text-lg font-bold text-white">Audit Trails</h3>
+                <h3 className="text-lg font-bold text-white">{t('landing.bento_audit')}</h3>
                 <p className="text-xs text-white/50 leading-relaxed">
-                  Maintains a fully cryptographically secure record of workspace activities, ensuring SOC2-ready accountability.
+                  {t('landing.bento_audit_desc')}
                 </p>
               </div>
             </InteractiveCard>
@@ -521,19 +530,19 @@ export default function Landing() {
       <section className="relative py-24 px-4 border-t border-white/5 bg-white/[0.005]">
         <div className="max-w-4xl mx-auto space-y-12 text-center">
           <div className="space-y-4">
-            <span className="section-label">AI Architecture</span>
+            <span className="section-label">{t('landing.pipeline_badge')}</span>
             <h2 className="text-3xl sm:text-4xl font-bold font-display text-white">
-              The 5-Stage Verification Core
+              {t('landing.pipeline_title')}
             </h2>
           </div>
 
           <div className="grid md:grid-cols-5 gap-4">
             {[
-              { num: '01', title: 'Ingestion', desc: 'Accept text, file bytes or URL metadata.', color: 'border-sky-500/20 text-sky-400' },
-              { num: '02', title: 'Extraction', desc: 'Identify claims, entities, and voice clones.', color: 'border-cyan-500/20 text-cyan-400' },
-              { num: '03', title: 'Verification', desc: 'Query pgvector facts for matching evidence.', color: 'border-indigo-500/20 text-indigo-400' },
-              { num: '04', title: 'Scoring', desc: 'Aggregate results into trust percentages.', color: 'border-purple-500/20 text-purple-400' },
-              { num: '05', title: 'Reporting', desc: 'Output explainable briefings and counter-facts.', color: 'border-pink-500/20 text-pink-400' },
+              { num: '01', title: t('landing.stage_title_0'), desc: t('landing.stage_desc_0'), color: 'border-sky-500/20 text-sky-400' },
+              { num: '02', title: t('landing.stage_title_1'), desc: t('landing.stage_desc_1'), color: 'border-cyan-500/20 text-cyan-400' },
+              { num: '03', title: t('landing.stage_title_2'), desc: t('landing.stage_desc_2'), color: 'border-indigo-500/20 text-indigo-400' },
+              { num: '04', title: t('landing.stage_title_3'), desc: t('landing.stage_desc_3'), color: 'border-purple-500/20 text-purple-400' },
+              { num: '05', title: t('landing.stage_title_4'), desc: t('landing.stage_desc_4'), color: 'border-pink-500/20 text-pink-400' },
             ].map(stage => (
               <div key={stage.num} className={`glass-card p-5 space-y-3 border ${stage.color}`}>
                 <div className="text-2xl font-bold font-mono">{stage.num}</div>
@@ -549,15 +558,15 @@ export default function Landing() {
       <section className="relative py-24 px-4">
         <div className="max-w-5xl mx-auto space-y-12">
           <div className="text-center space-y-3">
-            <span className="section-label">Audited Trust</span>
-            <h2 className="text-3xl font-bold font-display text-white">What Intelligence Teams Say</h2>
+            <span className="section-label">{t('landing.testimonials_badge')}</span>
+            <h2 className="text-3xl font-bold font-display text-white">{t('landing.testimonials_title')}</h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { quote: 'TruthShield transformed how we verify active press streams. The pgvector RAG works at speeds typical databases cannot match.', author: 'Director of Intelligence', org: 'Cyber Defense Center' },
-              { quote: 'The deepfake audio mapping and spectral analysis saved our PR teams hours of manual verification. Essential product.', author: 'Chief Information Officer', org: 'Nexus Global Media' },
-              { quote: 'Onboarding our regional analyst teams was seamless. RBAC workspaces are clean, secure, and compliant.', author: 'SecOps Architect', org: 'Arctic Intelligence Hub' },
+              { quote: t('landing.testimonial_quote_0'), author: t('landing.testimonial_author_0'), org: t('landing.testimonial_org_0') },
+              { quote: t('landing.testimonial_quote_1'), author: t('landing.testimonial_author_1'), org: t('landing.testimonial_org_1') },
+              { quote: t('landing.testimonial_quote_2'), author: t('landing.testimonial_author_2'), org: t('landing.testimonial_org_2') },
             ].map((test, idx) => (
               <div key={idx} className="glass-card p-6 flex flex-col justify-between space-y-6">
                 <div className="flex gap-1">
@@ -578,15 +587,15 @@ export default function Landing() {
       <section className="relative py-24 px-4 border-t border-white/5 bg-white/[0.005]">
         <div className="max-w-5xl mx-auto space-y-12">
           <div className="text-center space-y-3">
-            <span className="section-label">Pricing Tiers</span>
-            <h2 className="text-3xl font-bold font-display text-white">Predictable Enterprise Pricing</h2>
+            <span className="section-label">{t('landing.pricing_badge')}</span>
+            <h2 className="text-3xl font-bold font-display text-white">{t('landing.pricing_title')}</h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto items-stretch">
             {[
-              { plan: 'Developer', price: '$0', desc: 'Test pipeline integrations and run basic claim scans.', features: ['100 scans / month', 'Text & Web URL analysis', 'Basic API access', 'Community support'] },
-              { plan: 'Professional', price: '$149', desc: 'Deploy automated NLP systems and analyze large media uploads.', features: ['5,000 scans / month', 'Multimodal (Image/Audio/Video)', 'Advanced pgvector RAG', 'Standard API Keys', 'Priority SecOps support'], highlighted: true },
-              { plan: 'Enterprise', price: 'Custom', desc: 'Scale threat verification with dedicated servers & custom databases.', features: ['Unlimited scans', 'Dedicated RAG fact cluster', 'Custom LLM fine-tuning', 'Full audit logs & RBAC', '99.9% uptime SLA'] },
+              { plan: 'Developer', price: '$0', desc: t('landing.pricing_dev_desc'), features: [t('landing.pricing_feature_0'), t('landing.pricing_feature_1'), t('landing.pricing_feature_2'), t('landing.pricing_feature_3')] },
+              { plan: 'Professional', price: '$149', desc: t('landing.pricing_pro_desc'), features: [t('landing.pricing_feature_4'), t('landing.pricing_feature_5'), t('landing.pricing_feature_6'), t('landing.pricing_feature_7'), t('landing.pricing_feature_8')], highlighted: true },
+              { plan: 'Enterprise', price: t('landing.pricing_custom'), desc: t('landing.pricing_ent_desc'), features: [t('landing.pricing_feature_9'), t('landing.pricing_feature_10'), t('landing.pricing_feature_11'), t('landing.pricing_feature_12'), t('landing.pricing_feature_13')] },
             ].map(tier => (
               <InteractiveCard
                 key={tier.plan}
@@ -596,14 +605,14 @@ export default function Landing() {
                 <div className="p-8 flex flex-col justify-between space-y-8 h-full relative overflow-hidden">
                   {tier.highlighted && (
                     <div className="absolute top-0 right-0 bg-sky-400 text-slate-950 font-bold text-[9px] uppercase px-3 py-1 rounded-bl-lg">
-                      Recommended
+                      {t('landing.pricing_recommended')}
                     </div>
                   )}
                   <div className="space-y-4">
                     <h4 className="text-lg font-bold text-white">{tier.plan}</h4>
                     <div className="flex items-baseline gap-1">
                       <span className="text-4xl font-extrabold text-white">{tier.price}</span>
-                      {tier.price !== 'Custom' && <span className="text-xs text-white/30">/mo</span>}
+                      {tier.price !== t('landing.pricing_custom') && <span className="text-xs text-white/30">{t('landing.pricing_mo')}</span>}
                     </div>
                     <p className="text-xs text-white/40 leading-relaxed">{tier.desc}</p>
                   </div>
@@ -618,7 +627,7 @@ export default function Landing() {
                   </div>
 
                   <button className={`w-full text-xs font-semibold py-2.5 rounded-xl transition-all ${tier.highlighted ? 'btn-primary' : 'btn-secondary'}`}>
-                    Get Started
+                    {t('landing.pricing_btn_start')}
                   </button>
                 </div>
               </InteractiveCard>
@@ -641,16 +650,16 @@ export default function Landing() {
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 flex items-center justify-center mx-auto shadow-lg shadow-sky-500/20">
                 <Shield className="w-6 h-6 text-white" />
               </div>
-              <h2 className="text-3xl font-bold font-display text-white">Join the TruthShield Network</h2>
+              <h2 className="text-3xl font-bold font-display text-white">{t('landing.cta_title')}</h2>
               <p className="text-xs sm:text-sm text-white/40 max-w-md mx-auto leading-relaxed">
-                Connect your media rooms and intelligence divisions to our low-latency validation clusters today.
+                {t('landing.cta_desc')}
               </p>
               <div className="flex justify-center gap-4">
                 <Link to="/login" className="btn-primary text-xs py-2 px-6">
-                  Create Free Account
+                  {t('landing.cta_btn_free')}
                 </Link>
                 <Link to="/login" className="btn-secondary text-xs py-2 px-6">
-                  Contact Sales
+                  {t('landing.cta_btn_sales')}
                 </Link>
               </div>
             </div>
@@ -665,14 +674,14 @@ export default function Landing() {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-sky-500 to-cyan-500 flex items-center justify-center">
               <Shield className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold font-display text-white">TruthShield</span>
+            <span className="font-bold font-display text-white">{t('app_name')}</span>
           </div>
           
           <div className="flex flex-wrap justify-center gap-6 text-xs text-white/30">
-            <span className="hover:text-white/60 cursor-pointer">Security Suite</span>
-            <span className="hover:text-white/60 cursor-pointer">API Integration</span>
-            <span className="hover:text-white/60 cursor-pointer">Fact Check Database</span>
-            <span className="hover:text-white/60 cursor-pointer">Compliance</span>
+            <span className="hover:text-white/60 cursor-pointer">{t('landing.footer_link_suite')}</span>
+            <span className="hover:text-white/60 cursor-pointer">{t('landing.footer_link_api')}</span>
+            <span className="hover:text-white/60 cursor-pointer">{t('landing.footer_link_db')}</span>
+            <span className="hover:text-white/60 cursor-pointer">{t('landing.footer_link_compliance')}</span>
           </div>
 
           <div className="flex items-center gap-2 text-[10px] text-white/20">

@@ -124,6 +124,17 @@ export function AuthProvider({ children }) {
     if (error) throw error;
   }, []);
 
+  // Sign in with GitHub
+  const signInWithGithub = useCallback(async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) throw error;
+  }, []);
+
   // Sign up with Password
   const signUpWithPassword = useCallback(async (email, password) => {
     const data = await safeFetch(`${API_BASE}/auth/signup`, {
@@ -238,6 +249,7 @@ export function AuthProvider({ children }) {
     signInWithOtp,
     verifyOtp,
     signInWithGoogle,
+    signInWithGithub,
     signUpWithPassword,
     signInWithPassword,
     signInAsDemo,

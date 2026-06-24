@@ -32,7 +32,7 @@ const slideVariants = {
 export default function Login() {
   const navigate = useNavigate();
   const { 
-    signInWithOtp, verifyOtp, signInWithGoogle, 
+    signInWithOtp, verifyOtp, signInWithGoogle, signInWithGithub,
     fetchOrganizations, createOrganization, setOrganization, 
     signUpWithPassword, signInWithPassword, signInAsDemo,
     isAuthenticated 
@@ -202,14 +202,7 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      // Supabase OAuth
-      const { data, error: err } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`
-        }
-      });
-      if (err) throw err;
+      await signInWithGithub();
     } catch (err) {
       setError(err.message || 'GitHub login failed.');
       setLoading(false);

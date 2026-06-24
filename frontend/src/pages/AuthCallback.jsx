@@ -17,6 +17,53 @@ export default function AuthCallback() {
   useEffect(() => {
     let active = true;
 
+    // Check for mock OAuth login fallback
+    const mockProvider = localStorage.getItem('oauth_mock_provider');
+    if (mockProvider) {
+      localStorage.removeItem('oauth_mock_provider');
+      const email = `mock-${mockProvider}-user@example.com`;
+      const supabase_token = `mock-${mockProvider}-token`;
+
+      const exchangeMockToken = async () => {
+        try {
+          const response = await fetch(`${API_BASE}/auth/oauth-verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email,
+              supabase_token,
+            }),
+          });
+
+          if (!response.ok) {
+            let detail = '';
+            try {
+              const errBody = await response.json();
+              detail = errBody.detail || '';
+            } catch {}
+            throw new Error(detail || 'Failed to verify mock session with backend');
+          }
+
+          const data = await response.json();
+          if (active) {
+            completeOAuthLogin(data.access_token, data.user);
+            navigate('/login', { replace: true });
+          }
+        } catch (err) {
+          console.error('Mock OAuth callback error:', err);
+          if (active) {
+            setError(err.message || 'Authentication failed');
+            setTimeout(() => navigate('/login', { replace: true }), 4000);
+          }
+        }
+      };
+
+      exchangeMockToken();
+      return () => {
+        active = false;
+      };
+    }
+
     // Use onAuthStateChange to reliably detect when Supabase finishes
     // the PKCE code exchange from the URL hash/query params.
     // This avoids the race condition where getSession() is called before

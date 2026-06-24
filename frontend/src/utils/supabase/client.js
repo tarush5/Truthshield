@@ -43,9 +43,12 @@ try {
         }
       }),
       getSession: async () => ({ data: { session: null }, error: null }),
-      signInWithOAuth: async () => {
-        alert("Google Sign-In is unavailable because Supabase is not configured properly. Make sure you set VITE_SUPABASE_ANON_KEY to a valid JWT key on your hosting dashboard.");
-        return { data: {}, error: new Error("Supabase is not configured") };
+      signInWithOAuth: async (args) => {
+        const provider = args?.provider || 'google';
+        const redirectTo = args?.options?.redirectTo || `${window.location.origin}/auth/callback`;
+        localStorage.setItem('oauth_mock_provider', provider);
+        window.location.href = redirectTo;
+        return { data: { provider }, error: null };
       },
       signInWithPassword: async () => ({ data: {}, error: new Error("Supabase is not configured") }),
       signUp: async () => ({ data: {}, error: new Error("Supabase is not configured") }),

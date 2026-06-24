@@ -20,38 +20,47 @@ export default function CursorTrail() {
     window.addEventListener('resize', resize);
 
     const handleMouseMove = (e) => {
-      // Create trail points with star sparkle and electric spark types
+      // Create fire particles (sparkles and embers)
       points.push({
         x: e.clientX,
         y: e.clientY,
+        vy: -Math.random() * 0.4 - 0.1, // float upward slightly
+        vx: (Math.random() - 0.5) * 0.3,
         age: 0,
-        maxAge: 38,
-        size: Math.random() * 3.8 + 2.2,
-        color: Math.random() > 0.4 ? '#7dd3fc' : '#22d3ee', // Ice blue or Cyan
+        maxAge: 40,
+        size: Math.random() * 3.5 + 1.8,
+        color: Math.random() > 0.6 
+          ? '#FFD600' // Gold/yellow
+          : Math.random() > 0.4 
+          ? '#FF9100' // Orange
+          : '#FF1744', // Neon red
         angle: Math.random() * Math.PI,
-        spin: (Math.random() - 0.5) * 0.05,
-        type: Math.random() > 0.78 ? 'star' : 'sparkle'
+        spin: (Math.random() - 0.5) * 0.08,
+        type: Math.random() > 0.8 ? 'flame' : 'spark'
       });
     };
 
     const handleMouseDown = (e) => {
-      // Create a particle burst on click containing sparkles and electric sparks
-      for (let i = 0; i < 35; i++) {
+      // Create a big fiery particle burst on click (flame sparks and red electric arcs)
+      for (let i = 0; i < 40; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 6.5 + 2.5;
-        const isElectric = Math.random() > 0.45;
+        const speed = Math.random() * 7 + 2;
+        const isElectric = Math.random() > 0.6;
         
         bursts.push({
           x: e.clientX,
           y: e.clientY,
           vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          size: Math.random() * 4.5 + 1.2,
+          vy: Math.sin(angle) * speed - 1.5, // slightly upward blast bias
+          size: Math.random() * 4 + 1,
           opacity: 1,
-          decay: 0.018 + Math.random() * 0.025,
-          color: Math.random() > 0.5 ? '#22d3ee' : (Math.random() > 0.5 ? '#a78bfa' : '#38bdf8'), // Cyan, Purple, Sky Blue
-          type: isElectric ? 'electric' : 'star',
-          points: [] // path points for electric arcs
+          decay: 0.015 + Math.random() * 0.02,
+          color: Math.random() > 0.5 
+            ? '#FF3D00' // Red-orange
+            : Math.random() > 0.5 
+            ? '#FFD600' // Gold
+            : '#FF1744', // Neon red
+          type: isElectric ? 'electric' : 'ember'
         });
       }
     };
@@ -59,11 +68,11 @@ export default function CursorTrail() {
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mousedown', handleMouseDown);
 
-    // Twinkling Star drawing helper
-    const drawStar = (cx, cy, spikes, outerRadius, innerRadius, color, alpha, rotationAngle = 0) => {
+    // Fire Star / Twinkle drawing helper
+    const drawSpark = (cx, cy, spikes, outerRadius, innerRadius, color, alpha, rotationAngle = 0) => {
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
-      ctx.shadowBlur = 14;
+      ctx.shadowBlur = 10;
       ctx.shadowColor = color;
       ctx.fillStyle = color;
       ctx.globalAlpha = alpha;
@@ -105,33 +114,38 @@ export default function CursorTrail() {
         const p = points[i];
         p.age++;
         p.angle += p.spin;
+        p.y += p.vy;
+        p.x += p.vx;
         
         const ratio = 1 - p.age / p.maxAge;
         const currentSize = p.size * ratio;
         
-        if (p.type === 'star') {
-          drawStar(p.x, p.y, 4, currentSize * 2.8, currentSize * 0.5, p.color, ratio * 0.78, p.angle);
-        } else {
-          // Standard sparkling glow dot
+        if (p.type === 'flame') {
+          // Glow ember particle
           ctx.beginPath();
-          ctx.arc(p.x, p.y, currentSize * 0.8, 0, Math.PI * 2);
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = ratio * 0.7;
-          ctx.shadowBlur = 12;
-          ctx.shadowColor = p.color;
+          ctx.arc(p.x, p.y, currentSize * 1.5, 0, Math.PI * 2);
+          const emberGlow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 2 * ratio);
+          emberGlow.addColorStop(0, p.color);
+          emberGlow.addColorStop(0.5, '#FF3D00');
+          emberGlow.addColorStop(1, 'transparent');
+          ctx.fillStyle = emberGlow;
+          ctx.globalAlpha = ratio * 0.8;
           ctx.fill();
+        } else {
+          // Sharp sparkle star
+          drawSpark(p.x, p.y, 4, currentSize * 2.5, currentSize * 0.45, p.color, ratio * 0.75, p.angle);
         }
 
-        // Ribbon tail linking trail elements
+        // Connecting fire tail
         if (i > 0) {
           const prev = points[i - 1];
           const dist = Math.hypot(p.x - prev.x, p.y - prev.y);
-          if (dist < 45) {
+          if (dist < 40) {
             ctx.beginPath();
             ctx.strokeStyle = p.color;
-            ctx.lineWidth = currentSize * 0.5;
-            ctx.globalAlpha = ratio * 0.25;
-            ctx.shadowBlur = 10;
+            ctx.lineWidth = currentSize * 0.4;
+            ctx.globalAlpha = ratio * 0.2;
+            ctx.shadowBlur = 8;
             ctx.shadowColor = p.color;
             ctx.moveTo(prev.x, prev.y);
             ctx.lineTo(p.x, p.y);
@@ -140,12 +154,13 @@ export default function CursorTrail() {
         }
       }
 
-      // 2. Draw click particle bursts
+      // 2. Draw click bursts
       for (let i = bursts.length - 1; i >= 0; i--) {
         const b = bursts[i];
         b.x += b.vx;
         b.y += b.vy;
-        b.vy += 0.05; // gravity
+        b.vy += 0.08; // gravity drop
+        b.vx *= 0.98;
         b.opacity -= b.decay;
 
         if (b.opacity <= 0) {
@@ -154,23 +169,22 @@ export default function CursorTrail() {
         }
 
         if (b.type === 'electric') {
-          // Render jagged electric discharge arc
+          // Red lightning/electric heat arc
           ctx.save();
-          ctx.shadowBlur = 15;
+          ctx.shadowBlur = 12;
           ctx.shadowColor = b.color;
-          ctx.strokeStyle = '#e0f2fe';
-          ctx.lineWidth = Math.random() * 1.5 + 0.5;
+          ctx.strokeStyle = '#FFE082'; // bright hot core
+          ctx.lineWidth = Math.random() * 1.2 + 0.4;
           ctx.globalAlpha = b.opacity;
 
           ctx.beginPath();
           ctx.moveTo(b.x, b.y);
           
-          // Draw a small 3-segment lightning arc
           let lastX = b.x;
           let lastY = b.y;
           for (let s = 0; s < 3; s++) {
-            const nextX = lastX + (Math.random() - 0.5) * 16 + b.vx * 0.5;
-            const nextY = lastY + (Math.random() - 0.5) * 16 + b.vy * 0.5;
+            const nextX = lastX + (Math.random() - 0.5) * 12 + b.vx * 0.4;
+            const nextY = lastY + (Math.random() - 0.5) * 12 + b.vy * 0.4;
             ctx.lineTo(nextX, nextY);
             lastX = nextX;
             lastY = nextY;
@@ -178,14 +192,20 @@ export default function CursorTrail() {
           ctx.stroke();
           ctx.restore();
         } else {
-          // Render twinkling star burst particle
-          drawStar(b.x, b.y, 4, b.size * 2.2, b.size * 0.45, b.color, b.opacity, b.x * 0.015);
+          // Small glowing fire ash particle
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.size * b.opacity, 0, Math.PI * 2);
+          ctx.fillStyle = b.color;
+          ctx.globalAlpha = b.opacity * 0.8;
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = b.color;
+          ctx.fill();
         }
       }
 
       ctx.restore();
 
-      // Filter out aged points
+      // Filter out dead points
       points = points.filter((p) => p.age < p.maxAge);
 
       animId = requestAnimationFrame(draw);

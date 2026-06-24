@@ -12,6 +12,7 @@ import Login from './pages/Login';
 import Landing from './pages/Landing';
 import AuthCallback from './pages/AuthCallback';
 import CyberBackground from './components/CyberBackground';
+import CursorTrail from './components/CursorTrail';
 /* ─────────── NavBar ─────────── */
 function NavBar() {
   const { t, i18n } = useTranslation();
@@ -236,6 +237,7 @@ function AppContent() {
   return (
     <div className={`min-h-screen bg-black ${isDashboard ? '' : 'bg-grid'} relative overflow-hidden`}>
       <CyberBackground />
+      <CursorTrail />
       {!isDashboard && <div className="bg-radial-glow fixed inset-0 pointer-events-none z-0" />}
       {!isDashboard && <NavBar />}
       <main className={`relative z-10 ${isDashboard ? '' : 'pt-20 pb-12'}`}>

@@ -313,15 +313,49 @@ html.light .bg-white\/\[0\.03\],
 html.light .bg-white\/\[0\.04\] {
   background-color: rgba(148, 163, 184, 0.03) !important;
 }
+/* Wildcard fallback to make all custom text-white/XX opacity classes readable */
+html.light [class*="text-white/"]:not(.keep-white):not(.btn-primary *):not(.btn-primary-lg *):not(.bg-gradient-to-br *):not(.bg-brand-500 *):not(.bg-emerald-500 *):not(.bg-red-500 *) {
+  color: #475569 !important; /* Slate-600 */
+}
+html.light [class*="text-white/7"]:not(.keep-white):not(.btn-primary *):not(.btn-primary-lg *):not(.bg-gradient-to-br *):not(.bg-brand-500 *):not(.bg-emerald-500 *):not(.bg-red-500 *),
+html.light [class*="text-white/8"]:not(.keep-white):not(.btn-primary *):not(.btn-primary-lg *):not(.bg-gradient-to-br *):not(.bg-brand-500 *):not(.bg-emerald-500 *):not(.bg-red-500 *),
+html.light [class*="text-white/9"]:not(.keep-white):not(.btn-primary *):not(.btn-primary-lg *):not(.bg-gradient-to-br *):not(.bg-brand-500 *):not(.bg-emerald-500 *):not(.bg-red-500 *) {
+  color: #1e293b !important; /* Slate-800 */
+}
+html.light [class*="text-white/4"]:not(.keep-white):not(.btn-primary *):not(.btn-primary-lg *):not(.bg-gradient-to-br *):not(.bg-brand-500 *):not(.bg-emerald-500 *):not(.bg-red-500 *),
+html.light [class*="text-white/5"]:not(.keep-white):not(.btn-primary *):not(.btn-primary-lg *):not(.bg-gradient-to-br *):not(.bg-brand-500 *):not(.bg-emerald-500 *):not(.bg-red-500 *),
+html.light [class*="text-white/6"]:not(.keep-white):not(.btn-primary *):not(.btn-primary-lg *):not(.bg-gradient-to-br *):not(.bg-brand-500 *):not(.bg-emerald-500 *):not(.bg-red-500 *) {
+  color: #334155 !important; /* Slate-700 */
+}
+html.light [class*="text-white/1"]:not(.keep-white):not(.btn-primary *):not(.btn-primary-lg *):not(.bg-gradient-to-br *):not(.bg-brand-500 *):not(.bg-emerald-500 *):not(.bg-red-500 *),
+html.light [class*="text-white/2"]:not(.keep-white):not(.btn-primary *):not(.btn-primary-lg *):not(.bg-gradient-to-br *):not(.bg-brand-500 *):not(.bg-emerald-500 *):not(.bg-red-500 *),
+html.light [class*="text-white/3"]:not(.keep-white):not(.btn-primary *):not(.btn-primary-lg *):not(.bg-gradient-to-br *):not(.bg-brand-500 *):not(.bg-emerald-500 *):not(.bg-red-500 *) {
+  color: #64748b !important; /* Slate-500 */
+}
+
+/* Explicit class selectors matching compiled Tailwind classes */
+html.light .text-white\/5,
+html.light .text-white\/10 {
+  color: rgba(71, 85, 105, 0.3) !important;
+}
+html.light .text-white\/15,
+html.light .text-white\/20,
+html.light .text-white\/25,
 html.light .text-white\/30,
-html.light .text-white\/40 {
-  color: rgba(71, 85, 105, 0.5) !important;
+html.light .text-white\/35 {
+  color: #64748b !important;
 }
+html.light .text-white\/40,
+html.light .text-white\/45,
 html.light .text-white\/50,
+html.light .text-white\/55,
 html.light .text-white\/60,
-html.light .text-white\/70 {
-  color: rgba(71, 85, 105, 0.75) !important;
+html.light .text-white\/65 {
+  color: #334155 !important;
 }
+html.light .text-white\/70,
+html.light .text-white\/75,
+html.light .text-white\/80,
 html.light .text-white\/85,
 html.light .text-white\/90 {
   color: #1e293b !important;

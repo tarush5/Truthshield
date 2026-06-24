@@ -111,14 +111,14 @@ export default function ClaimTable({ claims = [] }) {
 
                     return (
                       <div key={eIdx} className="flex items-start gap-3 py-2 border-b border-white/[0.03] last:border-0">
-                        <ExternalLink className="w-3.5 h-3.5 text-brand-400 flex-shrink-0 mt-1 opacity-50" />
+                        <ExternalLink className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-1 opacity-50" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <a
                               href={ev.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-brand-400/90 hover:text-brand-300 font-medium transition-colors text-sm hover:underline truncate"
+                              className="text-red-400/90 hover:text-red-300 font-medium transition-colors text-sm hover:underline truncate"
                             >
                               {ev.title || ev.url}
                             </a>

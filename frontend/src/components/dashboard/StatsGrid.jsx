@@ -47,9 +47,9 @@ const STAT_CARDS = [
     key: 'total_scans',
     label: 'Total Scans',
     icon: BarChart3,
-    color: '#00f0ff',       // stitch-cyan
-    bgColor: 'rgba(0,240,255,0.08)',
-    borderColor: 'rgba(0,240,255,0.3)',
+    color: '#FF1744',       // Neon Red
+    bgColor: 'rgba(255,23,68,0.08)',
+    borderColor: 'rgba(255,23,68,0.3)',
     change: '+12.5%',
     isPositive: true,
   },
@@ -57,9 +57,9 @@ const STAT_CARDS = [
     key: 'fake_news',
     label: 'Threats Found',
     icon: AlertTriangle,
-    color: '#ef4444',       // red/rose
-    bgColor: 'rgba(239,68,68,0.08)',
-    borderColor: 'rgba(239,68,68,0.3)',
+    color: '#B11226',       // Blood Red
+    bgColor: 'rgba(177,18,38,0.08)',
+    borderColor: 'rgba(177,18,38,0.3)',
     change: '+3.2%',
     isPositive: false,
   },
@@ -67,9 +67,9 @@ const STAT_CARDS = [
     key: 'deepfakes',
     label: 'Deepfakes',
     icon: Eye,
-    color: '#f59e0b',       // amber
-    bgColor: 'rgba(245,158,11,0.08)',
-    borderColor: 'rgba(245,158,11,0.3)',
+    color: '#8B0000',       // Dark Crimson
+    bgColor: 'rgba(139,0,0,0.08)',
+    borderColor: 'rgba(139,0,0,0.3)',
     change: '+1.8%',
     isPositive: false,
   },
@@ -77,9 +77,9 @@ const STAT_CARDS = [
     key: 'voice_clones',
     label: 'Voice Clones',
     icon: ShieldCheck,
-    color: '#bc13fe',       // stitch-purple
-    bgColor: 'rgba(188,19,254,0.08)',
-    borderColor: 'rgba(188,19,254,0.3)',
+    color: '#ff3366',       // Cyber Red Glow
+    bgColor: 'rgba(255,51,102,0.08)',
+    borderColor: 'rgba(255,51,102,0.3)',
     change: '+4.1%',
     isPositive: false,
   },

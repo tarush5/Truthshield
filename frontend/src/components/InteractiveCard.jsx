@@ -89,7 +89,7 @@ export default function InteractiveCard({ children, className = '', tiltIntensit
         transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(${isHovered ? 1.02 : 1}, ${isHovered ? 1.02 : 1}, 1)`,
         transition: 'transform 0.1s ease-out, shadow 0.3s ease',
         boxShadow: isHovered 
-          ? '0 25px 50px -12px rgba(125, 211, 252, 0.15), 0 0 30px 2px rgba(139, 92, 246, 0.05)' 
+          ? '0 25px 50px -12px rgba(255, 23, 68, 0.12), 0 0 35px 2px rgba(139, 0, 0, 0.1)' 
           : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
       }}
     >
@@ -104,7 +104,7 @@ export default function InteractiveCard({ children, className = '', tiltIntensit
 
       {/* Underglow glow backplate */}
       <div
-        className="absolute -inset-px rounded-2xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 opacity-0 transition-opacity duration-500 pointer-events-none z-0"
+        className="absolute -inset-px rounded-2xl bg-gradient-to-br from-red-600/20 to-red-950/20 opacity-0 transition-opacity duration-500 pointer-events-none z-0"
         style={{
           opacity: isHovered ? 1 : 0,
         }}

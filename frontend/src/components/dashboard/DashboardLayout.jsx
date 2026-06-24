@@ -43,7 +43,7 @@ export default function DashboardLayout({ children, activeView, onViewChange }) 
   const sidebarWidth = collapsed ? 76 + 16 : 260 + 16;
 
   return (
-    <div className="min-h-screen bg-surface-900">
+    <div className="min-h-screen bg-black">
       {/* ── Desktop Sidebar ── */}
       {!isMobile && (
         <Sidebar
@@ -94,7 +94,7 @@ export default function DashboardLayout({ children, activeView, onViewChange }) 
       >
         {/* Top Bar */}
         <header className="sticky top-0 z-20 border-b border-white/[0.06]
-                           bg-surface-900/80 backdrop-blur-xl">
+                           bg-black/80 backdrop-blur-xl">
           <div className="flex items-center justify-between h-14 px-6">
             <div className="flex items-center gap-3">
               {/* Mobile hamburger */}

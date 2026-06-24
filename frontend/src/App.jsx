@@ -11,8 +11,7 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Landing from './pages/Landing';
 import AuthCallback from './pages/AuthCallback';
-import ArcticIntelligenceBackground from './components/ArcticIntelligenceBackground';
-import CursorTrail from './components/CursorTrail';
+import CyberBackground from './components/CyberBackground';
 /* ─────────── NavBar ─────────── */
 function NavBar() {
   const { t, i18n } = useTranslation();
@@ -56,9 +55,9 @@ function NavBar() {
   };
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 border-b transition-all duration-300 ${
+    <nav className={`fixed top-0 left-0 right-0 z-50 border-b transition-all duration-500 ${
       scrolled || !isLanding
-        ? 'border-white/5 bg-surface-900/80 backdrop-blur-xl'
+        ? 'border-white/[0.06] bg-black/80 backdrop-blur-2xl'
         : 'border-transparent bg-transparent'
     }`}>
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -66,16 +65,16 @@ function NavBar() {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
             <div className="relative">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-brand-500/25 group-hover:shadow-brand-500/40 transition-shadow">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center shadow-lg shadow-red-500/20 group-hover:shadow-red-500/40 transition-all duration-300">
                 <Shield className="w-5 h-5 text-white" />
               </div>
-              <div className="absolute -inset-1 rounded-xl bg-gradient-to-br from-brand-500 to-cyan-500 opacity-0 group-hover:opacity-20 blur transition-opacity" />
+              <div className="absolute -inset-1 rounded-xl bg-red-500 opacity-0 group-hover:opacity-15 blur-md transition-opacity duration-500" />
             </div>
             <div className="flex flex-col items-start leading-none">
-              <span className="text-lg font-bold font-display gradient-text">{t('app_name') || 'TruthShield'}</span>
+              <span className="text-lg font-bold gradient-text" style={{ fontFamily: 'Orbitron, sans-serif' }}>{t('app_name') || 'TruthShield'}</span>
               {activeOrg.name && (
                 <span className="text-[10px] text-white/40 mt-0.5 font-medium flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 pulse-red" />
                   {activeOrg.name}
                 </span>
               )}
@@ -88,10 +87,10 @@ function NavBar() {
               <Link
                 key={path}
                 to={path}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                   location.pathname === path
-                    ? 'bg-brand-500/10 text-brand-400'
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                    ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                    : 'text-white/60 hover:text-white hover:bg-white/[0.04]'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -105,22 +104,22 @@ function NavBar() {
             {/* Theme Toggle */}
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all border border-white/5"
+              className="p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-white/50 hover:text-red-400 transition-all duration-300 border border-white/[0.06]"
               aria-label="Toggle Theme"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
             {/* Language */}
-            <div className="hidden sm:flex items-center gap-1 bg-white/5 rounded-lg p-1">
+            <div className="hidden sm:flex items-center gap-1 bg-white/[0.04] rounded-lg p-1 border border-white/[0.06]">
               {['en', 'hi', 'ta'].map((lang) => (
                 <button
                   key={lang}
                   onClick={() => i18n.changeLanguage(lang)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-200 ${
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-300 ${
                     i18n.language === lang
-                      ? 'bg-brand-500 text-white shadow-sm'
-                      : 'text-white/50 hover:text-white hover:bg-white/5'
+                      ? 'bg-red-600 text-white shadow-sm shadow-red-500/20'
+                      : 'text-white/50 hover:text-white hover:bg-white/[0.06]'
                   }`}
                 >
                   {lang.toUpperCase()}
@@ -131,10 +130,10 @@ function NavBar() {
             {/* Auth Buttons */}
             {user ? (
               <div className="hidden md:flex items-center gap-3">
-                <span className="text-xs text-white/55 font-medium truncate max-w-[120px]">{user.email}</span>
+                <span className="text-xs text-white/50 font-medium truncate max-w-[120px]" style={{ fontFamily: 'JetBrains Mono, monospace' }}>{user.email}</span>
                 <button
                   onClick={handleLogout}
-                  className="px-3.5 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-semibold transition-all border border-red-500/10"
+                  className="px-3.5 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-semibold transition-all duration-300 border border-red-500/20 hover:border-red-500/40"
                 >
                   Logout
                 </button>
@@ -142,9 +141,10 @@ function NavBar() {
             ) : (
               <Link
                 to="/login"
-                className="hidden md:block px-3.5 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-400 text-white text-xs font-semibold shadow-md shadow-brand-500/20 transition-all"
+                className="hidden md:block px-4 py-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs font-bold tracking-wider shadow-lg shadow-red-500/20 hover:shadow-red-500/40 transition-all duration-300"
+                style={{ fontFamily: 'Orbitron, sans-serif', fontSize: '10px' }}
               >
-                Login
+                ACCESS PLATFORM
               </Link>
             )}
 
@@ -175,7 +175,7 @@ function NavBar() {
                     onClick={() => setMobileOpen(false)}
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
                       location.pathname === path
-                        ? 'bg-brand-500/10 text-brand-400'
+                        ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                         : 'text-white/60 hover:text-white hover:bg-white/5'
                     }`}
                   >
@@ -193,7 +193,7 @@ function NavBar() {
                       </button>
                     </>
                   ) : (
-                    <Link to="/login" onClick={() => setMobileOpen(false)} className="w-full text-center py-2.5 rounded-lg bg-brand-500 text-white text-xs font-semibold">
+                    <Link to="/login" onClick={() => setMobileOpen(false)} className="w-full text-center py-2.5 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs font-semibold shadow-md shadow-red-500/20 transition-all">
                       Login
                     </Link>
                   )}
@@ -214,7 +214,7 @@ function ProtectedRoute({ children }) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -234,9 +234,8 @@ function AppContent() {
   const isDashboard = location.pathname === '/dashboard';
 
   return (
-    <div className={`min-h-screen bg-surface-900 ${isDashboard ? '' : 'bg-grid'} relative overflow-hidden`}>
-      <ArcticIntelligenceBackground />
-      <CursorTrail />
+    <div className={`min-h-screen bg-black ${isDashboard ? '' : 'bg-grid'} relative overflow-hidden`}>
+      <CyberBackground />
       {!isDashboard && <div className="bg-radial-glow fixed inset-0 pointer-events-none z-0" />}
       {!isDashboard && <NavBar />}
       <main className={`relative z-10 ${isDashboard ? '' : 'pt-20 pb-12'}`}>

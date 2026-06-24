@@ -249,9 +249,9 @@ export default function Analyze() {
         animate={{ opacity: 1, y: 0 }}
         className="text-center space-y-4"
       >
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/20">
-          <Brain className="w-3.5 h-3.5 text-sky-400" />
-          <span className="text-[10px] font-bold uppercase tracking-wider text-sky-300">Advanced AI Core Ingestion</span>
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-950/40 border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.05)]">
+          <Brain className="w-3.5 h-3.5 text-red-500" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-red-400" style={{ fontFamily: 'Orbitron, sans-serif' }}>Advanced AI Core Ingestion</span>
         </div>
         <h1 className="text-4xl sm:text-5xl font-extrabold font-display text-white tracking-tight">
           Verify Claim Node
@@ -292,7 +292,7 @@ export default function Analyze() {
       {/* Dynamic Processing Pipeline (Replaces basic loaders) */}
       <AnimatePresence>
         {analyzing && (
-          <InteractiveCard className="border border-white/10 bg-[#030712]/40 backdrop-blur-xl">
+          <InteractiveCard className="border border-red-500/15 bg-black/60 backdrop-blur-xl shadow-[0_0_40px_rgba(255,23,68,0.05)]">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -300,7 +300,7 @@ export default function Analyze() {
               className="p-8 relative overflow-hidden space-y-8"
             >
             {/* Ambient Aurora Glow inside loader */}
-            <div className="absolute -top-12 -right-12 w-48 h-48 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -top-12 -right-12 w-48 h-48 bg-red-950/20 rounded-full blur-3xl pointer-events-none" />
 
             <div className="flex items-center justify-between">
               <div>
@@ -324,19 +324,18 @@ export default function Analyze() {
                     key={stage.key}
                     className={`flex items-center gap-4 p-3.5 rounded-xl border transition-all duration-300 ${
                       isActive 
-                        ? 'bg-sky-500/5 border-sky-400/30 shadow-[0_0_15px_rgba(14,165,233,0.05)] electric-glow laser-sweep' 
+                        ? 'bg-red-50/5 border-red-500/30 shadow-[0_0_15px_rgba(255,23,68,0.05)] electric-glow' 
                         : isCompleted
                         ? 'bg-white/[0.01] border-white/5 opacity-80'
                         : 'border-transparent opacity-25'
                     }`}
-
                   >
                     {/* Status Circle */}
                     <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                       isCompleted 
                         ? 'bg-emerald-500/15 text-emerald-400' 
                         : isActive 
-                        ? 'bg-sky-500/15 text-sky-400 animate-pulse' 
+                        ? 'bg-red-500/15 text-red-400 animate-pulse' 
                         : 'bg-white/5 text-white/30'
                     }`}>
                       {isCompleted ? (
@@ -349,13 +348,13 @@ export default function Analyze() {
                     </div>
 
                     <span className={`text-xs font-semibold ${
-                      isActive ? 'text-sky-300 font-bold' : isCompleted ? 'text-white/70' : 'text-white/30'
+                      isActive ? 'text-red-400 font-bold' : isCompleted ? 'text-white/70' : 'text-white/30'
                     }`}>
                       {stage.label}
                     </span>
 
                     {isActive && (
-                      <span className="text-[10px] font-mono text-sky-400 ml-auto animate-pulse">ACTIVE</span>
+                      <span className="text-[10px] font-mono text-red-500 ml-auto animate-pulse">ACTIVE</span>
                     )}
                     {isCompleted && (
                       <span className="text-[10px] font-mono text-emerald-400 ml-auto font-bold">✓ DONE</span>
@@ -371,9 +370,9 @@ export default function Analyze() {
                 <span>PIPELINE CAPACITY</span>
                 <span>{progress}%</span>
               </div>
-              <div className="progress-bar">
+              <div className="progress-bar-cyber h-1.5 rounded-full bg-white/5 overflow-hidden">
                 <motion.div 
-                  className="progress-fill bg-gradient-to-r from-sky-400 to-indigo-500" 
+                  className="h-full bg-gradient-to-r from-red-800 via-red-600 to-red-500" 
                   initial={{ width: 0 }}
                   animate={{ width: `${progress}%` }}
                   transition={{ duration: 0.3 }}
@@ -424,10 +423,10 @@ export default function Analyze() {
             { title: 'Localization Support', desc: 'Verified English, Hindi & Tamil semantic translation', icon: FileSearch },
             { title: 'pgvector Cluster', desc: 'RAG fact mapping against global research consensus', icon: Brain },
           ].map((item, i) => (
-            <InteractiveCard key={i} className="border border-white/5 bg-[#071124]/30 backdrop-blur-xl">
+            <InteractiveCard key={i} className="border border-white/[0.05] bg-white/[0.02] backdrop-blur-xl hover:border-red-500/25 transition-all">
               <div className="p-5 space-y-3">
-                <div className="w-8 h-8 rounded-lg bg-sky-500/10 flex items-center justify-center">
-                  <item.icon className="w-4 h-4 text-sky-400" />
+                <div className="w-8 h-8 rounded-lg bg-red-950/30 flex items-center justify-center border border-red-500/10">
+                  <item.icon className="w-4 h-4 text-red-500" />
                 </div>
                 <h4 className="text-xs font-bold text-white">{item.title}</h4>
                 <p className="text-[10px] text-white/45 leading-relaxed">{item.desc}</p>

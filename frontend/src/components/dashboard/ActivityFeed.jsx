@@ -80,7 +80,7 @@ export default function ActivityFeed({ logs, loading = false }) {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="text-sm font-semibold text-white/80 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-brand-400" />
+            <Clock className="w-4 h-4 text-red-500" />
             Activity Feed
           </h3>
           <p className="text-xs text-white/30 mt-0.5">Recent workspace events</p>

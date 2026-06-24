@@ -78,7 +78,7 @@ export default function RecentScans({ scans, fullPage = false, loading = false }
         <div>
           <h3 className={`font-semibold text-white/80 flex items-center gap-2
             ${fullPage ? 'section-title text-xl' : 'text-sm'}`}>
-            <FileText className="w-4 h-4 text-brand-400" />
+            <FileText className="w-4 h-4 text-red-500" />
             Recent Scans
           </h3>
           <p className="text-xs text-white/35 mt-1">

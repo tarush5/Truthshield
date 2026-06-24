@@ -5,8 +5,8 @@ import { API_BASE } from '../../config';
 
 // Role → color mapping
 const ROLE_STYLE = {
-  Admin:  'bg-brand-500/10 text-brand-400 border-brand-500/20',
-  Member: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+  Admin:  'bg-red-500/10 text-red-400 border-red-500/20',
+  Member: 'bg-red-950/20 text-red-300 border-red-950/30',
   Viewer: 'bg-white/5 text-white/40 border-white/10',
 };
 
@@ -109,7 +109,7 @@ export default function TeamPanel({ orgId, token }) {
         <div className="p-6 pb-0 flex items-center justify-between">
           <div>
             <h3 className="section-title text-lg flex items-center gap-2">
-              <Users className="w-5 h-5 text-brand-400" />
+              <Users className="w-5 h-5 text-red-500" />
               Team Members
             </h3>
             <p className="text-xs text-white/30 mt-1">

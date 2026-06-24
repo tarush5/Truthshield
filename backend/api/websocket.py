@@ -107,8 +107,9 @@ async def websocket_analyze(websocket: WebSocket):
                 progress_callback=tracker.send_progress,
             )
 
-            # Save report to Database
+            # Save report to Database (full JSON fields, matching AnalysisService)
             if user_uuid:
+                import json as _json
                 from backend.models.db import SessionLocal, Report as ReportDB, EvidenceDB
                 db = SessionLocal()
                 try:
@@ -125,9 +126,21 @@ async def websocket_analyze(websocket: WebSocket):
                         user_id=user_uuid,
                         org_id=org_uuid,
                         content_type=report.content_type.value,
+                        language=report.language.value if hasattr(report, 'language') and report.language else lang,
                         input_text=report.original_text,
                         verdict=report.credibility.verdict,
                         confidence=report.credibility.trust_score / 100.0,
+                        # Full JSON serialization
+                        claims_json=_json.dumps([cv.model_dump() for cv in report.claims]) if report.claims else None,
+                        explanation_json=_json.dumps(report.explanation.model_dump()) if report.explanation else None,
+                        counter_narrative_json=_json.dumps(report.counter_narrative.model_dump()) if report.counter_narrative else None,
+                        inconsistencies_json=_json.dumps([inc.model_dump() for inc in report.inconsistencies]) if report.inconsistencies else None,
+                        social_signals_json=_json.dumps([sig.model_dump() for sig in report.social_signals]) if report.social_signals else None,
+                        risk_factors_json=_json.dumps(report.risk_factors) if report.risk_factors else None,
+                        signal_correlations_json=_json.dumps(report.signal_correlations) if report.signal_correlations else None,
+                        confidence_profile_json=_json.dumps(report.confidence_profile) if report.confidence_profile else None,
+                        verdict_reasons_json=_json.dumps(report.verdict_reasons) if report.verdict_reasons else None,
+                        processing_time_seconds=report.processing_time_seconds or 0.0,
                     )
                     db.add(db_report)
                     

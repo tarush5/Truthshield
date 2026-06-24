@@ -520,7 +520,29 @@ async def analyze_content(
             f.write(content)
 
         if content_type == ContentType.TEXT:
-            resolved_text = content.decode("utf-8", errors="ignore")
+            # Try PDF extraction for .pdf files
+            if ext == ".pdf":
+                try:
+                    from PyPDF2 import PdfReader
+                    reader = PdfReader(file_path)
+                    pages_text = []
+                    for page in reader.pages:
+                        page_text = page.extract_text()
+                        if page_text:
+                            pages_text.append(page_text)
+                    if pages_text:
+                        resolved_text = "\n".join(pages_text)
+                        logger.info(f"PDF extracted: {len(pages_text)} pages, {len(resolved_text)} chars")
+                    else:
+                        resolved_text = content.decode("utf-8", errors="ignore")
+                except ImportError:
+                    logger.warning("PyPDF2 not installed, falling back to raw text decode for PDF")
+                    resolved_text = content.decode("utf-8", errors="ignore")
+                except Exception as e:
+                    logger.warning(f"PDF extraction failed: {e}, falling back to raw decode")
+                    resolved_text = content.decode("utf-8", errors="ignore")
+            else:
+                resolved_text = content.decode("utf-8", errors="ignore")
 
     elif resolved_url:
         content_type = ContentType.URL

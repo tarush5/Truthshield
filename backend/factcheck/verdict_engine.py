@@ -777,8 +777,23 @@ Analyze this claim and provide your verdict as JSON."""
                     support += impact * 0.5
                     signals.append(f"Mixed signals from '{source_label}'")
                 elif sim >= 0.05 and ev.source_score >= 0.60:
-                    ev.stance = "NEUTRAL"
-                    support += impact * 0.3
+                    # Implicit support: credible informational source discussing the claim
+                    # topic factually without any debunking keywords → lean SUPPORTS.
+                    # This handles well-known facts (e.g. "Earth orbits the Sun") where
+                    # Wikipedia/educational sources describe the topic without fact-check ratings.
+                    ev_domain = getattr(ev, 'url', '') or ''
+                    is_knowledge_source = any(d in ev_domain for d in [
+                        'wikipedia.org', '.edu', '.gov', 'britannica.com', 'nasa.gov',
+                        'who.int', 'un.org', 'nature.com', 'sciencedirect.com',
+                    ])
+                    if is_knowledge_source or (sim >= 0.10 and ev.source_score >= 0.70):
+                        ev.stance = "SUPPORTS"
+                        support += impact * 1.0
+                        signals.append(f"Implicitly supported by '{source_label}'")
+                        source_names["support"].append(source_label)
+                    else:
+                        ev.stance = "NEUTRAL"
+                        support += impact * 0.3
                 else:
                     ev.stance = "INSUFFICIENT"
 

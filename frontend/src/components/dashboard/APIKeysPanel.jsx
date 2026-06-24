@@ -103,7 +103,7 @@ export default function APIKeysPanel({ orgId, token }) {
       {/* ── Create Key Section ── */}
       <div className="glass-card p-6">
         <h3 className="section-title text-lg flex items-center gap-2 mb-1">
-          <Key className="w-5 h-5 text-red-500" />
+          <Key className="w-5 h-5 text-brand-400" />
           API Keys
         </h3>
         <p className="text-xs text-white/30 mb-6">
@@ -181,7 +181,7 @@ export default function APIKeysPanel({ orgId, token }) {
       <div className="glass-card overflow-hidden">
         <div className="p-6 pb-0">
           <h3 className="text-sm font-semibold text-white/70 flex items-center gap-2">
-            <Shield className="w-4 h-4 text-red-500" />
+            <Shield className="w-4 h-4 text-brand-400" />
             Active Keys
           </h3>
         </div>

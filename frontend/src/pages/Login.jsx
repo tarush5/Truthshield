@@ -252,19 +252,19 @@ export default function Login() {
         className="w-full max-w-md"
       >
         {/* Onboarding Frosted Card */}
-        <InteractiveCard className="border border-red-500/10 shadow-2xl bg-black/60 backdrop-blur-xl">
+        <InteractiveCard className="border border-white/10 shadow-2xl bg-[#030712]/40 backdrop-blur-xl">
           <div className="p-8 relative overflow-hidden">
             {/* Top glow */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-red-800 via-red-600 to-red-500" />
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-sky-400 via-purple-500 to-cyan-400" />
 
 
           {/* Title Header */}
           <div className="flex flex-col items-center justify-center mb-8">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-700 to-red-950 flex items-center justify-center mb-3 shadow-lg shadow-red-500/20 border border-red-500/25">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center mb-3 shadow-lg shadow-sky-500/20">
               <Shield className="w-4 h-4 text-white" />
             </div>
             <h3 className="text-xl font-bold font-display text-white">TruthShield Access</h3>
-            <p className="text-[10px] text-white/30 tracking-widest uppercase mt-0.5" style={{ fontFamily: 'Orbitron, sans-serif' }}>AI Cyber Command Center</p>
+            <p className="text-[10px] text-white/30 tracking-widest uppercase mt-0.5">Arctic Command Center</p>
           </div>
 
           {/* Stepper bar */}
@@ -273,14 +273,14 @@ export default function Login() {
               <React.Fragment key={s}>
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-mono font-bold transition-all duration-300 ${
                   i <= stepIndex 
-                    ? 'bg-red-500/10 text-red-400 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.15)]' 
+                    ? 'bg-sky-500/20 text-sky-400 border border-sky-400/40 shadow-[0_0_10px_rgba(14,165,233,0.15)]' 
                     : 'bg-white/5 text-white/20 border border-white/5'
                 }`}>
                   {i < stepIndex ? <Check className="w-3.5 h-3.5" /> : i + 1}
                 </div>
                 {i < STEPS.length - 1 && (
                   <div className={`w-8 h-[1px] transition-all duration-500 ${
-                    i < stepIndex ? 'bg-red-500/35' : 'bg-white/5'
+                    i < stepIndex ? 'bg-sky-500/40' : 'bg-white/5'
                   }`} />
                 )}
               </React.Fragment>
@@ -325,7 +325,7 @@ export default function Login() {
                       onClick={() => { setAuthMethod('otp'); setError(''); }}
                       className={`flex-1 text-center py-2 text-xs font-medium rounded-lg transition-all ${
                         authMethod === 'otp'
-                          ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                          ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
                           : 'text-white/40 hover:text-white/70'
                       }`}
                     >
@@ -336,7 +336,7 @@ export default function Login() {
                       onClick={() => { setAuthMethod('password'); setError(''); }}
                       className={`flex-1 text-center py-2 text-xs font-medium rounded-lg transition-all ${
                         authMethod === 'password'
-                          ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                          ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
                           : 'text-white/40 hover:text-white/70'
                       }`}
                     >
@@ -349,7 +349,7 @@ export default function Login() {
                       <button
                         type="button"
                         onClick={() => setPasswordMode('signin')}
-                        className={passwordMode === 'signin' ? 'text-red-400 font-bold' : 'text-white/30 hover:text-white/50'}
+                        className={passwordMode === 'signin' ? 'text-sky-400 font-bold' : 'text-white/30 hover:text-white/50'}
                       >
                         Sign In
                       </button>
@@ -357,7 +357,7 @@ export default function Login() {
                       <button
                         type="button"
                         onClick={() => setPasswordMode('signup')}
-                        className={passwordMode === 'signup' ? 'text-red-400 font-bold' : 'text-white/30 hover:text-white/50'}
+                        className={passwordMode === 'signup' ? 'text-sky-400 font-bold' : 'text-white/30 hover:text-white/50'}
                       >
                         Register
                       </button>
@@ -436,7 +436,7 @@ export default function Login() {
                       <div className="w-full border-t border-white/5" />
                     </div>
                     <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
-                      <span className="px-2 bg-black text-white/20">or secure OAuth</span>
+                      <span className="px-2 bg-[#0c1223] text-white/20">or secure OAuth</span>
                     </div>
                   </div>
 
@@ -464,14 +464,14 @@ export default function Login() {
                       <div className="w-full border-t border-white/5" />
                     </div>
                     <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
-                      <span className="px-2 bg-black text-white/20">or guest sandbox</span>
+                      <span className="px-2 bg-[#0c1223] text-white/20">or guest sandbox</span>
                     </div>
                   </div>
 
                   <button
                     onClick={handleDemoLogin}
                     disabled={loading}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-dashed border-red-500/30 bg-red-950/20 hover:bg-red-500/10 hover:border-red-400/50 text-red-400 text-xs font-bold transition-all shadow-[0_0_15px_rgba(239,68,68,0.05)] hover:shadow-[0_0_20px_rgba(239,68,68,0.15)] group"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-dashed border-sky-500/30 bg-sky-500/5 hover:bg-sky-500/10 hover:border-sky-400/50 text-sky-400 text-xs font-bold transition-all shadow-[0_0_15px_rgba(14,165,233,0.05)] hover:shadow-[0_0_20px_rgba(14,165,233,0.15)] group"
                   >
                     <Sparkles className="w-4 h-4 animate-pulse group-hover:scale-110 transition-transform" />
                     <span>Initialize Demo Access (Guest Mode)</span>
@@ -499,7 +499,7 @@ export default function Login() {
                   <div className="text-center space-y-1">
                     <h4 className="text-sm font-bold text-white">Enter Security Token</h4>
                     <p className="text-xs text-white/40">
-                      Code dispatched to <span className="text-red-400 font-medium font-mono">{email}</span>
+                      Code dispatched to <span className="text-sky-300 font-medium font-mono">{email}</span>
                     </p>
                   </div>
 
@@ -516,7 +516,7 @@ export default function Login() {
                           onChange={(e) => handleOtpChange(i, e.target.value)}
                           onKeyDown={(e) => handleOtpKeyDown(i, e)}
                           className="w-10 h-12 text-center text-lg font-bold bg-white/5 border border-white/10 rounded-lg text-white
-                                     focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all font-mono"
+                                     focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/20 transition-all font-mono"
                           autoFocus={i === 0}
                         />
                       ))}
@@ -538,7 +538,7 @@ export default function Login() {
                     Token failed?{' '}
                     <button
                       onClick={() => { setOtp(['','','','','','']); handleEmailSubmit({ preventDefault: () => {} }); }}
-                      className="text-red-400 hover:underline"
+                      className="text-sky-400 hover:underline"
                     >
                       Resend
                     </button>
@@ -572,7 +572,7 @@ export default function Login() {
                         className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 
                                    hover:bg-white/10 hover:border-white/15 transition-all text-left group"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-600/20 to-red-950/20 border border-red-500/20 flex items-center justify-center text-xs font-bold text-red-400">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500/20 to-indigo-500/20 border border-white/5 flex items-center justify-center text-xs font-bold text-sky-300">
                           {org.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">

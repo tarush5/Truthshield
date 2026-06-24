@@ -58,19 +58,19 @@ export default function Sidebar({ activeView, onViewChange, collapsed, onCollaps
       animate={{ width: collapsed ? 76 : 260 }}
       transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
       className="fixed left-4 top-4 bottom-4 z-40 flex flex-col
-                 bg-[#050505]/65 backdrop-blur-2xl border border-red-500/10 rounded-2xl
+                 bg-[#071124]/45 backdrop-blur-2xl border border-white/10 rounded-2xl
                  overflow-hidden select-none shadow-2xl"
     >
       {/* ── Brand Header ── */}
       <div className="p-4 border-b border-white/[0.06]">
         <div className="flex items-center gap-3">
           {/* Logo */}
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-red-950 
-                          flex items-center justify-center shrink-0 shadow-lg shadow-red-500/10
-                          relative group border border-red-500/20">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-cyan-500 
+                          flex items-center justify-center shrink-0 shadow-lg shadow-brand-500/20
+                          relative group">
             <Shield className="w-[18px] h-[18px] text-white" />
-            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-red-500 to-red-800 
-                            opacity-0 group-hover:opacity-20 blur transition-opacity duration-300" />
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-brand-400 to-cyan-400 
+                            opacity-0 group-hover:opacity-30 blur transition-opacity duration-300" />
           </div>
 
           <AnimatePresence>
@@ -124,7 +124,7 @@ export default function Sidebar({ activeView, onViewChange, collapsed, onCollaps
                 transition-all duration-200 group
                 ${collapsed ? 'px-0 py-3 justify-center' : 'px-3 py-2.5'}
                 ${isActive
-                  ? 'bg-red-500/10 text-white'
+                  ? 'bg-brand-500/10 text-white'
                   : 'text-white/45 hover:text-white hover:bg-white/[0.04]'
                 }
               `}
@@ -134,18 +134,18 @@ export default function Sidebar({ activeView, onViewChange, collapsed, onCollaps
                 <motion.div
                   layoutId="sidebar-indicator"
                   className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 
-                             bg-gradient-to-b from-red-500 to-red-800 rounded-r-full"
+                             bg-gradient-to-b from-brand-400 to-cyan-400 rounded-r-full"
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                 />
               )}
 
               <div className={`relative flex items-center justify-center w-[22px] h-[22px] shrink-0`}>
                 <Icon className={`w-[18px] h-[18px] transition-colors duration-200
-                  ${isActive ? 'text-red-500' : 'text-white/40 group-hover:text-white/70'}`}
+                  ${isActive ? 'text-brand-400' : 'text-white/40 group-hover:text-white/70'}`}
                 />
                 {/* Active glow */}
                 {isActive && (
-                  <div className="absolute inset-0 bg-red-500/20 rounded-full blur-md" />
+                  <div className="absolute inset-0 bg-brand-400/20 rounded-full blur-md" />
                 )}
               </div>
 
@@ -203,10 +203,10 @@ export default function Sidebar({ activeView, onViewChange, collapsed, onCollaps
                         ${profileOpen ? 'bg-white/[0.04]' : ''}`}
           >
             {/* Avatar */}
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-600/20 to-red-950/20 
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500/20 to-cyan-500/20 
                             flex items-center justify-center border border-white/[0.08] shrink-0
-                            group-hover:border-red-500/30 transition-colors">
-              <span className="text-[11px] font-bold text-red-400">{userInitial}</span>
+                            group-hover:border-brand-500/30 transition-colors">
+              <span className="text-[11px] font-bold text-brand-300">{userInitial}</span>
             </div>
 
             <AnimatePresence>
@@ -233,7 +233,7 @@ export default function Sidebar({ activeView, onViewChange, collapsed, onCollaps
                 exit={{ opacity: 0, y: 8, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
                 className={`absolute bottom-full mb-2 z-50 
-                            bg-black/95 backdrop-blur-2xl rounded-xl 
+                            bg-[#0c1a2e]/95 backdrop-blur-2xl rounded-xl 
                             border border-white/10 shadow-2xl overflow-hidden
                             ${collapsed ? 'left-0 w-48' : 'left-0 right-0'}`}
               >

@@ -33,7 +33,7 @@ export default function CounterNarrative({ narrative }) {
       {/* Header with language tabs */}
       <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
         <div className="flex items-center gap-2">
-          <Globe className="w-4 h-4 text-red-500" />
+          <Globe className="w-4 h-4 text-brand-400" />
           <span className="text-sm font-semibold text-white/70">{t('report.counter_narrative')}</span>
         </div>
 
@@ -44,7 +44,7 @@ export default function CounterNarrative({ narrative }) {
               onClick={() => setActiveLang(code)}
               className={`px-3 py-1 rounded-md text-xs font-semibold transition-all duration-200 ${
                 activeLang === code
-                  ? 'bg-red-600 text-white shadow-sm shadow-red-500/25'
+                  ? 'bg-brand-500 text-white shadow-sm'
                   : 'text-white/40 hover:text-white/70'
               }`}
             >
@@ -92,7 +92,7 @@ export default function CounterNarrative({ narrative }) {
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3 py-1 rounded-full bg-white/5 border border-white/5 text-xs text-red-400/70 hover:text-red-300 hover:border-red-500/30 transition-all"
+                    className="px-3 py-1 rounded-full bg-white/5 border border-white/5 text-xs text-brand-400/70 hover:text-brand-300 hover:border-brand-500/30 transition-all"
                   >
                     {domain}
                   </a>

@@ -69,7 +69,7 @@ export default function SettingsPanel() {
               onClick={() => setActiveTab(tab.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all border ${
                 isActive
-                  ? 'bg-red-500/10 text-red-400 border-red-500/30 shadow-[0_0_15px_rgba(255,23,68,0.05)]'
+                  ? 'bg-sky-500/10 text-sky-400 border-sky-400/30 shadow-[0_0_15px_rgba(14,165,233,0.05)]'
                   : 'text-white/45 hover:text-white/70 bg-transparent border-transparent hover:bg-white/[0.02]'
               }`}
             >
@@ -84,7 +84,7 @@ export default function SettingsPanel() {
       <div className="lg:col-span-9">
         <div className="glass-card p-6 md:p-8 border border-white/10 relative overflow-hidden">
           {/* Accent radial glow */}
-          <div className="absolute -top-16 -right-16 w-48 h-48 bg-red-500/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-16 -right-16 w-48 h-48 bg-sky-500/5 rounded-full blur-3xl pointer-events-none" />
 
           <form onSubmit={handleSave} className="space-y-6">
             
@@ -157,7 +157,7 @@ export default function SettingsPanel() {
 
                 <div className="pt-2 border-t border-white/5">
                   <button type="button" className="btn-secondary text-xs py-2 px-4 flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4 text-red-400" />
+                    <ShieldAlert className="w-4 h-4 text-sky-400" />
                     Revoke All Active Sessions
                   </button>
                 </div>
@@ -187,7 +187,7 @@ export default function SettingsPanel() {
                         type="button"
                         onClick={() => setNotifications({ ...notifications, [item.key]: !notifications[item.key] })}
                         className={`w-10 h-5 rounded-full p-0.5 transition-colors relative shrink-0 ${
-                          notifications[item.key] ? 'bg-red-600' : 'bg-white/10'
+                          notifications[item.key] ? 'bg-sky-500' : 'bg-white/10'
                         }`}
                       >
                         <div className={`w-4 h-4 bg-white rounded-full transition-transform ${

@@ -82,7 +82,7 @@ export default function UploadZone({ onFileSelect, onUrlSubmit, onTextSubmit, di
             disabled={disabled}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
               mode === id
-                ? 'bg-red-500/10 text-red-400 border border-red-500/20 shadow-sm shadow-red-500/5'
+                ? 'bg-brand-500/20 text-brand-400 shadow-sm'
                 : 'text-white/40 hover:text-white/70 hover:bg-white/5'
             }`}
           >
@@ -103,7 +103,7 @@ export default function UploadZone({ onFileSelect, onUrlSubmit, onTextSubmit, di
             disabled ? 'opacity-50 cursor-not-allowed' : ''
           } ${
             isDragging
-              ? 'border-red-500 bg-red-950/20 scale-[1.01] shadow-[0_0_20px_rgba(255,23,68,0.08)]'
+              ? 'border-brand-400 bg-brand-500/10 scale-[1.01]'
               : selectedFile
               ? 'border-emerald-500/30 bg-emerald-500/5'
               : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
@@ -124,8 +124,8 @@ export default function UploadZone({ onFileSelect, onUrlSubmit, onTextSubmit, di
                 const ft = getFileType(selectedFile);
                 const Icon = FILE_ICONS[ft] || FileText;
                 return (
-                  <div className="w-14 h-14 rounded-xl bg-red-950/30 border border-red-500/10 flex items-center justify-center">
-                    <Icon className="w-7 h-7 text-red-500" />
+                  <div className="w-14 h-14 rounded-xl bg-brand-500/10 flex items-center justify-center">
+                    <Icon className="w-7 h-7 text-brand-400" />
                   </div>
                 );
               })()}
@@ -142,8 +142,8 @@ export default function UploadZone({ onFileSelect, onUrlSubmit, onTextSubmit, di
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 px-6">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600/20 to-red-950/20 flex items-center justify-center mb-4 border border-red-500/15">
-                <Upload className="w-8 h-8 text-red-500" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-cyan-500/20 flex items-center justify-center mb-4">
+                <Upload className="w-8 h-8 text-brand-400" />
               </div>
               <p className="text-white/70 font-medium mb-1">{t('analyze.drop_zone')}</p>
               <p className="text-white/30 text-sm">{t('analyze.drop_hint')}</p>
@@ -164,7 +164,7 @@ export default function UploadZone({ onFileSelect, onUrlSubmit, onTextSubmit, di
       {mode === 'url' && (
         <div className="glass-card p-5">
           <div className="flex items-center gap-3">
-            <Link2 className="w-5 h-5 text-red-500 flex-shrink-0" />
+            <Link2 className="w-5 h-5 text-brand-400 flex-shrink-0" />
             <input
               type="url"
               value={url}

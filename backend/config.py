@@ -232,8 +232,8 @@ CLAUDE_MODEL = "claude-sonnet-4-6"
 CLAUDE_MAX_TOKENS = 1024
 
 # ── Gemini Model Config ──────────────────────────────────────
-GEMINI_MODEL = "gemini-2.5-flash"
-GEMINI_FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"]
+GEMINI_MODEL = "gemini-2.5-flash-lite"
+GEMINI_FALLBACK_MODELS = ["gemini-2.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"]
 GEMINI_MAX_TOKENS = 1024
 
 # ── Supported Languages ──────────────────────────────────────

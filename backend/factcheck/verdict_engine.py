@@ -97,12 +97,25 @@ class VerdictEngine:
         if not claim_words:
             return False
 
+        # Scalar-additive qualifiers. "Lung cancer is not ONLY about smoking"
+        # asserts there are further causes; it does not deny that smoking is
+        # one of them. Reading it as refutation flipped "smoking tobacco causes
+        # lung cancer" to LIKELY FALSE on the benchmark — an article agreeing
+        # with the claim was being counted as evidence against it.
+        additive = {"only", "just", "merely", "solely", "alone", "exclusively", "purely"}
+
         tokens = [t.strip("'") for t in re.findall(r"[a-zA-Z']+", ev_text.lower())]
         for i, tok in enumerate(tokens):
             if tok not in claim_words:
                 continue
-            window = tokens[max(0, i - 4):i]
-            if any(w.replace("'", "") in negations for w in window):
+            for j in range(max(0, i - 4), i):
+                if tokens[j].replace("'", "") not in negations:
+                    continue
+                # Look just past the negation: "not only", "not just", "not the
+                # only", "not always" hedge or add rather than contradict.
+                tail = tokens[j + 1:j + 3]
+                if any(t in additive for t in tail) or tail[:1] == ["always"]:
+                    continue
                 return True
         return False
 

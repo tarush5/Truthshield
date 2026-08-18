@@ -36,6 +36,7 @@ import logging
 import math
 import re
 import socket
+import threading
 import time
 from collections import OrderedDict
 from typing import List, Optional, Dict
@@ -70,6 +71,10 @@ from backend.models.schemas import Claim, Evidence
 
 logger = logging.getLogger(__name__)
 
+# ddgs sits on primp, a Rust HTTP client that hangs when two DDGS instances are
+# driven from different threads at once. Every DDGS use goes through this lock.
+_DDGS_LOCK = threading.Lock()
+
 
 class EvidenceRetriever:
     """Retrieve evidence from 12+ sources concurrently with intelligent fallback chains."""
@@ -90,6 +95,31 @@ class EvidenceRetriever:
     STRAGGLER_GRACE_SECONDS = 1.0
     MIN_RELEVANCE = 0.34
 
+    # ── Web-search backend selection ──
+    # ddgs walks its backend list serially until one answers. Measured over
+    # three queries from this host, duckduckgo/brave/mojeek/google returned
+    # nothing at all (0/3) while still costing ~1.9s of dead wait before the
+    # rotation reached a working engine. yandex answered 3/3 at ~1.1s, yahoo
+    # 2/3 at ~0.9s, bing 3/3 but at ~2.6s.
+    #
+    # So: race the two fast engines in parallel and take the first non-empty
+    # answer; fall back to the slow-but-reliable one only if both come up dry.
+    # Availability is IP- and region-dependent, so nothing here is treated as
+    # permanent — the circuit breaker below re-probes on its own.
+    SEARCH_BACKENDS_FAST = ("yandex", "yahoo")
+    SEARCH_BACKENDS_FALLBACK = ("bing",)
+    SEARCH_BACKEND_TIMEOUT = 4.0
+
+    # ── Circuit breaker ──
+    # A source that just failed is overwhelmingly likely to fail again within
+    # the next few seconds, and each retry costs a full connect timeout on the
+    # request path. Trip after N consecutive failures, then let a single probe
+    # through once the cooldown expires.
+    _breaker_failures: Dict[str, int] = {}
+    _breaker_open_until: Dict[str, float] = {}
+    _BREAKER_THRESHOLD = 3
+    _BREAKER_COOLDOWN = 120.0
+
     # ── Class-level persistent HTTP session (Keep-Alive + connection pooling) ──
     _session = None
 
@@ -98,6 +128,33 @@ class EvidenceRetriever:
     _query_cache: "OrderedDict[str, List[Evidence]]" = OrderedDict()
     _QUERY_CACHE_MAX = 128
     _QUERY_CACHE_TTL = 300.0
+
+    @classmethod
+    def _breaker_is_open(cls, name: str) -> bool:
+        """True when `name` is in cooldown and should be skipped entirely."""
+        until = cls._breaker_open_until.get(name, 0.0)
+        if until and time.time() < until:
+            return True
+        if until:
+            # Cooldown elapsed — half-open: allow one probe through.
+            cls._breaker_open_until.pop(name, None)
+            cls._breaker_failures[name] = cls._BREAKER_THRESHOLD - 1
+        return False
+
+    @classmethod
+    def _breaker_record(cls, name: str, ok: bool) -> None:
+        if ok:
+            cls._breaker_failures.pop(name, None)
+            cls._breaker_open_until.pop(name, None)
+            return
+        n = cls._breaker_failures.get(name, 0) + 1
+        cls._breaker_failures[name] = n
+        if n >= cls._BREAKER_THRESHOLD:
+            cls._breaker_open_until[name] = time.time() + cls._BREAKER_COOLDOWN
+            logger.info(
+                f"Circuit breaker OPEN for '{name}' after {n} consecutive failures; "
+                f"skipping for {cls._BREAKER_COOLDOWN:.0f}s"
+            )
 
     @classmethod
     def _get_session(cls) -> requests.Session:
@@ -794,16 +851,58 @@ class EvidenceRetriever:
                 link = entry.get("link", "")
                 summary = entry.get("summary", "")
                 summary_clean = re.sub(r"<[^>]+>", "", summary).strip()
+                if not (title and link):
+                    continue
 
-                if title and link:
-                    results.append(
-                        Evidence(
-                            title=f"Google News: {title}",
-                            url=link,
-                            snippet=summary_clean[:500] or title,
-                            source_score=self._score_source(link),
-                        )
+                # entry.link is a news.google.com interstitial: it carries no
+                # readable content, so it is worthless as a citation shown to a
+                # user and it scores as an aggregator rather than as whoever
+                # actually reported the story. A benchmark run had 27 of these
+                # across 12 claims, crowding out real articles.
+                #
+                # Recover the publisher two ways: a direct href in the summary
+                # HTML, and the <source> element Google attaches to every item.
+                real_link = link
+                m = re.search(r'href="(https?://(?!news\.google\.)[^"]+)"', summary or "")
+                if m:
+                    real_link = m.group(1)
+
+                publisher = ""
+                src = entry.get("source")
+                if isinstance(src, dict):
+                    publisher = src.get("title") or src.get("href") or ""
+                elif src:
+                    publisher = str(src)
+                # Google formats titles as "Headline - Publisher".
+                if not publisher and " - " in title:
+                    publisher = title.rsplit(" - ", 1)[1].strip()
+
+                # Score against the publisher's own domain when we recovered a
+                # real link. Otherwise try the publisher name, but only accept
+                # it if it actually matched a known outlet — _score_source
+                # returns the 0.50 unknown-domain default for anything it does
+                # not recognise, and a plain name like "Space.com" resolving to
+                # 0.50 would rank the aggregator link *above* its own 0.20
+                # penalty rather than below it.
+                if real_link != link:
+                    score = self._score_source(real_link)
+                else:
+                    aggregator_score = self._score_source(link)
+                    score = aggregator_score
+                    if publisher:
+                        pub_score = self._score_source(publisher)
+                        if pub_score != 0.50:  # recognised, not the default
+                            score = pub_score
+
+                display = title if not publisher else f"{title} ({publisher})"
+                results.append(
+                    Evidence(
+                        title=display[:300],
+                        url=real_link,
+                        snippet=summary_clean[:500] or title,
+                        source_score=score,
                     )
+                )
             return results
         except Exception as e:
             logger.warning(f"Google News RSS search failed: {e}")
@@ -981,53 +1080,84 @@ class EvidenceRetriever:
     # TIER 5: Fallback — DuckDuckGo
     # ──────────────────────────────────────────────────────────
 
+    def _search_one_backend(self, query: str, backend: str) -> List[Evidence]:
+        """
+        Run a single ddgs backend. Raises nothing; returns [] on any failure.
+
+        Serialised on _DDGS_LOCK: concurrent DDGS instances deadlock (see
+        _ddg_combined_search). The lock is acquired with a timeout so a wedged
+        holder degrades this source to empty rather than stalling the request.
+        """
+        if DDGS is None or self._breaker_is_open(f"search:{backend}"):
+            return []
+        if not _DDGS_LOCK.acquire(timeout=self.SEARCH_BACKEND_TIMEOUT + 2):
+            logger.warning("Web search lock busy; skipping backend '%s'", backend)
+            return []
+        results: List[Evidence] = []
+        try:
+            with DDGS(timeout=self.SEARCH_BACKEND_TIMEOUT) as ddgs:
+                for r in ddgs.text(query, max_results=5, backend=backend):
+                    url = r.get("href", r.get("link", ""))
+                    title = r.get("title", "")
+                    snippet = r.get("body", r.get("snippet", ""))
+                    if title and url:
+                        results.append(
+                            Evidence(
+                                title=title,
+                                url=url,
+                                snippet=(snippet or "")[:500],
+                                source_score=self._score_source(url),
+                            )
+                        )
+        except Exception as e:
+            logger.debug(f"search backend '{backend}' failed: {e}")
+            self._breaker_record(f"search:{backend}", ok=False)
+            return []
+        finally:
+            _DDGS_LOCK.release()
+        self._breaker_record(f"search:{backend}", ok=bool(results))
+        return results
+
     def _ddg_combined_search(self, query: str) -> List[Evidence]:
-        """Combined web and news search via ddgs package, falling back to DDG Lite scraper."""
-        results = []
+        """
+        Broad web search.
 
+        Previously this called ddgs.text() with the default backend rotation and
+        then ddgs.news() sequentially in the same thread — so one task walked
+        google → yandex → duckduckgo → bing → yahoo one engine at a time, and
+        the news call (which failed on every observed run) ran only after all of
+        that finished. It was the single longest pole in the request.
+
+        Now the fast backends run concurrently and the first useful answer wins.
+        """
         import os
-        is_render = os.getenv("RENDER") == "true" or os.getenv("LOW_MEMORY") == "true"
+        if os.getenv("RENDER") == "true" or os.getenv("LOW_MEMORY") == "true":
+            return []
+        if DDGS is None:
+            return self._ddg_lite_search(query)
 
-        if DDGS is not None and not is_render:
-            try:
-                with DDGS(timeout=3) as ddgs:
-                    try:
-                        for r in ddgs.text(query, max_results=5):
-                            url = r.get("href", r.get("link", ""))
-                            title = r.get("title", "")
-                            snippet = r.get("body", r.get("snippet", ""))
-                            if title and url:
-                                results.append(
-                                    Evidence(
-                                        title=title,
-                                        url=url,
-                                        snippet=(snippet or "")[:500],
-                                        source_score=self._score_source(url),
-                                    )
-                                )
-                    except Exception as e:
-                        logger.warning(f"ddgs text search failed: {e}")
+        results: List[Evidence] = []
 
-                    try:
-                        for r in ddgs.news(query, max_results=3):
-                            url = r.get("url", "")
-                            title = r.get("title", "")
-                            snippet = r.get("body", "")
-                            if title and url:
-                                results.append(
-                                    Evidence(
-                                        title=title,
-                                        url=url,
-                                        snippet=(snippet or "")[:500],
-                                        source_score=self._score_source(url),
-                                    )
-                                )
-                    except Exception as e:
-                        logger.warning(f"ddgs news search failed: {e}")
-            except Exception as e:
-                logger.warning(f"DDGS initialization failed: {e}")
+        # Best-first, sequential, stop at the first engine that answers.
+        #
+        # Running the engines concurrently would be the obvious win, but it
+        # deadlocks: ddgs is backed by primp (a Rust HTTP client) and two DDGS
+        # instances driven from different threads hang indefinitely. Verified
+        # directly — one backend alone returns in ~1.2s, the same two calls in a
+        # ThreadPoolExecutor never return. Hence the module-level lock below,
+        # which also protects against two pipeline stages searching at once.
+        #
+        # Ordering is by measured reliability then latency, so the common path
+        # is a single ~1s call rather than the default rotation's ~3.5s walk
+        # through engines that return nothing from this host.
+        for backend in (*self.SEARCH_BACKENDS_FAST, *self.SEARCH_BACKENDS_FALLBACK):
+            if self._breaker_is_open(f"search:{backend}"):
+                continue
+            results = self._search_one_backend(query, backend)
+            if results:
+                break
 
-        if not results and not is_render:
+        if not results:
             results.extend(self._ddg_lite_search(query))
 
         return results

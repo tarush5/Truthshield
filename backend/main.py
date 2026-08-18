@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from backend.config import get_settings
 from backend.api.routes import router as api_router
@@ -139,6 +140,13 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# ── Response compression ──────────────────────────────────────
+# Analysis reports are large JSON documents (evidence snippets, per-claim
+# verdicts, counter-narratives) and were being sent uncompressed. GZip is added
+# before CORS so it wraps the outermost response. minimum_size skips payloads
+# too small for compression to pay for itself.
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 
 # ── CORS Middleware ───────────────────────────────────────────
 app.add_middleware(

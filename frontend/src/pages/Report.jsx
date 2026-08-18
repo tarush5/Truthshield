@@ -183,6 +183,47 @@ export default function Report() {
                 <span className={`badge ${getVerdictStyle(report.credibility?.verdict)} mt-4`}>
                   {t(`verdicts.${report.credibility?.verdict}`) || report.credibility?.verdict || t('verdicts.UNVERIFIED')}
                 </span>
+
+                {/* Misinformation likelihood, stated outright rather than left
+                    for the reader to infer from the trust score. */}
+                {typeof report.credibility?.fake_probability === 'number' && (
+                  <div className="mt-4 w-full text-center">
+                    <div className="section-label mb-1">Chance of being fake</div>
+                    <div
+                      className={`text-2xl font-bold tabular-nums ${
+                        report.credibility.fake_probability >= 56
+                          ? 'text-rose-400'
+                          : report.credibility.fake_probability > 44
+                            ? 'text-amber-400'
+                            : 'text-emerald-400'
+                      }`}
+                    >
+                      {report.credibility.fake_probability}%
+                    </div>
+                    <div className="text-[11px] uppercase tracking-wide text-white/50 mt-0.5">
+                      {report.credibility.fake_likelihood_label}
+                    </div>
+                    <div
+                      className="mt-2 h-1.5 w-full rounded-full bg-white/10 overflow-hidden"
+                      role="progressbar"
+                      aria-valuenow={report.credibility.fake_probability}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label="Chance of being fake"
+                    >
+                      <div
+                        className={`h-full rounded-full ${
+                          report.credibility.fake_probability >= 56
+                            ? 'bg-rose-400'
+                            : report.credibility.fake_probability > 44
+                              ? 'bg-amber-400'
+                              : 'bg-emerald-400'
+                        }`}
+                        style={{ width: `${report.credibility.fake_probability}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Explanations */}

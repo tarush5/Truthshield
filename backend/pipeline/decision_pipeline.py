@@ -46,6 +46,26 @@ from backend.models.schemas import (
 logger = logging.getLogger(__name__)
 
 
+# Optional social-ingestion stack. Resolved once per process: a failed import
+# is not cached by Python, so retrying it per request cost real work and spammed
+# the log. _UNSET distinguishes "not looked up yet" from "looked up, absent".
+_UNSET = object()
+_social_enricher_cache: Any = _UNSET
+
+
+def _social_enricher_cls():
+    """Return the SocialSignalEnricher class, or None if its deps are missing."""
+    global _social_enricher_cache
+    if _social_enricher_cache is _UNSET:
+        try:
+            from backend.social_ingestion.social_signal_enricher import SocialSignalEnricher
+            _social_enricher_cache = SocialSignalEnricher
+        except Exception as e:
+            logger.info(f"Social enrichment unavailable, disabling for this process: {e}")
+            _social_enricher_cache = None
+    return _social_enricher_cache
+
+
 # ═══════════════════════════════════════════════════════════
 # Pipeline Stage Enum
 # ═══════════════════════════════════════════════════════════
@@ -532,16 +552,24 @@ class DecisionPipeline:
 
                 import asyncio
 
-                # Social signal enrichment
-                try:
-                    from backend.social_ingestion.social_signal_enricher import SocialSignalEnricher
-                    enricher = SocialSignalEnricher()
-                    fetch_url = ctx.input_url
-                    if fetch_url:
-                        ctx.social_signals = enricher.get_signals_for_url(fetch_url)
+                # Social signal enrichment.
+                # The import is resolved once per process and the outcome cached:
+                # when the optional deps are absent (praw et al) this raised
+                # ImportError on every single request, re-running the import
+                # machinery and logging the same warning each time. It is also
+                # skipped outright when there is no URL to enrich.
+                fetch_url = ctx.input_url
+                if fetch_url and _social_enricher_cls() is not None:
+                    try:
+                        enricher = _social_enricher_cls()()
+                        # get_signals_for_url does blocking network I/O, so it
+                        # must not run directly on the event loop.
+                        ctx.social_signals = await asyncio.to_thread(
+                            enricher.get_signals_for_url, fetch_url
+                        )
                         ctx.is_crisis = enricher.assess_crisis_potential(ctx.social_signals)
-                except Exception as e:
-                    logger.warning(f"Social enrichment skipped: {e}")
+                    except Exception as e:
+                        logger.warning(f"Social enrichment failed: {e}")
 
                 # Retrieve and rank evidence per claim CONCURRENTLY
                 evidence_map = {}

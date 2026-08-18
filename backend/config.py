@@ -237,6 +237,53 @@ SOURCE_CREDIBILITY = {
     "coursehero.com": 0.25,
     "studyx.ai": 0.25,
     "numerade.com": 0.25,
+    "youtube.com": 0.15,
+    "x.com": 0.15,
+    "twitter.com": 0.15,
+    "vk.com": 0.10,
+    "scribd.com": 0.20,
+    "slideshare.net": 0.20,
+    "homeworkify.net": 0.20,
+    "gauthmath.com": 0.25,
+    "vaia.com": 0.25,
+    "toppr.com": 0.25,
+    "doubtnut.com": 0.25,
+
+    # ── Tier 9: Tabloids & low-editorial-standard outlets (0.25-0.40) ──
+    # These carry a masthead and so were falling through to the unknown-domain
+    # default, which ranked them alongside real reporting. A benchmark run
+    # surfaced dailystar.co.uk as the top-ranked source for a moon-landing
+    # hoax claim, above the Guardian and the Institute of Physics.
+    "dailystar.co.uk": 0.25,
+    "thesun.co.uk": 0.30,
+    "dailymail.co.uk": 0.30,
+    "mirror.co.uk": 0.35,
+    "express.co.uk": 0.30,
+    "nypost.com": 0.40,
+    "tmz.com": 0.25,
+    "radaronline.com": 0.25,
+    "unilad.com": 0.25,
+    "ladbible.com": 0.25,
+    "cracked.com": 0.25,
+    "theonion.com": 0.10,      # satire, routinely mistaken for reporting
+    "babylonbee.com": 0.10,    # satire
+
+    # ── Tier 10: Aggregators & redirect shells (0.45-0.50, deliberately neutral) ──
+    # news.google.com links are interstitial redirects rather than articles, so
+    # they are poor citations and sit just below the 0.50 unknown default to let
+    # real reporting outrank them.
+    #
+    # They are NOT scored lower than that. An aggregator link says nothing about
+    # whether a claim is true, but it made up ~28 of the evidence items per
+    # benchmark run, so scoring it at 0.20 dragged the source-credibility
+    # component down for every claim. That flipped "Water boils at 100 degrees
+    # Celsius" from LIKELY TRUE (trust 78) to MIXED EVIDENCE (trust 45).
+    # Neutral is the honest weight: demote for ranking, do not treat as a
+    # signal of falsehood.
+    "news.google.com": 0.45,
+    "news.yahoo.com": 0.45,
+    "msn.com": 0.45,
+    "flipboard.com": 0.45,
 }
 
 KNOWN_DISINFO_DOMAINS = [

@@ -447,8 +447,25 @@ html.light .btn-secondary-lg:hover {
 }
 
 /* ── Cybernetic Electrifying Custom Styles ── */
+/* The glow pulse used to animate box-shadow and border-color directly, which
+   repaints the element every frame. The lit state now lives on a pseudo-element
+   and only its opacity animates, which the compositor can run off the main
+   thread. Uses ::after because .laser-sweep already owns ::before and the two
+   classes are applied together on the Analyze drop zone. */
 .electric-glow {
+  position: relative;
+}
+
+.electric-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 25px 4px rgba(34, 211, 238, 0.6),
+              inset 0 0 12px 2px rgba(34, 211, 238, 0.4);
   animation: electricPulse 2.5s ease-in-out infinite alternate;
+  will-change: opacity;
 }
 
 .electric-border {
@@ -465,7 +482,7 @@ html.light .btn-secondary-lg:hover {
 .laser-sweep::before {
   content: '';
   position: absolute;
-  top: -100%;
+  top: 0;
   left: 0;
   width: 100%;
   height: 50%;
@@ -478,6 +495,7 @@ html.light .btn-secondary-lg:hover {
   animation: laserSweep 5s linear infinite;
   pointer-events: none;
   z-index: 10;
+  will-change: transform;
 }
 
 /* Sparking text effect */
@@ -487,20 +505,38 @@ html.light .btn-secondary-lg:hover {
 }
 
 @keyframes electricPulse {
-  0% {
-    box-shadow: 0 0 8px 1px rgba(34, 211, 238, 0.25), 
-                inset 0 0 4px 1px rgba(34, 211, 238, 0.1);
-    border-color: rgba(34, 211, 238, 0.2);
-  }
-  100% {
-    box-shadow: 0 0 25px 4px rgba(34, 211, 238, 0.6), 
-                inset 0 0 12px 2px rgba(34, 211, 238, 0.4);
-    border-color: rgba(34, 211, 238, 0.75);
-  }
+  0%   { opacity: 0.32; }
+  100% { opacity: 1; }
 }
 
+/* Was animating `top`, which triggers layout on every frame — and on Landing
+   this sits over a backdrop-blur card, so each frame also re-ran the backdrop
+   filter. translateY is compositor-only. The element is 50% of its parent's
+   height, so the old -100%..200% of the parent equals -200%..400% of itself. */
 @keyframes laserSweep {
-  0% { top: -100%; }
-  100% { top: 200%; }
+  0%   { transform: translateY(-200%); }
+  100% { transform: translateY(400%); }
+}
+
+/* ── Reduced motion ──
+   Honour the OS setting: hold every looping decorative animation at rest.
+   The canvas backgrounds check the same query in JS. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .laser-sweep::before {
+    display: none;
+  }
+
+  .electric-glow::after {
+    opacity: 0.5;
+  }
 }
 

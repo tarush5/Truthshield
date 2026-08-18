@@ -1,46 +1,177 @@
 import React, { useEffect, useRef } from 'react';
 
+/**
+ * Cursor trail + click bursts.
+ *
+ * Perf notes — the previous version had three costs that dominated the frame:
+ *   1. A point was pushed per mousemove event but aged once per frame. A
+ *      1000 Hz mouse against a 60 Hz loop meant ~16 new points per frame with a
+ *      38-frame lifetime, so the live set sat in the hundreds.
+ *   2. Every particle set ctx.shadowBlur, which forces a per-draw blur pass.
+ *   3. The canvas carried mixBlendMode:'screen' at z-9999, which promotes the
+ *      whole viewport to a blended compositing layer re-blended each frame.
+ *
+ * This version emits by distance travelled, ages by elapsed time, caps the pool,
+ * and replaces shadowBlur with a glow sprite rendered once per colour.
+ */
+
+const MAX_POINTS = 80;
+const MAX_BURSTS = 140;
+const POINT_LIFETIME_MS = 620;
+const EMIT_MIN_DIST = 4;
+const TRAIL_COLORS = ['#7dd3fc', '#22d3ee'];
+const BURST_COLORS = ['#22d3ee', '#a78bfa', '#38bdf8'];
+
+/** Pre-render a soft radial glow once per colour so draws become drawImage. */
+function makeGlowSprite(color, radius) {
+  const size = radius * 2;
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(radius, radius, 0, radius, radius, radius);
+  grad.addColorStop(0, color);
+  grad.addColorStop(0.35, color);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.globalAlpha = 1;
+  g.fillStyle = grad;
+  g.beginPath();
+  g.arc(radius, radius, radius, 0, Math.PI * 2);
+  g.fill();
+  return c;
+}
+
+/** Pre-render a 4-point star once per colour. */
+function makeStarSprite(color, radius) {
+  const size = radius * 2;
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const g = c.getContext('2d');
+  const outer = radius * 0.92;
+  const inner = radius * 0.18;
+
+  const grad = g.createRadialGradient(radius, radius, 0, radius, radius, outer);
+  grad.addColorStop(0, color);
+  grad.addColorStop(0.5, color);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad;
+
+  let rot = (Math.PI / 2) * 3;
+  const step = Math.PI / 4;
+  g.beginPath();
+  g.moveTo(radius, radius - outer);
+  for (let i = 0; i < 4; i++) {
+    g.lineTo(radius + Math.cos(rot) * outer, radius + Math.sin(rot) * outer);
+    rot += step;
+    g.lineTo(radius + Math.cos(rot) * inner, radius + Math.sin(rot) * inner);
+    rot += step;
+  }
+  g.closePath();
+  g.fill();
+  return c;
+}
+
 export default function CursorTrail() {
   const canvasRef = useRef(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let animId;
-    let points = [];
-    let bursts = [];
+
+    // Respect the OS "reduce motion" setting — skip the effect entirely.
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (motionQuery.matches) return;
+
+    // Coarse pointers (touch) never produce a hover trail; skip the whole loop.
+    if (window.matchMedia('(pointer: coarse)').matches) return;
+
+    const ctx = canvas.getContext('2d', { alpha: true });
+    let animId = null;
+    let running = true;
+
+    const SPRITE_R = 32;
+    const glow = {};
+    const stars = {};
+    for (const c of new Set([...TRAIL_COLORS, ...BURST_COLORS])) {
+      glow[c] = makeGlowSprite(c, SPRITE_R);
+      stars[c] = makeStarSprite(c, SPRITE_R);
+    }
+
+    // Fixed-size pools. Nothing is allocated per frame, so the GC stays quiet.
+    const points = [];
+    const bursts = [];
+
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    let dpr = Math.min(window.devicePixelRatio || 1, 2); // clamp: 3x costs 9x fill
 
     const resize = () => {
-      canvas.width = window.innerWidth * window.devicePixelRatio;
-      canvas.height = window.innerHeight * window.devicePixelRatio;
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      // Setting .width resets the transform, so this scale is not cumulative.
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     resize();
-    window.addEventListener('resize', resize);
 
+    let lastX = null;
+    let lastY = null;
+    let pendingX = null;
+    let pendingY = null;
+
+    // Only record the latest position here; emission happens in the frame loop
+    // so a high-polling mouse cannot outrun the renderer.
     const handleMouseMove = (e) => {
-      // Create trail points with star sparkle and electric spark types
+      pendingX = e.clientX;
+      pendingY = e.clientY;
+    };
+
+    const emitTrail = (now) => {
+      if (pendingX === null) return;
+      const x = pendingX;
+      const y = pendingY;
+      if (lastX !== null) {
+        const dx = x - lastX;
+        const dy = y - lastY;
+        if (dx * dx + dy * dy < EMIT_MIN_DIST * EMIT_MIN_DIST) return;
+      }
+      lastX = x;
+      lastY = y;
+
+      if (points.length >= MAX_POINTS) points.shift();
       points.push({
-        x: e.clientX,
-        y: e.clientY,
-        age: 0,
-        maxAge: 38,
+        x,
+        y,
+        born: now,
         size: Math.random() * 3.8 + 2.2,
-        color: Math.random() > 0.4 ? '#7dd3fc' : '#22d3ee', // Ice blue or Cyan
+        color: Math.random() > 0.4 ? TRAIL_COLORS[0] : TRAIL_COLORS[1],
         angle: Math.random() * Math.PI,
         spin: (Math.random() - 0.5) * 0.05,
-        type: Math.random() > 0.78 ? 'star' : 'sparkle'
+        star: Math.random() > 0.78,
       });
     };
 
     const handleMouseDown = (e) => {
-      // Create a particle burst on click containing sparkles and electric sparks
-      for (let i = 0; i < 35; i++) {
+      const room = MAX_BURSTS - bursts.length;
+      const count = Math.min(28, room);
+      for (let i = 0; i < count; i++) {
         const angle = Math.random() * Math.PI * 2;
         const speed = Math.random() * 6.5 + 2.5;
-        const isElectric = Math.random() > 0.45;
-        
+        const electric = Math.random() > 0.45;
+        // Jag offsets are frozen at spawn. Re-rolling them every frame is what
+        // made the arcs strobe rather than travel.
+        const jag = electric
+          ? [
+              (Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16,
+              (Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16,
+              (Math.random() - 0.5) * 16, (Math.random() - 0.5) * 16,
+            ]
+          : null;
         bursts.push({
           x: e.clientX,
           y: e.clientY,
@@ -49,163 +180,161 @@ export default function CursorTrail() {
           size: Math.random() * 4.5 + 1.2,
           opacity: 1,
           decay: 0.018 + Math.random() * 0.025,
-          color: Math.random() > 0.5 ? '#22d3ee' : (Math.random() > 0.5 ? '#a78bfa' : '#38bdf8'), // Cyan, Purple, Sky Blue
-          type: isElectric ? 'electric' : 'star',
-          points: [] // path points for electric arcs
+          color: BURST_COLORS[(Math.random() * BURST_COLORS.length) | 0],
+          electric,
+          jag,
         });
       }
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mousedown', handleMouseDown);
-
-    // Twinkling Star drawing helper
-    const drawStar = (cx, cy, spikes, outerRadius, innerRadius, color, alpha, rotationAngle = 0) => {
-      ctx.save();
-      ctx.globalCompositeOperation = 'screen';
-      ctx.shadowBlur = 14;
-      ctx.shadowColor = color;
-      ctx.fillStyle = color;
-      ctx.globalAlpha = alpha;
-
-      let rot = (Math.PI / 2) * 3 + rotationAngle;
-      let x = cx;
-      let y = cy;
-      const step = Math.PI / spikes;
-
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - outerRadius);
-      for (let i = 0; i < spikes; i++) {
-        x = cx + Math.cos(rot) * outerRadius;
-        y = cy + Math.sin(rot) * outerRadius;
-        ctx.lineTo(x, y);
-        rot += step;
-
-        x = cx + Math.cos(rot) * innerRadius;
-        y = cy + Math.sin(rot) * innerRadius;
-        ctx.lineTo(x, y);
-        rot += step;
+    // Drop everything and stop the loop while the tab is hidden.
+    const handleVisibility = () => {
+      if (document.hidden) {
+        running = false;
+        if (animId !== null) cancelAnimationFrame(animId);
+        animId = null;
+      } else if (!running) {
+        running = true;
+        points.length = 0;
+        bursts.length = 0;
+        lastFrame = performance.now();
+        animId = requestAnimationFrame(draw);
       }
-      ctx.lineTo(cx, cy - outerRadius);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
     };
 
-    const draw = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      ctx.clearRect(0, 0, w, h);
+    let lastFrame = performance.now();
 
-      ctx.save();
-      ctx.globalCompositeOperation = 'screen';
+    const draw = (now) => {
+      // Normalise motion to 60 fps so a 144 Hz display does not fast-forward
+      // the burst physics, and clamp so a long stall cannot teleport particles.
+      const dt = Math.min((now - lastFrame) / 16.667, 3);
+      lastFrame = now;
 
-      // 1. Draw cursor trails
-      for (let i = 0; i < points.length; i++) {
+      ctx.clearRect(0, 0, width, height);
+      emitTrail(now);
+
+      ctx.globalCompositeOperation = 'lighter';
+
+      // ── Trail ──
+      for (let i = points.length - 1; i >= 0; i--) {
         const p = points[i];
-        p.age++;
-        p.angle += p.spin;
-        
-        const ratio = 1 - p.age / p.maxAge;
-        const currentSize = p.size * ratio;
-        
-        if (p.type === 'star') {
-          drawStar(p.x, p.y, 4, currentSize * 2.8, currentSize * 0.5, p.color, ratio * 0.78, p.angle);
-        } else {
-          // Standard sparkling glow dot
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, currentSize * 0.8, 0, Math.PI * 2);
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = ratio * 0.7;
-          ctx.shadowBlur = 12;
-          ctx.shadowColor = p.color;
-          ctx.fill();
+        const ratio = 1 - (now - p.born) / POINT_LIFETIME_MS;
+        if (ratio <= 0) {
+          points.splice(i, 1);
+          continue;
         }
+        p.angle += p.spin * dt;
+        const size = p.size * ratio;
 
-        // Ribbon tail linking trail elements
-        if (i > 0) {
-          const prev = points[i - 1];
-          const dist = Math.hypot(p.x - prev.x, p.y - prev.y);
-          if (dist < 45) {
-            ctx.beginPath();
-            ctx.strokeStyle = p.color;
-            ctx.lineWidth = currentSize * 0.5;
-            ctx.globalAlpha = ratio * 0.25;
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = p.color;
-            ctx.moveTo(prev.x, prev.y);
-            ctx.lineTo(p.x, p.y);
-            ctx.stroke();
-          }
+        if (p.star) {
+          const r = size * 2.8;
+          ctx.globalAlpha = ratio * 0.78;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.angle);
+          ctx.drawImage(stars[p.color], -r, -r, r * 2, r * 2);
+          ctx.restore();
+        } else {
+          const r = size * 2.2;
+          ctx.globalAlpha = ratio * 0.7;
+          ctx.drawImage(glow[p.color], p.x - r, p.y - r, r * 2, r * 2);
         }
       }
 
-      // 2. Draw click particle bursts
+      // ── Ribbon linking consecutive trail points ──
+      ctx.globalAlpha = 1;
+      for (let i = 1; i < points.length; i++) {
+        const p = points[i];
+        const prev = points[i - 1];
+        const ratio = 1 - (now - p.born) / POINT_LIFETIME_MS;
+        if (ratio <= 0) continue;
+        const dx = p.x - prev.x;
+        const dy = p.y - prev.y;
+        if (dx * dx + dy * dy > 45 * 45) continue;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.size * ratio * 0.5;
+        ctx.globalAlpha = ratio * 0.25;
+        ctx.beginPath();
+        ctx.moveTo(prev.x, prev.y);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+      }
+
+      // ── Click bursts ──
       for (let i = bursts.length - 1; i >= 0; i--) {
         const b = bursts[i];
-        b.x += b.vx;
-        b.y += b.vy;
-        b.vy += 0.05; // gravity
-        b.opacity -= b.decay;
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        b.vy += 0.05 * dt; // gravity
+        b.opacity -= b.decay * dt;
 
         if (b.opacity <= 0) {
           bursts.splice(i, 1);
           continue;
         }
 
-        if (b.type === 'electric') {
-          // Render jagged electric discharge arc
-          ctx.save();
-          ctx.shadowBlur = 15;
-          ctx.shadowColor = b.color;
-          ctx.strokeStyle = '#e0f2fe';
-          ctx.lineWidth = Math.random() * 1.5 + 0.5;
+        if (b.electric) {
           ctx.globalAlpha = b.opacity;
-
+          ctx.strokeStyle = '#e0f2fe';
+          ctx.lineWidth = 1.2;
           ctx.beginPath();
           ctx.moveTo(b.x, b.y);
-          
-          // Draw a small 3-segment lightning arc
-          let lastX = b.x;
-          let lastY = b.y;
+          let lx = b.x;
+          let ly = b.y;
           for (let s = 0; s < 3; s++) {
-            const nextX = lastX + (Math.random() - 0.5) * 16 + b.vx * 0.5;
-            const nextY = lastY + (Math.random() - 0.5) * 16 + b.vy * 0.5;
-            ctx.lineTo(nextX, nextY);
-            lastX = nextX;
-            lastY = nextY;
+            lx += b.jag[s * 2] + b.vx * 0.5;
+            ly += b.jag[s * 2 + 1] + b.vy * 0.5;
+            ctx.lineTo(lx, ly);
           }
           ctx.stroke();
-          ctx.restore();
         } else {
-          // Render twinkling star burst particle
-          drawStar(b.x, b.y, 4, b.size * 2.2, b.size * 0.45, b.color, b.opacity, b.x * 0.015);
+          const r = b.size * 2.2;
+          ctx.globalAlpha = b.opacity;
+          ctx.drawImage(stars[b.color], b.x - r, b.y - r, r * 2, r * 2);
         }
       }
 
-      ctx.restore();
-
-      // Filter out aged points
-      points = points.filter((p) => p.age < p.maxAge);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
 
       animId = requestAnimationFrame(draw);
     };
 
-    draw();
+    const handleMotionChange = (e) => {
+      if (e.matches) {
+        running = false;
+        if (animId !== null) cancelAnimationFrame(animId);
+        animId = null;
+        ctx.clearRect(0, 0, width, height);
+      }
+    };
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    window.addEventListener('mousedown', handleMouseDown, { passive: true });
+    document.addEventListener('visibilitychange', handleVisibility);
+    motionQuery.addEventListener('change', handleMotionChange);
+
+    animId = requestAnimationFrame(draw);
 
     return () => {
-      cancelAnimationFrame(animId);
+      if (animId !== null) cancelAnimationFrame(animId);
       window.removeEventListener('resize', resize);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      motionQuery.removeEventListener('change', handleMotionChange);
     };
   }, []);
 
+  // No mixBlendMode: a full-viewport blended layer at z-9999 forced the entire
+  // page to be re-composited every frame. 'lighter' inside the canvas gives the
+  // same additive glow for free.
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden"
-      style={{ mixBlendMode: 'screen' }}
+      className="fixed inset-0 pointer-events-none z-[9999]"
+      aria-hidden="true"
     />
   );
 }

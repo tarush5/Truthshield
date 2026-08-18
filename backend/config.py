@@ -264,8 +264,12 @@ CLAUDE_MODEL = "claude-sonnet-5"
 CLAUDE_MAX_TOKENS = 1024
 
 # ── Gemini Model Config ──────────────────────────────────────
-GEMINI_MODEL = "gemini-2.5-flash"
-GEMINI_FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
+# flash-lite stays the primary: 2d69a2f found gemini-2.5-flash 404s on this
+# project's key. The fallbacks below are real models — the previous chain
+# listed gemini-3.5-flash and gemini-3.1-flash-lite, which do not exist, so
+# every call burned the full retry budget before giving up.
+GEMINI_MODEL = "gemini-2.5-flash-lite"
+GEMINI_FALLBACK_MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.5-flash"]
 GEMINI_MAX_TOKENS = 1024
 
 # ── Supported Languages ──────────────────────────────────────

@@ -141,11 +141,14 @@ class ResultAggregator:
                     cv_support = 0.0
                     cv_refute = 0.0
 
-                # Evidence stance signals
+                # Evidence stance signals. The denominator is the evidence that
+                # actually took a side — dividing by every retrieved item let
+                # background results dilute unanimous refutation down to noise,
+                # which pushed clearly-false claims into INSUFFICIENT EVIDENCE.
                 supports_ev = [e for e in cv.evidence if getattr(e, "stance", "NEUTRAL") == "SUPPORTS"]
                 refutes_ev = [e for e in cv.evidence if getattr(e, "stance", "NEUTRAL") == "REFUTES"]
-                total_ev = len(cv.evidence)
-                
+                total_ev = len(supports_ev) + len(refutes_ev)
+
                 ev_support = len(supports_ev) / total_ev if total_ev > 0 else 0.0
                 ev_refute = len(refutes_ev) / total_ev if total_ev > 0 else 0.0
                 
@@ -656,5 +659,12 @@ class ResultAggregator:
             return "PARTIALLY TRUE"
         elif support_score >= 0.20 and refute_score >= 0.20:
             return "MIXED EVIDENCE"
+        # One-sided but moderate evidence still points somewhere. Without these
+        # tiers a claim with clear, unopposed refutation fell through to
+        # INSUFFICIENT EVIDENCE purely because it missed the 0.55 cutoff.
+        elif refute_score >= 0.30 and refute_score > support_score * 1.5:
+            return "LIKELY FALSE"
+        elif support_score >= 0.30 and support_score > refute_score * 1.5:
+            return "PARTIALLY TRUE"
         else:
             return "INSUFFICIENT EVIDENCE"

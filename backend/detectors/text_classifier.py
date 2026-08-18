@@ -50,9 +50,17 @@ class TextClassifier:
             return
 
         import os
-        # If running on Render or low-memory environment, do not load Hugging Face models (prevents OOM crashes)
-        if os.getenv("LOW_MEMORY") == "true" or os.getenv("RENDER") == "true":
-            logger.info("Low memory or Render environment detected. Skipping Hugging Face model loading for TextClassifier.")
+        from backend.config import get_settings
+
+        # Skipped by default: loading the zero-shot pipeline dominates cold
+        # start, and its output is only a secondary signal behind the
+        # evidence-based verdict.
+        if (
+            not get_settings().ENABLE_HEAVY_MODELS
+            or os.getenv("LOW_MEMORY") == "true"
+            or os.getenv("RENDER") == "true"
+        ):
+            logger.info("Local transformer models disabled. TextClassifier using heuristic scoring.")
             TextClassifier._shared_pipeline_loaded = True
             self._pipeline = None
             return

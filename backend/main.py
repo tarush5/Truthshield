@@ -91,9 +91,28 @@ async def lifespan(app: FastAPI):
     if getattr(settings, "MODEL_CACHE_DIR", None):
         os.makedirs(settings.MODEL_CACHE_DIR, exist_ok=True)
 
+    import asyncio
+
+    # Warm the lazy singletons off the request path. spaCy costs several
+    # seconds to import and load; without this the first user to hit /analyze
+    # pays for it.
+    async def _warmup():
+        def _load():
+            try:
+                from backend.factcheck.claim_extractor import ClaimExtractor
+                ClaimExtractor().extract("Warmup sentence for model loading.", "en")
+                from backend.factcheck.evidence_retriever import EvidenceRetriever
+                EvidenceRetriever._get_session()
+                logger.info("Warmup complete: NLP pipeline and HTTP session ready.")
+            except Exception as e:
+                logger.warning(f"Warmup failed (non-fatal): {e}")
+
+        await asyncio.to_thread(_load)
+
+    asyncio.create_task(_warmup())
+
     # Start real-time monitoring simulation task in background (disabled by default in dev)
     if os.getenv("RUN_SIMULATION") == "true":
-        import asyncio
         asyncio.create_task(start_realtime_ingestion_simulation())
 
     logger.info("=" * 60)

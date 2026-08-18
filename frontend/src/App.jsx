@@ -1,18 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Shield, BarChart3, Search, Menu, X, Sun, Moon } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Analyze from './pages/Analyze';
-import Report from './pages/Report';
-import Dashboard from './pages/Dashboard';
-import Login from './pages/Login';
 import Landing from './pages/Landing';
-import AuthCallback from './pages/AuthCallback';
 import ArcticIntelligenceBackground from './components/ArcticIntelligenceBackground';
 import CursorTrail from './components/CursorTrail';
+
+// Landing stays eager since it is the entry route. Everything behind auth is
+// split out so first paint no longer ships the charting and dashboard code.
+const Analyze = lazy(() => import('./pages/Analyze'));
+const Report = lazy(() => import('./pages/Report'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Login = lazy(() => import('./pages/Login'));
+const AuthCallback = lazy(() => import('./pages/AuthCallback'));
+
+function RouteFallback() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
 /* ─────────── NavBar ─────────── */
 function NavBar() {
   const { t, i18n } = useTranslation();
@@ -262,15 +273,17 @@ function AppContent() {
       {!isDashboard && <div className="bg-radial-glow fixed inset-0 pointer-events-none z-0" />}
       {!isDashboard && <NavBar />}
       <main className={`relative z-10 ${isDashboard ? '' : 'pt-20 pb-12'}`}>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/analyze" element={<ProtectedRoute><Analyze /></ProtectedRoute>} />
-          <Route path="/report/:id" element={<ProtectedRoute><Report /></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/analyze" element={<ProtectedRoute><Analyze /></ProtectedRoute>} />
+            <Route path="/report/:id" element={<ProtectedRoute><Report /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </main>
     </div>
   );

@@ -38,6 +38,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 settings = get_settings()
 
+# Verdict vocabulary emitted by ResultAggregator, grouped for reporting.
+FALSE_VERDICTS = ("FALSE", "LIKELY FALSE", "MISLEADING")
+TRUE_VERDICTS = ("TRUE", "VERIFIED", "LIKELY TRUE", "PARTIALLY TRUE")
+
 # ── In-memory store (replace with PostgreSQL in production) ───
 reports_store: dict = {}
 feedback_store: list = []
@@ -817,47 +821,43 @@ async def get_user_dashboard(
         return AnalyticsService.get_workspace_stats(db, uuid.UUID(org_id))
 
     from backend.models.db import Report as ReportDB
-    
+    from sqlalchemy import case, func
+
     user_uuid = uuid.UUID(current_user.id)
 
-    # Query Supabase/PostgreSQL for user scans
-    total_scans = db.query(ReportDB).filter(ReportDB.user_id == user_uuid).count()
-    fake_news = db.query(ReportDB).filter(
-        ReportDB.user_id == user_uuid,
-        ReportDB.verdict == "FALSE"
-    ).count()
+    # All four headline tiles in one pass over the user's reports.
+    # The aggregator emits graded verdicts ("LIKELY FALSE", "MISLEADING"), so
+    # matching only the exact string "FALSE" under-counted nearly every threat.
+    is_false = ReportDB.verdict.in_(FALSE_VERDICTS)
+    totals = db.query(
+        func.count(ReportDB.id),
+        func.sum(case((is_false, 1), else_=0)),
+        func.sum(case(((is_false) & (ReportDB.content_type == "image"), 1), else_=0)),
+        func.sum(case(((is_false) & (ReportDB.content_type == "audio"), 1), else_=0)),
+    ).filter(ReportDB.user_id == user_uuid).one()
+    total_scans = totals[0] or 0
+    fake_news = totals[1] or 0
+    deepfakes = totals[2] or 0
+    voice_clones = totals[3] or 0
 
-    deepfakes = db.query(ReportDB).filter(
-        ReportDB.user_id == user_uuid,
-        ReportDB.content_type == "image",
-        ReportDB.verdict == "FALSE"
-    ).count()
-
-    voice_clones = db.query(ReportDB).filter(
-        ReportDB.user_id == user_uuid,
-        ReportDB.content_type == "audio",
-        ReportDB.verdict == "FALSE"
-    ).count()
-
-    # Query weekly scan trend (last 7 days)
+    # Weekly scan trend — one grouped query rather than a COUNT per day.
     from datetime import datetime, timedelta, timezone
     today = datetime.now(timezone.utc).date()
+    week_start = datetime.combine(today - timedelta(days=6), datetime.min.time())
+
+    per_day = dict(
+        db.query(func.date(ReportDB.created_at), func.count(ReportDB.id))
+        .filter(ReportDB.user_id == user_uuid, ReportDB.created_at >= week_start)
+        .group_by(func.date(ReportDB.created_at))
+        .all()
+    )
+
     weekly_trend = []
     for i in range(6, -1, -1):
         d = today - timedelta(days=i)
-        start_dt = datetime.combine(d, datetime.min.time())
-        end_dt = datetime.combine(d, datetime.max.time())
-        
-        count = db.query(ReportDB).filter(
-            ReportDB.user_id == user_uuid,
-            ReportDB.created_at >= start_dt,
-            ReportDB.created_at <= end_dt
-        ).count()
-        
-        weekly_trend.append({
-            "day": d.strftime("%a"),
-            "scans": count
-        })
+        # SQLite returns date() as a string; PostgreSQL returns a date object.
+        count = per_day.get(d) or per_day.get(d.isoformat()) or 0
+        weekly_trend.append({"day": d.strftime("%a"), "scans": count})
 
     # Fetch recent scans
     recent_reports = db.query(ReportDB).filter(
@@ -1095,21 +1095,31 @@ async def get_stats(db: Session = Depends(get_db)):
     """Get aggregated dashboard statistics."""
     from backend.models.db import Report as ReportDB
     
+    from sqlalchemy import func
+
     try:
-        total_analyses = db.query(ReportDB).count()
-
+        # Single grouped query instead of one COUNT per verdict, with the
+        # aggregator's graded verdicts folded into the four reported buckets.
         verdicts = {"TRUE": 0, "FALSE": 0, "MISLEADING": 0, "UNVERIFIED": 0}
-        for v in verdicts.keys():
-            verdicts[v] = db.query(ReportDB).filter(ReportDB.verdict == v).count()
+        total_analyses = 0
+        for verdict, count in db.query(ReportDB.verdict, func.count(ReportDB.id)).group_by(ReportDB.verdict):
+            total_analyses += count
+            if verdict == "MISLEADING":
+                verdicts["MISLEADING"] += count
+            elif verdict in FALSE_VERDICTS:
+                verdicts["FALSE"] += count
+            elif verdict in TRUE_VERDICTS:
+                verdicts["TRUE"] += count
+            else:
+                verdicts["UNVERIFIED"] += count
 
-        avg_trust = 50.0
-        reports = db.query(ReportDB).all()
-        if reports:
-            avg_trust = sum(r.confidence for r in reports) / len(reports) * 100.0
+        # Average in SQL — loading every report to average one column made this
+        # endpoint scale linearly with table size.
+        avg_confidence = db.query(func.avg(ReportDB.confidence)).scalar()
+        avg_trust = float(avg_confidence) * 100.0 if avg_confidence is not None else 50.0
 
         # Compute actual language distribution from DB
         lang_dist = {}
-        from sqlalchemy import func
         lang_counts = db.query(ReportDB.language, func.count(ReportDB.id)).group_by(ReportDB.language).all()
         for lang_code, count in lang_counts:
             if lang_code:

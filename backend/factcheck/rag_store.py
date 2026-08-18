@@ -40,9 +40,17 @@ class RAGStore:
             return
 
         import os
-        # If running on Render or low-memory environment, do not load heavy PyTorch models (prevents OOM crashes)
-        if os.getenv("LOW_MEMORY") == "true" or os.getenv("RENDER") == "true":
-            logger.info("Low memory or Render environment detected. Skipping RAG Store dense sentence embedding model loading.")
+        from backend.config import get_settings
+
+        # Skipped by default: the dense encoder downloads a model and embeds
+        # each document with its own forward pass. TF-IDF ranks this small a
+        # candidate set just as well at a fraction of the cost.
+        if (
+            not get_settings().ENABLE_HEAVY_MODELS
+            or os.getenv("LOW_MEMORY") == "true"
+            or os.getenv("RENDER") == "true"
+        ):
+            logger.info("Local transformer models disabled. RAG Store using TF-IDF ranking.")
             RAGStore._model_loaded = True
             RAGStore._cached_tokenizer = None
             RAGStore._cached_model = None

@@ -39,7 +39,15 @@ class Settings(BaseSettings):
 
     GOOGLE_FACTCHECK_API_KEY: str = Field(default="", description="Google Fact Check Tools API Key")
     BRAVE_API_KEY: str = Field(default="", description="Brave Search API Key (free 2000/month)")
-    EVIDENCE_TIMEOUT: int = Field(default=12, description="Evidence retriever timeout in seconds")
+    EVIDENCE_TIMEOUT: int = Field(default=8, description="Evidence retriever timeout in seconds")
+
+    # Local transformer models (DistilBERT zero-shot + MiniLM embeddings) cost
+    # ~30s of cold start and hundreds of MB of RAM while contributing little:
+    # verdicts come from retrieved evidence, and the heuristic/TF-IDF paths
+    # cover their role. Opt in only if you have the headroom.
+    ENABLE_HEAVY_MODELS: bool = Field(
+        default=False, description="Load local HuggingFace models (slow cold start)"
+    )
 
     # ── Database ──────────────────────────────────────────────
     DATABASE_URL: str = Field(
@@ -205,6 +213,30 @@ SOURCE_CREDIBILITY = {
     "icc-cricket.com": 0.90,
     "fifa.com": 0.90,
     "olympics.com": 0.90,
+
+    # ── Tier 8: User-generated, social & homework sites (0.05-0.30) ──
+    # Scored below the 0.50 unknown-domain default so they cannot be mistaken
+    # for corroboration. Anonymous forums and joke listicles were previously
+    # counted as supporting evidence for fabricated claims.
+    "4chan.org": 0.05,
+    "4channel.org": 0.05,
+    "tiktok.com": 0.10,
+    "pinterest.com": 0.10,
+    "facebook.com": 0.15,
+    "instagram.com": 0.15,
+    "reddit.com": 0.20,
+    "quora.com": 0.20,
+    "answers.com": 0.20,
+    "buzzfeed.com": 0.20,
+    "neatorama.com": 0.20,
+    "blogspot.com": 0.20,
+    "wordpress.com": 0.20,
+    "medium.com": 0.30,
+    "brainly.com": 0.25,
+    "chegg.com": 0.25,
+    "coursehero.com": 0.25,
+    "studyx.ai": 0.25,
+    "numerade.com": 0.25,
 }
 
 KNOWN_DISINFO_DOMAINS = [
@@ -228,12 +260,12 @@ CREDIBILITY_WEIGHTS = {
 }
 
 # ── Claude Model Config ───────────────────────────────────────
-CLAUDE_MODEL = "claude-sonnet-4-6"
+CLAUDE_MODEL = "claude-sonnet-5"
 CLAUDE_MAX_TOKENS = 1024
 
 # ── Gemini Model Config ──────────────────────────────────────
-GEMINI_MODEL = "gemini-2.5-flash-lite"
-GEMINI_FALLBACK_MODELS = ["gemini-2.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"]
+GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
 GEMINI_MAX_TOKENS = 1024
 
 # ── Supported Languages ──────────────────────────────────────

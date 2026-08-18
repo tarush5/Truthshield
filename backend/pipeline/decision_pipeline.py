@@ -19,6 +19,7 @@ import asyncio
 import hashlib
 import logging
 import time
+import uuid
 from collections import OrderedDict
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, List, Optional
@@ -228,6 +229,12 @@ class DecisionPipeline:
         cache_key = self._cache_key(text=text, url=url)
         cached_report = self._cache_get(cache_key)
         if cached_report:
+            # Each submission is its own report, even when the analysis is
+            # reused. Returning the cached object verbatim reused its primary
+            # key, so persisting the second request failed with a unique
+            # constraint violation and the caller got a 500.
+            cached_report = cached_report.model_copy(deep=True)
+            cached_report.id = uuid.uuid4().hex
             if progress_callback:
                 try:
                     await progress_callback("done", 1.0, "Analysis complete (cached)!", {

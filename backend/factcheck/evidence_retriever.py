@@ -16,22 +16,28 @@ Retrieves evidence from up to 12 sources concurrently with robust fallback chain
     6. NewsData.io — 200 free queries/day, 80k+ sources
     7. GNews API — 100 free queries/day
     8. Google News RSS — unlimited, no key needed
-    9. GDELT API — free, global real-time news monitoring
 
-  Tier 4 — Knowledge Bases:
+  Tier 4 — General web search (no key required):
+    9. DuckDuckGo via the ddgs package — primary broad-coverage source
+
+  Tier 5 — Knowledge Bases:
     10. Wikipedia API (intro extracts)
     11. Google Knowledge Graph API — entity verification
     12. Wikidata Knowledge Graph
 
-  Tier 5 — Fallback:
-    13. DuckDuckGo (ddgs package, only if Tier 2 returns nothing)
-    14. Deep Page Scraping (top 2 URLs)
+  Tier 6 — Refinement:
+    13. Deep Page Scraping (top 2 URLs, only with budget left)
+
+Sources are collected against a deadline with early exit, so a slow upstream
+cannot set the latency floor for every request.
 """
 
 import logging
 import math
 import re
 import socket
+import time
+from collections import OrderedDict
 from typing import List, Optional, Dict
 from urllib.parse import quote_plus, urlparse
 
@@ -70,8 +76,28 @@ class EvidenceRetriever:
 
     MAX_EVIDENCE_PER_CLAIM = 15
 
+    # Stop waiting on slow sources once the fast, authoritative ones have
+    # answered — the tail sources rarely change the verdict but always cost
+    # the full timeout budget.
+    EARLY_EXIT_STRONG = 3
+    EARLY_EXIT_TOTAL = 8
+    STRONG_SOURCE_SCORE = 0.85
+
+    # Once we hold enough usable evidence, give the remaining sources only a
+    # short grace period rather than the whole budget. Without this a single
+    # slow upstream sets the latency floor for every request.
+    MIN_USABLE_EVIDENCE = 5
+    STRAGGLER_GRACE_SECONDS = 1.0
+    MIN_RELEVANCE = 0.34
+
     # ── Class-level persistent HTTP session (Keep-Alive + connection pooling) ──
     _session = None
+
+    # Claims extracted from one submission overlap heavily, so the same query
+    # would otherwise hit every upstream source once per claim.
+    _query_cache: "OrderedDict[str, List[Evidence]]" = OrderedDict()
+    _QUERY_CACHE_MAX = 128
+    _QUERY_CACHE_TTL = 300.0
 
     @classmethod
     def _get_session(cls) -> requests.Session:
@@ -98,11 +124,51 @@ class EvidenceRetriever:
     # Public API
     # ──────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _relevance(claim_text: str, ev: Evidence) -> float:
+        """Fraction of the claim's content words present in this evidence item."""
+        stop = {
+            "the", "and", "for", "that", "this", "with", "from", "was", "were",
+            "are", "has", "have", "had", "its", "their", "according", "said",
+        }
+        claim_words = {
+            w for w in re.findall(r"\b[a-zA-Z]{4,}\b", claim_text.lower()) if w not in stop
+        }
+        if not claim_words:
+            return 0.0
+        ev_words = set(re.findall(r"\b[a-zA-Z]{4,}\b", f"{ev.title} {ev.snippet}".lower()))
+        return len(claim_words & ev_words) / len(claim_words)
+
+    @classmethod
+    def _cache_get(cls, key: str) -> Optional[List[Evidence]]:
+        entry = cls._query_cache.get(key)
+        if entry is None:
+            return None
+        ts, evidence = entry
+        if time.time() - ts > cls._QUERY_CACHE_TTL:
+            del cls._query_cache[key]
+            return None
+        cls._query_cache.move_to_end(key)
+        # Callers mutate Evidence.stance, so hand back independent copies.
+        return [ev.model_copy(deep=True) for ev in evidence]
+
+    @classmethod
+    def _cache_set(cls, key: str, evidence: List[Evidence]) -> None:
+        cls._query_cache[key] = (time.time(), [ev.model_copy(deep=True) for ev in evidence])
+        cls._query_cache.move_to_end(key)
+        while len(cls._query_cache) > cls._QUERY_CACHE_MAX:
+            cls._query_cache.popitem(last=False)
+
     async def retrieve(self, claim: Claim) -> List[Evidence]:
         """Fetch evidence from all sources in parallel, dedup, and return."""
         # Preserve full claim for search — don't over-truncate
         search_query = self._formulate_search_query(claim.text)
         fact_check_query = self._formulate_factcheck_query(claim.text)
+
+        cached = self._cache_get(search_query)
+        if cached is not None:
+            logger.info(f"Evidence cache HIT for '{search_query[:60]}' ({len(cached)} items)")
+            return cached
 
         wiki_query = (
             claim.entity
@@ -148,10 +214,11 @@ class EvidenceRetriever:
                 asyncio.to_thread(self._serpapi_search, search_query)
             ))
 
-        # Brave Search — free, no key needed for basic search
-        tasks.append(asyncio.create_task(
-            asyncio.to_thread(self._brave_search, search_query)
-        ))
+        if getattr(settings, "BRAVE_API_KEY", ""):
+            has_reliable_search = True
+            tasks.append(asyncio.create_task(
+                asyncio.to_thread(self._brave_search, search_query)
+            ))
 
         # Tier 3 — News APIs
         if settings.NEWSDATA_API_KEY:
@@ -168,9 +235,13 @@ class EvidenceRetriever:
             asyncio.to_thread(self._google_news_rss_search, search_query)
         ))
 
-        tasks.append(asyncio.create_task(
-            asyncio.to_thread(self._gdelt_search, search_query)
-        ))
+        # General web search — the only broad-coverage source that needs no API
+        # key, so it runs as a primary source rather than a last-resort fallback.
+        # Encyclopedia lookups alone cannot verify a claim.
+        if not is_render:
+            tasks.append(asyncio.create_task(
+                asyncio.to_thread(self._ddg_combined_search, search_query)
+            ))
 
         # Tier 4 — Knowledge Bases
         tasks.append(asyncio.create_task(
@@ -185,32 +256,68 @@ class EvidenceRetriever:
                 asyncio.to_thread(self._google_knowledge_graph, wiki_query)
             ))
 
-        # Allocate timeout for all sources
-        done, pending = await asyncio.wait(tasks, timeout=max(3.0, timeout - 2.0))
+        # Collect results as they land rather than waiting on the slowest source.
+        # Fact-check databases and CSE usually answer in well under a second; the
+        # news/GDELT tail routinely takes the entire budget without changing the
+        # verdict, so stop once the authoritative sources have reported.
+        deadline = time.monotonic() + max(3.0, timeout - 2.0)
+        grace_deadline: Optional[float] = None
+        pending = set(tasks)
+        all_evidence: List[Evidence] = []
+        strong_count = 0
+        relevant_count = 0
+
+        while pending:
+            limit = deadline if grace_deadline is None else min(deadline, grace_deadline)
+            remaining = limit - time.monotonic()
+            if remaining <= 0:
+                break
+            done, pending = await asyncio.wait(
+                pending, timeout=remaining, return_when=asyncio.FIRST_COMPLETED
+            )
+            if not done:
+                break
+            for task in done:
+                try:
+                    results = task.result()
+                except Exception as exc:
+                    logger.warning(f"Evidence source task failed: {exc}")
+                    continue
+                all_evidence.extend(results)
+                for ev in results:
+                    # Only evidence that actually discusses the claim counts
+                    # toward "we have enough" — otherwise an off-topic
+                    # encyclopedia hit ends the search for a claim we have
+                    # found nothing about.
+                    if self._relevance(claim.text, ev) >= self.MIN_RELEVANCE:
+                        relevant_count += 1
+                        if ev.source_score >= self.STRONG_SOURCE_SCORE:
+                            strong_count += 1
+            if strong_count >= self.EARLY_EXIT_STRONG and relevant_count >= self.EARLY_EXIT_TOTAL:
+                logger.info(
+                    f"Evidence early-exit: {strong_count} strong / {relevant_count} relevant "
+                    f"with {len(pending)} sources still outstanding"
+                )
+                break
+            if grace_deadline is None and relevant_count >= self.MIN_USABLE_EVIDENCE:
+                grace_deadline = time.monotonic() + self.STRAGGLER_GRACE_SECONDS
 
         for task in pending:
             task.cancel()
 
-        all_evidence: List[Evidence] = []
-        for task in done:
+        # Last-resort retry with a fact-check-oriented query when nothing
+        # on-topic came back. Gated on relevance, not raw source score — a
+        # high-scoring but off-topic hit is not evidence about this claim.
+        if relevant_count < 2 and not is_render:
+            logger.info("No on-topic evidence found. Retrying web search with fact-check query.")
             try:
-                results = task.result()
-                all_evidence.extend(results)
-            except Exception as exc:
-                logger.warning(f"Evidence source task failed: {exc}")
-
-        # Tier 5 — DuckDuckGo fallback (only if reliable search returned nothing)
-        reliable_results = [ev for ev in all_evidence if ev.source_score >= 0.5]
-        if len(reliable_results) < 3 and not is_render:
-            logger.info("Reliable sources returned < 3 results. Triggering DuckDuckGo fallback.")
-            try:
-                ddg_results = await asyncio.wait_for(
-                    asyncio.to_thread(self._ddg_combined_search, search_query),
+                retry_results = await asyncio.wait_for(
+                    asyncio.to_thread(self._ddg_combined_search, fact_check_query),
                     timeout=4.0
                 )
-                all_evidence.extend(ddg_results)
+                all_evidence.extend(retry_results)
             except Exception as e:
-                logger.warning(f"DuckDuckGo fallback failed: {e}")
+                logger.warning(f"Fact-check web search retry failed: {e}")
 
         # Deep Page Scraping on top 2 candidate URLs (skip on Render)
         urls_to_scrape = []
@@ -225,16 +332,24 @@ class EvidenceRetriever:
                 ]):
                     urls_to_scrape.append(ev.url)
 
-        if urls_to_scrape and not is_render:
+        # Deep scraping is a refinement, not a requirement — only run it with
+        # budget left over, and never let it extend past the deadline.
+        scrape_budget = deadline - time.monotonic()
+        if urls_to_scrape and not is_render and scrape_budget > 1.0:
             try:
                 async def scrape_single_url(url):
                     return await asyncio.to_thread(self._deep_scrape_single_url, url, claim.text)
 
-                deep_tasks = [scrape_single_url(url) for url in urls_to_scrape[:3]]
-                deep_results = await asyncio.gather(*deep_tasks, return_exceptions=True)
+                deep_tasks = [scrape_single_url(url) for url in urls_to_scrape[:2]]
+                deep_results = await asyncio.wait_for(
+                    asyncio.gather(*deep_tasks, return_exceptions=True),
+                    timeout=scrape_budget,
+                )
                 for res in deep_results:
                     if isinstance(res, list):
                         all_evidence.extend(res)
+            except asyncio.TimeoutError:
+                logger.info("Deep scraping skipped: evidence budget exhausted")
             except Exception as e:
                 logger.warning(f"Deep web scraping failed: {e}")
 
@@ -259,11 +374,14 @@ class EvidenceRetriever:
                 "factchecktools.googleapis.com"
             ]):
                 score += 0.25
-            # Relevance: keyword overlap
-            claim_words = set(re.findall(r"\b[a-zA-Z]{4,}\b", claim.text.lower()))
-            snippet_words = set(re.findall(r"\b[a-zA-Z]{4,}\b", ev.snippet.lower()))
-            overlap = len(claim_words.intersection(snippet_words))
-            score += min(0.20, overlap * 0.025)
+            # Relevance dominates: a highly credible source that does not
+            # discuss the claim is worse evidence than a moderate source that
+            # does, so off-topic items are pushed below everything on-topic.
+            rel = self._relevance(claim.text, ev)
+            if rel < self.MIN_RELEVANCE:
+                score -= 0.60
+            else:
+                score += rel * 0.40
             # Penalize very short snippets
             if len(ev.snippet) < 50:
                 score -= 0.10
@@ -279,7 +397,9 @@ class EvidenceRetriever:
             f"Retrieved {len(unique)} unique items (from {len(all_evidence)} raw)"
         )
 
-        return unique[: self.MAX_EVIDENCE_PER_CLAIM]
+        result = unique[: self.MAX_EVIDENCE_PER_CLAIM]
+        self._cache_set(search_query, result)
+        return result
 
     # ──────────────────────────────────────────────────────────
     # TIER 1: Fact-Check Databases
@@ -339,13 +459,29 @@ class EvidenceRetriever:
         results = []
         query_words = set(re.findall(r"\b[a-zA-Z]{3,}\b", query.lower()))
 
-        for name, url in feeds:
-            try:
-                resp = self._get_session().get(url, timeout=4)
-                if resp.status_code != 200:
-                    continue
+        # Fetch all feeds concurrently — serially these cost 4x the slowest feed
+        # and routinely consumed the whole evidence budget on their own.
+        from concurrent.futures import ThreadPoolExecutor
 
-                feed = feedparser.parse(resp.content)
+        def _fetch(feed_spec):
+            name, url = feed_spec
+            try:
+                resp = self._get_session().get(url, timeout=(2, 2))
+                if resp.status_code != 200:
+                    return name, None
+                return name, resp.content
+            except Exception as e:
+                logger.debug(f"RSS feed '{name}' failed: {e}")
+                return name, None
+
+        with ThreadPoolExecutor(max_workers=len(feeds)) as pool:
+            fetched = list(pool.map(_fetch, feeds))
+
+        for name, content in fetched:
+            if content is None:
+                continue
+            try:
+                feed = feedparser.parse(content)
                 for entry in feed.entries[:15]:
                     title = entry.get("title", "")
                     link = entry.get("link", "")
@@ -542,35 +678,9 @@ class EvidenceRetriever:
                         logger.info(f"Brave Search API returned {len(results)} results")
                         return results
 
-            # Fallback: Brave Search Goggles (no key needed, HTML scrape)
-            resp = self._get_session().get(
-                f"https://search.brave.com/search?q={quote_plus(query)}&source=web",
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
-                timeout=4,
-            )
-            if resp.status_code != 200:
-                return []
-
-            soup = BeautifulSoup(resp.text, "html.parser")
-            results = []
-            for item in soup.select(".snippet")[:5]:
-                title_el = item.select_one(".snippet-title")
-                desc_el = item.select_one(".snippet-description")
-                link_el = item.select_one("a[href]")
-                if title_el and link_el:
-                    href = link_el.get("href", "")
-                    if href.startswith("/"):
-                        continue
-                    results.append(
-                        Evidence(
-                            title=f"Brave: {title_el.get_text(strip=True)}",
-                            url=href,
-                            snippet=(desc_el.get_text(strip=True) if desc_el else "")[:500],
-                            source_score=self._score_source(href),
-                        )
-                    )
-            logger.info(f"Brave Search scrape returned {len(results)} results")
-            return results
+            # Without a key there is nothing to do here — Brave blocks the
+            # HTML scrape, so it only ever cost a request and returned nothing.
+            return []
         except Exception as e:
             logger.warning(f"Brave Search failed: {e}")
             return []
@@ -699,45 +809,6 @@ class EvidenceRetriever:
             logger.warning(f"Google News RSS search failed: {e}")
             return []
 
-    def _gdelt_search(self, query: str) -> List[Evidence]:
-        """GDELT API — free, global real-time news monitoring (250+ countries, 100+ languages)."""
-        try:
-            params = {
-                "query": query,
-                "mode": "ArtList",
-                "maxrecords": 5,
-                "format": "json",
-                "sort": "DateDesc",
-            }
-            resp = self._get_session().get(
-                "https://api.gdeltproject.org/api/v2/doc/doc",
-                params=params,
-                timeout=8,
-            )
-            if resp.status_code != 200:
-                return []
-
-            data = resp.json()
-            results = []
-            for article in data.get("articles", [])[:5]:
-                title = article.get("title", "")
-                url = article.get("url", "")
-                source = article.get("domain", "")
-                seendate = article.get("seendate", "")
-                if title and url:
-                    results.append(
-                        Evidence(
-                            title=f"GDELT ({source}): {title}",
-                            url=url,
-                            snippet=f"{title} (Published: {seendate[:10] if seendate else 'Unknown'})",
-                            source_score=self._score_source(url),
-                        )
-                    )
-            logger.info(f"GDELT returned {len(results)} results")
-            return results
-        except Exception as e:
-            logger.warning(f"GDELT search failed: {e}")
-            return []
 
     # ──────────────────────────────────────────────────────────
     # TIER 4: Knowledge Bases
@@ -762,43 +833,44 @@ class EvidenceRetriever:
             )
             data = resp.json()
 
-            results = []
-            for item in data.get("query", {}).get("search", []):
-                page_title = item.get("title", "")
-                url = f"https://en.wikipedia.org/wiki/{quote_plus(page_title)}"
+            hits = data.get("query", {}).get("search", [])
+            if not hits:
+                return []
 
-                # Fetch intro extract text
-                snippet = ""
-                try:
-                    extract_params = {
+            titles = [item.get("title", "") for item in hits if item.get("title")]
+
+            # One batched extracts call for every hit — the API accepts
+            # pipe-separated titles, so this replaces one request per result.
+            extracts: Dict[str, str] = {}
+            try:
+                ext_resp = self._get_session().get(
+                    "https://en.wikipedia.org/w/api.php",
+                    params={
                         "action": "query",
                         "prop": "extracts",
                         "exintro": 1,
                         "explaintext": 1,
-                        "titles": page_title,
+                        "titles": "|".join(titles),
                         "format": "json",
-                    }
-                    ext_resp = self._get_session().get(
-                        "https://en.wikipedia.org/w/api.php",
-                        params=extract_params,
-                        timeout=4,
-                    )
-                    ext_data = ext_resp.json()
-                    pages = ext_data.get("query", {}).get("pages", {})
-                    for page_id, page_data in pages.items():
-                        if "extract" in page_data:
-                            snippet = page_data["extract"]
-                            break
-                except Exception as ext_err:
-                    logger.debug(f"Failed to fetch intro extract for Wiki page '{page_title}': {ext_err}")
+                    },
+                    timeout=4,
+                )
+                for page_data in ext_resp.json().get("query", {}).get("pages", {}).values():
+                    if "extract" in page_data:
+                        extracts[page_data.get("title", "")] = page_data["extract"]
+            except Exception as ext_err:
+                logger.debug(f"Batched Wikipedia extract fetch failed: {ext_err}")
 
-                if not snippet:
-                    snippet = re.sub(r"<[^>]+>", "", item.get("snippet", ""))
-
+            results = []
+            for item in hits:
+                page_title = item.get("title", "")
+                snippet = extracts.get(page_title) or re.sub(
+                    r"<[^>]+>", "", item.get("snippet", "")
+                )
                 results.append(
                     Evidence(
                         title=f"Wikipedia: {page_title}",
-                        url=url,
+                        url=f"https://en.wikipedia.org/wiki/{quote_plus(page_title)}",
                         snippet=snippet[:500],
                         source_score=0.65,
                     )

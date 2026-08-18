@@ -81,6 +81,32 @@ class VerdictEngine:
         return set(w for w in words if w not in stopwords)
 
     @staticmethod
+    def _negates_claim(claim_text: str, ev_text: str) -> bool:
+        """True when the evidence negates the claim's own assertion.
+
+        Scoped deliberately: a negation word anywhere in a document says
+        nothing about the claim, but a negation immediately before one of the
+        claim's distinctive terms ("...is NOT made of cheese") is a direct
+        contradiction of it.
+        """
+        negations = {
+            "not", "no", "never", "isnt", "arent", "wasnt", "werent", "dont",
+            "doesnt", "didnt", "cannot", "cant", "wont", "nor", "false", "debunked",
+        }
+        claim_words = VerdictEngine._get_content_words(claim_text)
+        if not claim_words:
+            return False
+
+        tokens = [t.strip("'") for t in re.findall(r"[a-zA-Z']+", ev_text.lower())]
+        for i, tok in enumerate(tokens):
+            if tok not in claim_words:
+                continue
+            window = tokens[max(0, i - 4):i]
+            if any(w.replace("'", "") in negations for w in window):
+                return True
+        return False
+
+    @staticmethod
     def _extract_reviewed_claim(ev_text: str) -> Optional[str]:
         """Extract the claim being reviewed from a fact-check snippet."""
         patterns = [
@@ -157,7 +183,10 @@ class VerdictEngine:
                     for ev in evidence
                 ]
                 rag.add_documents(docs)
-                retrieved_docs = rag.query(claim.text, top_k=5)
+                # Keep most of the retrieved set. Cutting to 5 threw away the
+                # bulk of the stance signal, so a single highly-similar but
+                # contrarian article could outvote the rest and flip a verdict.
+                retrieved_docs = rag.query(claim.text, top_k=10)
                 evidence = [doc["raw_ev"] for doc in retrieved_docs]
                 logger.info(f"RAG Store filtered evidence for claim: {len(evidence)} items retrieved.")
             except Exception as e:
@@ -273,11 +302,14 @@ class VerdictEngine:
         against live web data, not just pre-retrieved snippets. This dramatically
         improves accuracy for current events and factual claims.
         """
-        # Try primary model first, then fallback model
+        # Walk the model list once. Only the first model gets a single short
+        # retry on rate-limit — a longer backoff here stalls the whole request,
+        # and the next model is usually available immediately.
         models_to_try = GEMINI_FALLBACK_MODELS
-        
-        for model_name in models_to_try:
-            for attempt in range(3):
+
+        for model_idx, model_name in enumerate(models_to_try):
+            max_attempts = 2 if model_idx == 0 else 1
+            for attempt in range(max_attempts):
                 try:
                     from google.genai import types
 
@@ -405,14 +437,12 @@ Return ONLY valid JSON:
                 except Exception as e:
                     error_str = str(e)
                     if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "503" in error_str or "UNAVAILABLE" in error_str:
-                        if attempt < 2:
-                            wait_time = 3.0 * (2 ** attempt)  # 3s, 6s exponential backoff
-                            logger.warning(f"Gemini {model_name} rate-limited (attempt {attempt+1}), retrying in {wait_time}s...")
-                            time.sleep(wait_time)
+                        if attempt + 1 < max_attempts:
+                            logger.warning(f"Gemini {model_name} rate-limited, retrying once in 1s...")
+                            time.sleep(1.0)
                             continue
-                        else:
-                            logger.warning(f"Gemini {model_name} unavailable after retries, trying next model...")
-                            break
+                        logger.warning(f"Gemini {model_name} unavailable, trying next model...")
+                        break
                     else:
                         logger.warning(f"Gemini evaluation failed: {e}")
                         return None
@@ -688,6 +718,17 @@ Analyze this claim and provide your verdict as JSON."""
                     logger.debug(f"Skipping background evidence '{ev.title[:30]}' due to 0 content word overlap")
                     continue
 
+            # Quiz and homework pages restate a claim as an exercise rather
+            # than asserting it. Their "true or false" / "select the correct"
+            # phrasing otherwise reads as a verdict and flips the stance.
+            if re.search(
+                r"\b(true or false|select the correct|which of the following|"
+                r"choose the (correct|right)|answer[: ]|solved|homework|quiz)\b",
+                ev_text, re.IGNORECASE,
+            ):
+                ev.stance = "INSUFFICIENT"
+                continue
+
             relevant += 1
             max_sim = max(max_sim, sim)
             impact = sim * ev.source_score
@@ -739,13 +780,14 @@ Analyze this claim and provide your verdict as JSON."""
                 elif has_false and has_true:
                     raw_polarity = "mixed"
 
-            # ── Step 2: Determine stance using negation-aware polarity alignment ──
-            # Check if evidence has any negation/contradiction indicator
-            ev_has_negation = any(w in get_words(ev_text_raw.lower()) for w in negation_words)
-            
-            # If the evidence has a false rating, or the evidence title/snippet has negation/debunking keywords,
-            # then it represents a negative/refuting signal towards a positive rumor.
-            is_refuting_positive = (raw_polarity == "false") or ev_has_negation or (raw_polarity == "misleading")
+            # ── Step 2: Determine stance from measured polarity ──
+            # Polarity already applies negation-aware keyword matching. Any
+            # negation must be tied to the claim's own assertion — a blanket
+            # "contains a negation word" test mislabels ordinary prose as
+            # refutation (a physics page stating water boils at 100C is not
+            # refuting the claim that it does).
+            negates = self._negates_claim(claim.text, ev_text_raw)
+            is_refuting_positive = raw_polarity in ("false", "misleading") or negates
             
             source_label = ev.title[:60]
             
@@ -776,11 +818,12 @@ Analyze this claim and provide your verdict as JSON."""
                     contra += impact * 0.8
                     support += impact * 0.5
                     signals.append(f"Mixed signals from '{source_label}'")
-                elif sim >= 0.05 and ev.source_score >= 0.60:
-                    # Implicit support: credible informational source discussing the claim
-                    # topic factually without any debunking keywords → lean SUPPORTS.
-                    # This handles well-known facts (e.g. "Earth orbits the Sun") where
-                    # Wikipedia/educational sources describe the topic without fact-check ratings.
+                elif sim >= 0.05 and ev.source_score >= 0.60 and overlap_ratio >= 0.50:
+                    # Implicit support: a credible source discussing the claim
+                    # factually without debunking language. This requires strong
+                    # content-word overlap — sharing only a topic is not support.
+                    # ("Moon" appearing on a NASA page does not corroborate
+                    # "the Moon is made of cheese".)
                     ev_domain = getattr(ev, 'url', '') or ''
                     is_knowledge_source = any(d in ev_domain for d in [
                         'wikipedia.org', '.edu', '.gov', 'britannica.com', 'nasa.gov',

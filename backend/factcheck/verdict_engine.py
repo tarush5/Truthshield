@@ -104,6 +104,14 @@ class VerdictEngine:
         # with the claim was being counted as evidence against it.
         additive = {"only", "just", "merely", "solely", "alone", "exclusively", "purely"}
 
+        # NB: an attempt to scope this per-sentence (requiring two claim terms in
+        # the negating sentence, to stop a neutral Wikipedia definition of
+        # "Smoking" from refuting "smoking causes lung cancer") was reverted. It
+        # collapsed the benchmark from 22/30 to 7/30: negation then almost never
+        # fired, so refutation of genuinely false claims stopped working and 22
+        # of 30 claims fell through to unsure. The flat scan is over-eager on
+        # long documents, but that is far less damaging than not detecting
+        # refutation at all.
         tokens = [t.strip("'") for t in re.findall(r"[a-zA-Z']+", ev_text.lower())]
         for i, tok in enumerate(tokens):
             if tok not in claim_words:
@@ -118,6 +126,41 @@ class VerdictEngine:
                     continue
                 return True
         return False
+
+    # Universal quantifiers that make a claim's scope total.
+    _UNIVERSAL = {
+        "every", "all", "everyone", "everybody", "each", "universal",
+        "universally", "any", "nationwide", "countrywide",
+    }
+
+    @staticmethod
+    def _scope_mismatch(claim_text: str, ev_text: str) -> bool:
+        """
+        True when the claim asserts something universal but the evidence does
+        not carry that universality.
+
+        A claim of the form "X for every citizen" is only corroborated by a
+        source that also describes something universal. Measured case: "the
+        Indian government announced free electricity for every citizen" came
+        back LIKELY TRUE (trust 78) on the strength of "Telangana government
+        announces free electricity for Ganesh [pandals]" and "200 Units Free
+        Electricity for AAY Families" — one sub-national actor and one
+        eligibility-capped scheme. The topic matched; the scope did not.
+
+        Testing for the *absence* of universality in the evidence rather than
+        for the presence of narrowing words, because narrowing is expressed in
+        unboundedly many ways (a state name, a scheme name, a unit cap) and
+        enumerating them would mean maintaining a list of every Indian state.
+
+        Strictly one-directional: it only ever withholds support from a
+        universal claim, and never produces refutation. Evidence describing
+        something narrower means the claim is unverified, not false.
+        """
+        claim_tokens = set(re.findall(r"[a-z]+", (claim_text or "").lower()))
+        if not (claim_tokens & VerdictEngine._UNIVERSAL):
+            return False
+        ev_tokens = set(re.findall(r"[a-z]+", (ev_text or "").lower()))
+        return not (ev_tokens & VerdictEngine._UNIVERSAL)
 
     @staticmethod
     def _extract_reviewed_claim(ev_text: str) -> Optional[str]:
@@ -821,6 +864,18 @@ Analyze this claim and provide your verdict as JSON."""
                     contra += impact * 2.5
                     signals.append(f"Refuted by '{source_label}'")
                     source_names["refute"].append(source_label)
+                elif (raw_polarity == "true" or (sim >= 0.15 and ev.source_score >= 0.50)) \
+                        and self._scope_mismatch(claim.text, ev.title or ""):
+                    # Scope is judged on the headline, not the body: a long
+                    # snippet almost always contains "all" somewhere incidentally
+                    # ("all over India"), which silently satisfied the
+                    # universality test and let the guard through.
+                    # Topic matches but scope does not: the claim is universal
+                    # and this source only documents a bounded programme. Not
+                    # verification, and not refutation either — withhold the
+                    # support rather than assert the opposite.
+                    ev.stance = "INSUFFICIENT"
+                    signals.append(f"Narrower in scope than the claim: '{source_label}'")
                 elif raw_polarity == "true" or (sim >= 0.15 and ev.source_score >= 0.50):
                     ev.stance = "SUPPORTS"
                     support += impact * 1.5

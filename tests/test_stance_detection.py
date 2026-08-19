@@ -54,6 +54,38 @@ class TestRealNegation:
         assert negates(claim, evidence) is True
 
 
+class TestScopeMismatch:
+    """A universal claim needs evidence that is itself universal in scope."""
+
+    CLAIM = "The Indian government announced free electricity for every citizen"
+
+    @pytest.mark.parametrize("evidence", [
+        "Telangana government announces free electricity for Ganesh pandals",
+        "200 Units Free Electricity for AAY Families",
+        "Nitish Kumar's big move: 125 units of free electricity",
+    ])
+    def test_narrower_programme_is_not_support(self, evidence):
+        # Regression: these corroborated a fabricated universal claim and
+        # returned LIKELY TRUE at trust 78 — a fabrication asserted as true,
+        # which is the most damaging direction this system can fail in.
+        assert VerdictEngine._scope_mismatch(self.CLAIM, evidence) is True
+
+    def test_matching_universal_scope_is_support(self):
+        assert VerdictEngine._scope_mismatch(
+            self.CLAIM,
+            "India announces universal free electricity for all citizens nationwide",
+        ) is False
+
+    def test_non_universal_claim_is_unaffected(self):
+        # The guard must not touch ordinary claims.
+        assert VerdictEngine._scope_mismatch(
+            "Paris is the capital of France", "Paris is the capital of France"
+        ) is False
+        assert VerdictEngine._scope_mismatch(
+            "Smoking tobacco causes lung cancer", "How smoking causes lung cancer"
+        ) is False
+
+
 class TestNonNegation:
     """Plain agreeing prose is not a negation."""
 

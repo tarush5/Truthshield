@@ -112,3 +112,8 @@ truthshield_test.db
 .agents/
 scratch/
 backend/uploads/
+
+# Python virtual environments
+.venv/
+venv/
+env/

@@ -64,21 +64,156 @@ class VerdictEngine:
     # Claim alignment helpers (used by bypass gate + TF-IDF)
     # ──────────────────────────────────────────────────────────
 
+    # Three-or-more characters, OR two characters where one is a digit. That
+    # second alternative exists because a 3-character floor discarded exactly
+    # the most identifying token in a claim: "5G" vanished from "5G towers
+    # spread the coronavirus", so "No, 5G Didn't Cause the Coronavirus
+    # Pandemic" \u2014 the definitive debunk \u2014 overlapped the claim on the single
+    # word "coronavirus" and was filtered out as off-topic before anything
+    # looked at its stance. Same for 3D, G7, and the "19" in COVID-19.
+    _TOKEN_RE = re.compile(
+        r"\b(?:[a-zA-Z0-9\u0900-\u097F\u0B80-\u0BFF]{3,}"
+        r"|[a-zA-Z]\d|\d[a-zA-Z])\b"
+    )
+
+    # Generic connectives carry no topical signal but sat in the denominator of
+    # the overlap ratio, so a claim padded with them ("...spread the coronavirus
+    # THROUGH radio waves", "...cures COVID-19 WITHIN 24 hours") needed more
+    # matching words from the evidence to clear the same threshold.
+    _STOPWORDS = {
+        "the", "and", "for", "that", "this", "with", "from", "was", "were", "been",
+        "has", "have", "had", "are", "its", "their", "his", "her", "who", "whom",
+        "which", "they", "she", "him", "them", "your", "our", "about", "there",
+        "not", "but", "what", "when", "where", "how", "why", "will", "would", "shall",
+        "should", "can", "could", "may", "might", "must", "other", "some", "such",
+        "into", "than", "then", "these", "those", "upon", "did", "does", "done",
+        "fact", "check", "claim", "reviewed", "rating", "false", "true",
+        "video", "photo", "image", "photos", "videos", "images",
+        "through", "over", "under", "between", "during", "within", "across",
+        "around", "against", "among", "toward", "towards", "after", "before",
+        "said", "says", "according",
+    }
+
     @staticmethod
     def _get_content_words(text: str) -> set:
         """Tokenize and return content words (stopwords removed) for semantic comparison."""
-        words = [w.lower() for w in re.findall(r"\b[a-zA-Z0-9\u0900-\u097F\u0B80-\u0BFF]{3,}\b", text)]
-        stopwords = {
-            "the", "and", "for", "that", "this", "with", "from", "was", "were", "been",
-            "has", "have", "had", "are", "its", "their", "his", "her", "who", "whom",
-            "which", "they", "she", "him", "them", "your", "our", "about", "there",
-            "not", "but", "what", "when", "where", "how", "why", "will", "would", "shall",
-            "should", "can", "could", "may", "might", "must", "other", "some", "such",
-            "into", "than", "then", "these", "those", "upon", "did", "does", "done",
-            "fact", "check", "claim", "reviewed", "rating", "false", "true",
-            "video", "photo", "image", "photos", "videos", "images",
-        }
-        return set(w for w in words if w not in stopwords)
+        words = [w.lower() for w in VerdictEngine._TOKEN_RE.findall(text)]
+        return set(w for w in words if w not in VerdictEngine._STOPWORDS)
+
+    # Typographic apostrophes. Headlines overwhelmingly use U+2019, and the
+    # word tokenizer only accepts [a-zA-Z'], so "won’t" split into "won" + "t"
+    # and the contraction never matched the negation list. "Garlic and bleach
+    # won’t cure coronavirus" was therefore not read as refuting "drinking
+    # bleach cures COVID-19".
+    _APOSTROPHES = str.maketrans({"’": "'", "ʼ": "'", "`": "'", "´": "'"})
+
+    @staticmethod
+    def _stem(word: str) -> str:
+        """
+        Crude suffix stripper, used only to match a claim's words against
+        evidence wording.
+
+        Evidence rarely repeats a claim's exact inflection: the claim says
+        "cures", the headline says "cure". Without this the negation scan looked
+        for "cures" in "...won't cure coronavirus" and found nothing, so an
+        explicit debunk registered as neutral.
+
+        Deliberately conservative — no irregular forms, nothing under 4
+        characters — because over-stemming would collapse unrelated words and
+        make spurious negations more likely, which is the costlier error.
+        """
+        if len(word) < 4:
+            return word
+
+        # A cascade, not a chain of exclusive branches. As exclusive branches
+        # the first matching rule won and related forms landed on different
+        # stems: "landings" took the plural rule to "landing" while "landing"
+        # took the participle rule to "land".
+        w = word
+
+        # 1. Plural. "s" before "es": taking "es" off "cures" yields "cur",
+        #    which no longer matches "cure". "es" is only right after a
+        #    sibilant, and that is matched on the whole ending rather than the
+        #    base — "caus|es" has a base ending in "s" and was wrongly caught.
+        if w.endswith("ies") and len(w) > 4:
+            w = w[:-3] + "y"
+        elif w.endswith(("sses", "xes", "zes", "ches", "shes")):
+            w = w[:-2]
+        elif w.endswith("s") and not w.endswith("ss"):
+            w = w[:-1]
+
+        # 2. Participle / gerund.
+        if w.endswith("ing") and len(w) - 3 >= 3:
+            w = w[:-3]
+        elif w.endswith("ed") and len(w) - 2 >= 3:
+            w = w[:-2]
+
+        # 3. Silent trailing "e". "cause"/"caused" and "cure"/"cures" otherwise
+        #    differ by exactly this letter after the rules above.
+        if len(w) > 3 and w.endswith("e"):
+            w = w[:-1]
+
+        return w
+
+    # How much text after the question mark still counts as "just the
+    # question".
+    #
+    # Swept against the frozen fixture: at 12 or below the guard misses the
+    # debunk snippets it exists for and two false claims come back TRUE; at 20
+    # and above the fixture is clean (9 correct, 0 wrong). 20 is the smallest
+    # value that reaches zero wrong, so the guard fires as rarely as it can
+    # while still doing its job.
+    _QUESTION_BODY_WORDS = 20
+
+    # Interrogative openers. A headline starting with one of these and ending
+    # in a question mark poses the claim rather than asserting it.
+    _QUESTION_OPENERS = (
+        "do", "does", "did", "is", "are", "was", "were", "can", "could",
+        "will", "would", "should", "has", "have", "had", "why", "how",
+        "what", "when", "where", "which", "who", "whose", "whom",
+    )
+
+    @staticmethod
+    def _is_interrogative(text: str) -> bool:
+        """
+        True when the evidence is a question rather than a statement.
+
+        Judged on the leading clause only. A body that happens to contain a
+        question ("...but is that true? Here is the evidence: ...") still
+        asserts something, so requiring the question to *open* the text keeps
+        this to headlines and aggregator snippets, which is where the problem
+        is. Google News snippets are frequently just the headline repeated, so
+        the whole text collapses to the question.
+        """
+        if not text:
+            return False
+        head = re.split(r"[.!?\n\r]", text.strip(), maxsplit=1)
+        lead = (head[0] if head else "").strip()
+        if not lead:
+            return False
+
+        # Must actually be marked as a question, otherwise "How vaccines are
+        # made" (a statement) would match.
+        remainder = text.strip()[len(lead):].lstrip()
+        if not remainder.startswith("?"):
+            return False
+
+        first = re.findall(r"[a-zA-Z']+", lead.lower())
+        if not first or first[0] not in VerdictEngine._QUESTION_OPENERS:
+            return False
+
+        # Only when the question is essentially the whole text.
+        #
+        # An aggregator snippet is frequently just the headline repeated, so
+        # there is nothing but the question and it asserts nothing. A real
+        # article that merely *opens* with a question goes on to answer it, and
+        # that body is exactly the evidence we want. Suppressing those too cost
+        # a large share of usable evidence on live search, where question-form
+        # SEO headlines are the norm ("What Temperature Does Water Boil?
+        # Boiling Point by Altitude" carries a full explanation underneath).
+        body = re.sub(r"\s+", " ", remainder[1:]).strip()
+        body_words = [w for w in re.findall(r"[a-zA-Z']+", body) if len(w) > 2]
+        return len(body_words) < VerdictEngine._QUESTION_BODY_WORDS
 
     @staticmethod
     def _negates_claim(claim_text: str, ev_text: str) -> bool:
@@ -104,27 +239,40 @@ class VerdictEngine:
         # with the claim was being counted as evidence against it.
         additive = {"only", "just", "merely", "solely", "alone", "exclusively", "purely"}
 
-        # NB: an attempt to scope this per-sentence (requiring two claim terms in
-        # the negating sentence, to stop a neutral Wikipedia definition of
-        # "Smoking" from refuting "smoking causes lung cancer") was reverted. It
-        # collapsed the benchmark from 22/30 to 7/30: negation then almost never
-        # fired, so refutation of genuinely false claims stopped working and 22
-        # of 30 claims fell through to unsure. The flat scan is over-eager on
-        # long documents, but that is far less damaging than not detecting
-        # refutation at all.
-        tokens = [t.strip("'") for t in re.findall(r"[a-zA-Z']+", ev_text.lower())]
-        for i, tok in enumerate(tokens):
-            if tok not in claim_words:
-                continue
-            for j in range(max(0, i - 4), i):
-                if tokens[j].replace("'", "") not in negations:
+        # NB: an attempt to scope this per-sentence *by content* (requiring two
+        # claim terms in the negating sentence, to stop a neutral Wikipedia
+        # definition of "Smoking" from refuting "smoking causes lung cancer")
+        # was reverted. It collapsed the benchmark from 22/30 to 7/30: negation
+        # then almost never fired, so refutation of genuinely false claims
+        # stopped working and 22 of 30 claims fell through to unsure.
+        #
+        # What remains here is the far narrower rule that a negation cannot
+        # reach across a sentence boundary. The scan used to run over a flat
+        # token list with punctuation stripped, so "...most pipe and cigar
+        # smokers do not inhale. Smoking is primarily practiced..." read as
+        # "not inhale smoking" — a negation four tokens from a claim term — and
+        # Wikipedia's neutral definition of smoking was recorded as refuting
+        # "smoking tobacco causes lung cancer". One such item was enough to
+        # carry the claim to FALSE. Detection *within* a sentence is unchanged,
+        # so this does not reopen the 7/30 regression above.
+        # Match on stems so the claim's inflection need not match the evidence's.
+        claim_stems = {VerdictEngine._stem(w) for w in claim_words}
+        normalized = ev_text.lower().translate(VerdictEngine._APOSTROPHES)
+
+        for sentence in re.split(r"(?<=[.!?])\s+|[\n\r]+", normalized):
+            tokens = [t.strip("'") for t in re.findall(r"[a-zA-Z']+", sentence)]
+            for i, tok in enumerate(tokens):
+                if tok not in claim_words and VerdictEngine._stem(tok) not in claim_stems:
                     continue
-                # Look just past the negation: "not only", "not just", "not the
-                # only", "not always" hedge or add rather than contradict.
-                tail = tokens[j + 1:j + 3]
-                if any(t in additive for t in tail) or tail[:1] == ["always"]:
-                    continue
-                return True
+                for j in range(max(0, i - 4), i):
+                    if tokens[j].replace("'", "") not in negations:
+                        continue
+                    # Look just past the negation: "not only", "not just", "not
+                    # the only", "not always" hedge or add rather than contradict.
+                    tail = tokens[j + 1:j + 3]
+                    if any(t in additive for t in tail) or tail[:1] == ["always"]:
+                        continue
+                    return True
         return False
 
     # Universal quantifiers that make a claim's scope total.
@@ -610,7 +758,28 @@ Analyze this claim and provide your verdict as JSON."""
 
         claim_terms = get_all_terms(claim.text) or ["unknown"]
         claim_words_set = set(get_words(claim.text))
+        claim_word_stems = {VerdictEngine._stem(w) for w in claim_words_set}
         claim_content_words = _get_content_words(claim.text)
+        claim_content_stems = {VerdictEngine._stem(w) for w in claim_content_words}
+
+        # ── The claim's distinctive terms ────────────────────────
+        # A term appearing across most of the retrieved set is background for
+        # the topic; the rarer ones carry what the claim actually asserts.
+        # Used only to gate *implicit* support below — never to discard
+        # evidence that takes a position outright.
+        _ev_stem_sets = [
+            {VerdictEngine._stem(w) for w in _get_content_words(ev.title + " " + ev.snippet)}
+            for ev in evidence
+        ]
+        _stem_df = Counter()
+        for _st in _ev_stem_sets:
+            for _s in claim_content_stems & _st:
+                _stem_df[_s] += 1
+        _df_cutoff = max(1.0, len(evidence) * 0.5)
+        claim_key_stems = {s for s in claim_content_stems if _stem_df[s] <= _df_cutoff}
+        if not claim_key_stems:
+            claim_key_stems = set(claim_content_stems)
+
         corpus = [claim_terms]
         for ev in evidence:
             corpus.append(get_all_terms(ev.title + " " + ev.snippet))
@@ -738,6 +907,16 @@ Analyze this claim and provide your verdict as JSON."""
         support = 0.0
         relevant = 0
         source_names = {"support": [], "refute": []}
+        has_adjudicated_rating = False
+        # Strongest (source_score, overlap_ratio) seen on each side, so the
+        # minimum-evidence gate can judge a lone source on its merits.
+        best_side = {"support": (0.0, 0.0), "refute": (0.0, 0.0)}
+
+        def _note_side(side: str):
+            prev = best_side[side]
+            cand = (ev.source_score, overlap_ratio)
+            if cand > prev:
+                best_side[side] = cand
 
         user_claim_has_negation = any(w in get_words(claim.text.lower()) for w in negation_words)
 
@@ -746,32 +925,57 @@ Analyze this claim and provide your verdict as JSON."""
             ev_text = " " + ev_text_raw.lower() + " "
             ev_terms = get_all_terms(ev_text_raw)
             if not ev_terms:
+                ev.stance = "INSUFFICIENT"
                 continue
 
             sim = cosine(claim_vec, tfidf_vec(ev_terms))
             
-            # Secondary relevance: raw keyword overlap ratio
-            ev_words_set = set(get_words(ev_text_raw))
-            keyword_overlap = len(claim_words_set & ev_words_set) / max(len(claim_words_set), 1)
+            # Secondary relevance: keyword overlap ratio, on stems for the same
+            # reason as the content-word gate below — an exact-match version of
+            # this test scored the Washington Post's "Garlic and bleach won't
+            # cure coronavirus" at 1/6 against "Drinking bleach cures COVID-19"
+            # and discarded the article as unrelated.
+            ev_word_stems = {VerdictEngine._stem(w) for w in get_words(ev_text_raw)}
+            keyword_overlap = len(claim_word_stems & ev_word_stems) / max(len(claim_word_stems), 1)
             
             # Consider relevant if cosine >= 0.02 OR keyword overlap >= 30%
             if sim < 0.02 and keyword_overlap < 0.30:
+                ev.stance = "INSUFFICIENT"
                 continue
 
-            # Check content word overlap to filter out general background/topic-only noise
-            ev_content_words = _get_content_words(ev_text_raw)
-            overlap_words = claim_content_words & ev_content_words
-            overlap_ratio = len(overlap_words) / max(len(claim_content_words), 1)
-            
+            # Check content word overlap to filter out general background/topic-only noise.
+            #
+            # Compared on stems. With exact word matching this gate discarded
+            # the evidence that most directly addressed the claim: for
+            # "Drinking bleach cures COVID-19", the Washington Post piece
+            # "Garlic and bleach won't cure coronavirus" overlapped on {bleach}
+            # alone — "cure" did not match "cures" — so it fell below the
+            # two-word floor and was dropped as background before the stance
+            # logic ever saw it. Items dropped here keep their default stance,
+            # so an explicit debunk was also reported to the reader as NEUTRAL.
+            ev_content_stems = {VerdictEngine._stem(w) for w in _get_content_words(ev_text_raw)}
+            overlap_words = claim_content_stems & ev_content_stems
+
+            # The denominator is capped so that a longer claim is not harder to
+            # match than a short one. Uncapped, every extra qualifier in the
+            # claim raised the bar: "Water boils at 100 degrees Celsius at sea
+            # level" has 7 content stems, so Wikipedia's article on the Celsius
+            # scale matched 2 of them for a ratio of 0.29 and was dropped just
+            # under the 0.30 floor. Past roughly five content words, matching
+            # two or three of them already establishes the evidence is on topic.
+            overlap_ratio = len(overlap_words) / max(1, min(len(claim_content_stems), 5))
+
             # If claim has multiple content words, require at least 2 content words overlap and ratio >= 0.30
             # If it is a very short claim (<= 2 content words), require at least 1 content word overlap
-            if len(claim_content_words) >= 3:
+            if len(claim_content_stems) >= 3:
                 if len(overlap_words) < 2 or overlap_ratio < 0.30:
                     logger.debug(f"Skipping background evidence '{ev.title[:30]}' due to low content word overlap ({len(overlap_words)} words, {overlap_ratio:.2f} ratio)")
+                    ev.stance = "INSUFFICIENT"
                     continue
             else:
                 if len(overlap_words) < 1:
                     logger.debug(f"Skipping background evidence '{ev.title[:30]}' due to 0 content word overlap")
+                    ev.stance = "INSUFFICIENT"
                     continue
 
             # Quiz and homework pages restate a claim as an exercise rather
@@ -782,6 +986,28 @@ Analyze this claim and provide your verdict as JSON."""
                 r"choose the (correct|right)|answer[: ]|solved|homework|quiz)\b",
                 ev_text, re.IGNORECASE,
             ):
+                ev.stance = "INSUFFICIENT"
+                continue
+
+            # A headline that *asks* the claim does not assert it.
+            #
+            # Debunks are routinely titled as the question they go on to
+            # answer, and an aggregator snippet is often just that headline
+            # repeated with no body to disambiguate. Read as assertions, they
+            # corroborated the very myths they exist to correct:
+            #
+            #   "Humans only use ten percent of their brains"
+            #     ← "Do We Really Use Only 10 Percent of Our Brain?" (Britannica)
+            #     ← "Do People Only Use 10 Percent of Their Brains?" (Sci. Am.)
+            #   "Vaccines cause autism…"
+            #     ← "Can MMR vaccines cause autism?" (Gavi)
+            #
+            # Each was scored SUPPORTS and together they carried both claims to
+            # TRUE. Same reasoning as the quiz guard above: the text restates
+            # the claim without endorsing it. Withheld from both sides — a
+            # question is not a refutation either.
+            if VerdictEngine._is_interrogative(ev_text_raw):
+                logger.debug(f"Skipping '{ev.title[:40]}': phrased as a question, asserts nothing")
                 ev.stance = "INSUFFICIENT"
                 continue
 
@@ -800,6 +1026,10 @@ Analyze this claim and provide your verdict as JSON."""
 
             if rating_match:
                 rating = rating_match.group(1).lower()
+                # A professional fact-checker's explicit verdict on this claim
+                # is an adjudication, not just another snippet, so it alone can
+                # carry the minimum-evidence gate below.
+                has_adjudicated_rating = True
                 if rating in ("false", "pants on fire", "mostly false"):
                     raw_polarity = "false"
                 elif rating in ("true", "mostly true"):
@@ -807,23 +1037,45 @@ Analyze this claim and provide your verdict as JSON."""
                 elif rating in ("half true", "misleading"):
                     raw_polarity = "misleading"
             else:
-                # Keyword-based polarity with negation awareness
+                # Keyword-based polarity with negation awareness.
+                #
+                # Scoped to the sentences that actually mention the claim, for
+                # the same reason _negates_claim is: a polarity word anywhere
+                # in a document says nothing about *this* claim. The lists
+                # include everyday verbs — "established", "launched",
+                # "verified", "completed" — so an unscoped substring test read
+                # ordinary prose as confirmation:
+                #
+                #   "Humans only use ten percent of their brains"
+                #     ← Wikipedia's "Human" article, for containing "established"
+                #   "The Earth is flat and NASA has been hiding it…"
+                #     ← "…a White House initiative launched in November", for "launched"
+                #   "Vaccines cause autism…"
+                #     ← Wikipedia's "Vaccine" article, for containing "verified"
+                #
+                # Each produced raw_polarity == "true" and a SUPPORTS stance on
+                # a page that never addresses the claim at all.
+                claim_context = " " + " ".join(
+                    sent for sent in re.split(r"(?<=[.!?])\s+|[\n\r]+", ev_text)
+                    if {VerdictEngine._stem(w) for w in _get_content_words(sent)} & claim_content_stems
+                ) + " "
+
                 has_false = False
                 has_true = False
 
                 for kw in false_keywords:
-                    if kw in ev_text:
-                        kw_pos = ev_text.find(kw)
-                        preceding = ev_text[max(0, kw_pos - 20):kw_pos].split()
+                    if kw in claim_context:
+                        kw_pos = claim_context.find(kw)
+                        preceding = claim_context[max(0, kw_pos - 20):kw_pos].split()
                         if preceding and preceding[-1] in negation_words:
                             has_true = True
                         else:
                             has_false = True
 
                 for kw in true_keywords:
-                    if kw in ev_text:
-                        kw_pos = ev_text.find(kw)
-                        preceding = ev_text[max(0, kw_pos - 20):kw_pos].split()
+                    if kw in claim_context:
+                        kw_pos = claim_context.find(kw)
+                        preceding = claim_context[max(0, kw_pos - 20):kw_pos].split()
                         if preceding and preceding[-1] in negation_words:
                             has_false = True
                         else:
@@ -853,17 +1105,20 @@ Analyze this claim and provide your verdict as JSON."""
                     support += impact * 1.5
                     signals.append(f"Supported by '{source_label}'")
                     source_names["support"].append(source_label)
+                    _note_side("support")
                 else:
                     ev.stance = "REFUTES"
                     contra += impact * 2.5
                     signals.append(f"Refuted by '{source_label}'")
                     source_names["refute"].append(source_label)
+                    _note_side("refute")
             else:
                 if is_refuting_positive:
                     ev.stance = "REFUTES"
                     contra += impact * 2.5
                     signals.append(f"Refuted by '{source_label}'")
                     source_names["refute"].append(source_label)
+                    _note_side("refute")
                 elif (raw_polarity == "true" or (sim >= 0.15 and ev.source_score >= 0.50)) \
                         and self._scope_mismatch(claim.text, ev.title or ""):
                     # Scope is judged on the headline, not the body: a long
@@ -876,32 +1131,79 @@ Analyze this claim and provide your verdict as JSON."""
                     # support rather than assert the opposite.
                     ev.stance = "INSUFFICIENT"
                     signals.append(f"Narrower in scope than the claim: '{source_label}'")
+                # NB: gating this branch on claim_key_stems as well (so that
+                # explicit support also had to engage a distinctive term) was
+                # tried and reverted — it cost "The Great Wall of China is
+                # located in China" without recovering any of the claims it was
+                # aimed at, 9/12 correct down to 8/12. The gate stays on the
+                # weaker implicit-support path only.
                 elif raw_polarity == "true" or (sim >= 0.15 and ev.source_score >= 0.50):
                     ev.stance = "SUPPORTS"
                     support += impact * 1.5
                     signals.append(f"Supported by '{source_label}'")
                     source_names["support"].append(source_label)
+                    _note_side("support")
                 elif raw_polarity == "mixed":
                     ev.stance = "NEUTRAL"
                     contra += impact * 0.8
                     support += impact * 0.5
                     signals.append(f"Mixed signals from '{source_label}'")
-                elif sim >= 0.05 and ev.source_score >= 0.60 and overlap_ratio >= 0.50:
+                elif (sim >= 0.05 or overlap_ratio >= 0.60) and ev.source_score >= 0.60 \
+                        and overlap_ratio >= 0.50:
                     # Implicit support: a credible source discussing the claim
                     # factually without debunking language. This requires strong
                     # content-word overlap — sharing only a topic is not support.
                     # ("Moon" appearing on a NASA page does not corroborate
                     # "the Moon is made of cheese".)
+                    #
+                    # High overlap can stand in for the cosine floor because
+                    # that floor is not reachable for real evidence. `sim` is
+                    # cosine over unigrams+bigrams+trigrams, so an evidence
+                    # snippet contributes hundreds of n-grams that the short
+                    # claim cannot match, and the vector norm in the denominator
+                    # grows with snippet length. Measured: a snippet restating
+                    # this claim *verbatim* scores 1.00 alone, 0.17 padded to 50
+                    # words and 0.12 at 100 — below the 0.15 support threshold
+                    # while saying exactly the claim. Real snippets paraphrase
+                    # and landed at 0.02-0.07, so CDC's "Health Effects of
+                    # Cigarettes: Cancer" (sim 0.023, overlap 0.60, source 0.98)
+                    # was filed INSUFFICIENT. Refutation has no such gate — it
+                    # keys off negation and debunking words — so the engine
+                    # could reach FALSE far more easily than TRUE. overlap_ratio
+                    # is unaffected by snippet length, so it carries the
+                    # relevance signal the cosine loses.
                     ev_domain = getattr(ev, 'url', '') or ''
                     is_knowledge_source = any(d in ev_domain for d in [
                         'wikipedia.org', '.edu', '.gov', 'britannica.com', 'nasa.gov',
                         'who.int', 'un.org', 'nature.com', 'sciencedirect.com',
                     ])
-                    if is_knowledge_source or (sim >= 0.10 and ev.source_score >= 0.70):
+                    # Implicit support additionally requires the evidence to
+                    # touch a term that distinguishes this claim, not merely
+                    # its subject. Without that, a general encyclopedia entry
+                    # corroborated whatever was asserted about its subject:
+                    #
+                    #   "Humans only use ten percent of their brains"
+                    #       ← "Wikipedia: Human" (a species article)
+                    #   "Vaccines cause autism according to a 2019 WHO study"
+                    #       ← "Wikipedia: Vaccine" (what a vaccine is)
+                    #   "The Earth is flat and NASA has been hiding it…"
+                    #       ← "NASA has quietly accumulated 150 petabytes of data"
+                    #
+                    # None mentions brains, autism or a flat Earth. Each was
+                    # nonetheless the lone "supporting" source that stopped its
+                    # claim from being called false.
+                    engages_claim = bool(overlap_words & claim_key_stems)
+
+                    if engages_claim and (
+                        is_knowledge_source
+                        or (sim >= 0.10 and ev.source_score >= 0.70)
+                        or (overlap_ratio >= 0.60 and ev.source_score >= 0.70)
+                    ):
                         ev.stance = "SUPPORTS"
                         support += impact * 1.0
                         signals.append(f"Implicitly supported by '{source_label}'")
                         source_names["support"].append(source_label)
+                        _note_side("support")
                     else:
                         ev.stance = "NEUTRAL"
                         support += impact * 0.3
@@ -909,10 +1211,50 @@ Analyze this claim and provide your verdict as JSON."""
                     ev.stance = "INSUFFICIENT"
 
         # ── Decision ──
+        #
+        # A directional verdict needs a real evidentiary base. Only `relevant ==
+        # 0` used to be gated, so a single tangential snippet could carry a
+        # claim: "The Earth is flat and NASA has been hiding it for decades"
+        # came back TRUE at "support strength 4.3x" on the strength of one item
+        # — a story titled "NASA has quietly accumulated more than 150 petabytes
+        # of data" that merely shared vocabulary with the claim.
+        #
+        # Two independent items on the same side is the floor, with one
+        # exception: a professional fact-checker's explicit rating of this claim
+        # is an adjudication rather than a snippet, and stands on its own.
+        # A lone source is still allowed to decide a claim when it is genuinely
+        # authoritative *and* squarely on topic — one gov.in statistics page is
+        # a reasonable basis for a GDP figure. The flat-earth failure had
+        # neither property: source_score 0.45 (below the 0.50 unknown-domain
+        # default) on a story that merely shared vocabulary. Requiring both
+        # keeps the authoritative single-source case while excluding that one.
+        MIN_SIDED_ITEMS = 2
+        LONE_SOURCE_CREDIBILITY = 0.80
+        LONE_SOURCE_OVERLAP = 0.50
+
+        support_items = len(source_names["support"])
+        refute_items = len(source_names["refute"])
+
+        def _thin(side: str) -> bool:
+            if has_adjudicated_rating:
+                return False
+            if len(source_names[side]) >= MIN_SIDED_ITEMS:
+                return False
+            score, overlap = best_side[side]
+            return not (score >= LONE_SOURCE_CREDIBILITY and overlap >= LONE_SOURCE_OVERLAP)
+
         parts = []
         if relevant == 0:
             verdict, confidence = Verdict.UNVERIFIED, 0.25
             parts.append("No relevant evidence found that addresses this specific claim.")
+        elif (contra > support and _thin("refute")) or (support > contra and _thin("support")):
+            verdict = Verdict.UNVERIFIED
+            confidence = min(0.40, 0.25 + max_sim * 0.2)
+            leaning = "against" if contra > support else "for"
+            parts.append(
+                f"Only {max(support_items, refute_items)} source argues {leaning} this claim, "
+                f"which is too thin a basis for a verdict."
+            )
         elif max(contra, support) <= 0.02:
             verdict, confidence = Verdict.UNVERIFIED, min(0.50, 0.3 + max_sim * 0.2)
             parts.append("Evidence overlaps with the claim topic but lacks explicit stance signals to confirm or deny it.")

@@ -93,6 +93,13 @@ class DeepfakeResult(BaseModel):
     flagged_frames: List[int] = Field(default_factory=list)
     needs_human_review: bool = False
 
+    # Which path produced this result. A detector that could not load its model
+    # returns confidence 0.0, which is indistinguishable from "checked it, looks
+    # clean" — and the report then told the reader no anomalies were detected
+    # when nothing had been examined at all. "unavailable" marks that case so
+    # callers can decline to make a claim either way.
+    method: str = "unavailable"  # efficientnet_b4 / heuristic / unavailable
+
 
 class VoiceCloneResult(BaseModel):
     is_cloned: bool = False
@@ -169,6 +176,16 @@ class Evidence(BaseModel):
     snippet: str
     source_score: float = 0.5
     stance: str = "NEUTRAL"
+
+    # The publisher's own site, when `url` does not identify them.
+    #
+    # Google News hands back news.google.com interstitials, so scoring `url`
+    # rates every article as an aggregator (0.45) no matter who reported it.
+    # The feed does name the publisher's domain separately, and SourceRanker
+    # scores this in preference to `url` when it is set — otherwise CDC,
+    # Reuters and Britannica articles all sit below the 0.50 floor that every
+    # stance path requires, and can never support or refute anything.
+    source_domain: Optional[str] = None
 
 
 class ClaimVerdict(BaseModel):

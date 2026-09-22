@@ -1,0 +1,886 @@
+{
+ "claims": [
+  {
+   "expected": "true",
+   "claim": "Water boils at 100 degrees Celsius at sea level.",
+   "evidence": [
+    {
+     "title": "Fact Check: Pure water boils at 100 degrees Celsius at sea… — True",
+     "url": "https://isthisbs.org/science/pure-water-boils-at-100-degrees-celsius-at-sea-level-e1c3e55c/",
+     "snippet": "May 27, 2026 · Pure water boils at 100 degrees Celsius at sea level (standard atmospheric pressure).",
+     "source_score": 0.65
+    },
+    {
+     "title": "Boiling Point of Water - What Temperature Does Water Boil?",
+     "url": "https://sciencenotes.org/boiling-point-of-water-what-temperature-does-water-boil/",
+     "snippet": "Aug 6, 2020 · Most people assume water only boils at 100°C (212°F), but it actually boils at room temperature if you lower the …",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Celsius",
+     "url": "https://en.wikipedia.org/wiki/Celsius",
+     "snippet": "The degree Celsius is the unit of temperature on the Celsius temperature scale (originally known as the centigrade scale in English), one of two temperature scales used in the International System of Units (SI), the other being the closely related Kelvin scale. The degree Celsius (symbol: °C) can refer to a specific point on the Celsius temperature scale or to a difference or range between two temperatures. It is named after the Swedish astronomer Anders Celsius (1701–1744), who proposed the fir",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Anders Celsius",
+     "url": "https://en.wikipedia.org/wiki/Anders+Celsius",
+     "snippet": "Anders Celsius (Swedish: [ˈânːdɛʂ ˈsɛ̌lːsɪɵs]; 27 November 1701 – 25 April 1744) was a Swedish astronomer, physicist and mathematician. He was professor of astronomy at Uppsala University from 1730 to 1744, but traveled from 1732 to 1735 visiting notable observatories in Germany, Italy and France. He founded the Uppsala Astronomical Observatory in 1741, and in 1742 proposed (an inverted form of) the centigrade temperature scale, which was later renamed Celsius in his honour.",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Fahrenheit",
+     "url": "https://en.wikipedia.org/wiki/Fahrenheit",
+     "snippet": "The Fahrenheit scale () is a temperature scale based on one proposed in 1724 by the physicist Daniel Gabriel Fahrenheit (1686–1736). It uses the degree Fahrenheit (symbol: °F) as the unit. Several accounts of how he originally defined his scale exist, but the original paper suggests the lower defining point, 0 °F, was established as the freezing temperature of a solution of brine made from a mixture of water, ice, and ammonium chloride (a salt). The other limit established was his best estimate ",
+     "source_score": 0.65
+    },
+    {
+     "title": "Think Like an Explorer: News Literacy - National Geographic Society (National Geographic Society)",
+     "url": "https://news.google.com/rss/articles/CBMickFVX3lxTFBvQzE0Tzd2TGNpSUtrWl9QNXVNbFNFU00tM1hVbGhGZGs0b1RzRnBySnBBVDREYWNnMnNySXhIOThXY3VmeGRVX2lyOGVuSFRWOUJSRWlVSEtpRTdtd0RramgwdHE2R3p6MkxwNXEyZDIxdw?oc=5",
+     "snippet": "Think Like an Explorer: News Literacy&nbsp;&nbsp;National Geographic Society",
+     "source_score": 0.65
+    },
+    {
+     "title": "Does water’s boiling point change with altitude? Americans aren’t sure - Pew Research Center (Pew Research Center)",
+     "url": "https://news.google.com/rss/articles/CBMiuwFBVV95cUxPX20zNU1wN0FzWTduTjVkUXhEekgyTUc5Z2N1MEFtRXRFSGc4NVNDOXV4XzM5SGR5UnNZd3A4d1FfMWN6NGVfQjhZZF9IbUgxOFpYd1BmRVJGcEdKVVZsR3Q1M1dpNDNBOHdqdmg5bHEwYjlpdHl6eldmdllVTExKeXZ1MTRLWUlFRmxfYkNNbURvMkczTVV3b3dXS1JFVEFXMUJyWDJLRlVoZ3lMc295elpCVU9PZ2lXZkJz?oc=5",
+     "snippet": "Does water’s boiling point change with altitude? Americans aren’t sure&nbsp;&nbsp;Pew Research Center",
+     "source_score": 0.65
+    },
+    {
+     "title": "Simultaneous packing structures in superionic water may explain ice giant magnetic fields - Phys.org (Phys.org)",
+     "url": "https://news.google.com/rss/articles/CBMigwFBVV95cUxQV0FWcXRQTEhkM2ZEX0tid2FQX2NiNlRzbFRVWGFVblNkdS1WUzJJUlBEQnZLUlp1SXd2bk9CbmRRaXByckc0dl8tZE5GQkpDQnlzSjVlUHpmNUFXY09JeGFoRmZjUmZJcml3dzhLVHItRWxrYnNuekZudWkzRHFadS1JMA?oc=5",
+     "snippet": "Simultaneous packing structures in superionic water may explain ice giant magnetic fields&nbsp;&nbsp;Phys.org",
+     "source_score": 0.65
+    },
+    {
+     "title": "Does Water Always Boil at 100 Degrees? Exploring the Science",
+     "url": "https://tandtlearninghub.com/does-water-always-boil-at-100-degrees-exploring-the-science/",
+     "snippet": "Sep 7, 2025 · At sea level, where the air pressure is at its highest, water reliably boils at 100 degrees Celsius. But as you climb to …",
+     "source_score": 0.5
+    },
+    {
+     "title": "Does Water Boil at 100 Degrees Celsius? The Truth Unveiled",
+     "url": "https://thetechylife.com/does-water-boil-at-100-degrees-celsius/",
+     "snippet": "Dec 26, 2023 · At sea level, where the standard atmospheric pressure is about 1 atmosphere, water boils at 100 degrees Celsius. …",
+     "source_score": 0.5
+    },
+    {
+     "title": "What Substance Boils at 100 Degrees Celsius? [The Scientific Answer]",
+     "url": "https://smartstep.blog/what-substance-boils-at-100-degrees-celsius",
+     "snippet": "The primary substance that boils at exactly 100 degrees Celsius (212°F) is pure water, but this physical constant only holds true …",
+     "source_score": 0.5
+    },
+    {
+     "title": "At about 19 kilometres up the air pressure falls low enough that water boils at human body temperature, so an unprotected person there would feel the saliva on their tongue turn to vapour, which is why aircrew above that altitude wear sealed pressure suits rat - Space Daily (Space Daily)",
+     "url": "https://news.google.com/rss/articles/CBMiwwJBVV95cUxOcTUyNXJkV3B4LTdlb2NTSE5MSjFyTTlkN2pwRWViN0pRZVlDN0N5SnN5VGtqTF9FNzBGZmlJSWJlMmRzWFI3VGxtUFg1eHA4cTFjdHNYZ0FOY21PY3piZWxuNU5LSVlZRFRST2xQRENla2RPS0tuN2M4clZZdmhWSXhMdlkwUHdFaEFtLW9pR09MUnlhSjAzLWZDMFNjcEtkOGVKWWM2UFJiUjVJTG9VdjlqNmxkYUNaQ1otTTJHTDVGc0ctdEpUdWpZb3hIdmxrQ3M0ZHB1Z2tKTV9yZzY3YW1pN1hhazU4dGVydEd4NkZkQnBtYlpUdllSR3NqYm9HUHgtNDUxa0M2eWNCX20zUDVVTTJ3TGx4Vm5HOGtwdWYwZFFjSkxxWDVKcFFnVGIxa01zV1FZM0R1Z3IwaG8xUmxKQQ?oc=5",
+     "snippet": "At about 19 kilometres up the air pressure falls low enough that water boils at human body temperature, so an unprotected person there would feel the saliva on their tongue turn to vapour, which is why aircrew above that altitude wear sealed pressure suits rat&nbsp;&nbsp;Space Daily",
+     "source_score": 0.5
+    },
+    {
+     "title": "Elevation: Why 7,000 Feet Can’t Deliver a Free Lunch - Mexperience (Mexperience)",
+     "url": "https://news.google.com/rss/articles/CBMid0FVX3lxTFBIRWVxZGxiU2NieHN4SHlPSWdfQVRybnFUdi1JN2hzcEJKS3BVX3V0NE1wOWdNRjFyYUhMbGc4YVdLOS1YRjdhUWZmYlN1MUdPWWxQVG9YcDh5bTQyeGVQend2d0Vpa1RqVzlGLXFkU0RlZ3BEZTdR?oc=5",
+     "snippet": "Elevation: Why 7,000 Feet Can’t Deliver a Free Lunch&nbsp;&nbsp;Mexperience",
+     "source_score": 0.5
+    }
+   ]
+  },
+  {
+   "expected": "true",
+   "claim": "Smoking tobacco causes lung cancer.",
+   "evidence": [
+    {
+     "title": "Risk Factors: Tobacco - NCI - National Cancer Institute",
+     "url": "https://www.cancer.gov/about-cancer/causes-prevention/risk/tobacco",
+     "snippet": "Jan 23, 2017 · Tobacco use causes many types of cancer, including cancer of the lung, larynx (voice box), mouth, …",
+     "source_score": 1.0
+    },
+    {
+     "title": "Tobacco and Cancer | Cancer | CDC",
+     "url": "https://www.cdc.gov/cancer/risk-factors/tobacco.html",
+     "snippet": "Jun 11, 2025 · If you were asked about tobacco and cancer, you might think of lung cancer. It's true that smoking cigarettes …",
+     "source_score": 0.98
+    },
+    {
+     "title": "Health Effects of Cigarettes: Cancer | Smoking and Tobacco …",
+     "url": "https://www.cdc.gov/tobacco/about/cigarettes-and-cancer.html",
+     "snippet": "Sep 17, 2024 · Smoking can cause cancer almost anywhere in the body. Quitting smoking lowers the risk for 12 different …",
+     "source_score": 0.98
+    },
+    {
+     "title": "Column | Can vaping cause cancer? The evidence suggests it might. - The Washington Post (The Washington Post)",
+     "url": "https://news.google.com/rss/articles/CBMiekFVX3lxTE4teFAzRE5Bd3VrVnRXT3NvazRmLXRGNmlOS1E3alc4MDB5emJfdE5aemE5dFZ6ZFlERVh3b2FOUUdrbEhBQm13TUxBcU42YWlZR0haWndpTmR0WXRVRVQ0dVBVWjJyUElWOWoyZ28xbzZOZm40WEJnWVpn?oc=5",
+     "snippet": "Column | Can vaping cause cancer? The evidence suggests it might.&nbsp;&nbsp;The Washington Post",
+     "source_score": 0.85
+    },
+    {
+     "title": "Wikidata: smoking (Q662860)",
+     "url": "https://www.wikidata.org/wiki/Q662860",
+     "snippet": "Entity: smoking. Description: breathing in smoke after burning a substance and inhaling, done in order to be tasted and absorbed into the bloodstream.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikidata: smoking (Q193713)",
+     "url": "https://www.wikidata.org/wiki/Q193713",
+     "snippet": "Entity: smoking. Description: exposing food to the smoke to flavour or preserve it.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Lighting up a cigarette harms more than the lungs. A doctor explains - CNN (CNN)",
+     "url": "https://news.google.com/rss/articles/CBMilgFBVV95cUxPNHNMWFQ4eG42M0ZhY25pdmNBRlUwcE5pUGtnLW1wdXNjTUcyMVJWQ2FNM2NLdnNkWl9RcS1odkV6enY1RnJsdjhNOG1ZUllyVWdtMElDcEwyU3NETVZEX0R5blozd3JwcWhKdzl3TGZQWGlRQTVqekVqWU03TXFJdUNMa2RycUN2SXFzR1VHaG9YMHV1Mmc?oc=5",
+     "snippet": "Lighting up a cigarette harms more than the lungs. A doctor explains&nbsp;&nbsp;CNN",
+     "source_score": 0.72
+    },
+    {
+     "title": "How does smoking cause cancer? - Cancer Research UK",
+     "url": "https://www.cancerresearchuk.org/about-cancer/causes-of-cancer/smoking-and-cancer/how-does-smoking-cause-cancer",
+     "snippet": "Jun 30, 2026 · Smoking causes at least 16 different types of cancer and is the biggest cause of lung cancer in the UK, and …",
+     "source_score": 0.65
+    },
+    {
+     "title": "A Reminder: Smoking Still Causes Cancer - American Association for Cancer Research (AACR) (American Association for Cancer Research (AACR))",
+     "url": "https://news.google.com/rss/articles/CBMiggFBVV95cUxQcWhnUk1rYTFQbmRBOE81RG5vZVNHdEJ0Q0xhWXJDTVBiZ2VMMmUtVGthdDcxNnp2dExEdFBONDZoZjJCWUFTYkY5cjhtUk9JZVF6UWtjUllnVEVibU0xRUJIb0FTTnhsTHRBZkE0NGtPUHRhOGhFTjFEazNhbGYxdXB3?oc=5",
+     "snippet": "A Reminder: Smoking Still Causes Cancer&nbsp;&nbsp;American Association for Cancer Research (AACR)",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Smoking",
+     "url": "https://en.wikipedia.org/wiki/Smoking",
+     "snippet": "Smoking is the combustion of a substance, usually plant material, and the inhalation of resulting fumes. Today, smoking is mostly practiced by rolling the dried leaves of the tobacco plant into a cigarette. Other forms of tobacco smoking include the use of a smoking tobacco with a pipe or cigar, or using a bong. Cigarette smokers almost always inhale the smoke; most pipe and cigar smokers do not inhale.\nSmoking is primarily practiced as a route of administration for psychoactive chemicals becaus",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Tobacco smoking",
+     "url": "https://en.wikipedia.org/wiki/Tobacco+smoking",
+     "snippet": "Tobacco smoking is the practice of burning tobacco and the absorption of the resulting smoke into one's body. The smoke may be inhaled, as is done with cigarettes, or released from the mouth, as is done with pipes and cigars. The practice is believed to have begun as early as 5000–3000 BC in Mesoamerica and South America. Tobacco was introduced to Eurasia in the 17th century by European colonists, where it followed common trade routes. The practice encountered criticism from its first import int",
+     "source_score": 0.65
+    },
+    {
+     "title": "Marijuana smoke and lung cancer: An unsettled and unsettling question - American Council on Science and Health (American Council on Science and Health)",
+     "url": "https://news.google.com/rss/articles/CBMirAFBVV95cUxNdlRpNGFBX25pcTNTNkhhbmFwRzU2VG05cE5yMTdSOFJpNTlJcWlpSDRBbWtTVHpWaE5hbXhrWFBJRkVsWjlVNEJhM2FCZWFTbDVsNlFjQzdMVHRiT1ZibXhpQ3NQN0owdWIzLUN3ZWdYQ0NIQkgzTV93LWROMlNnR1ZXcUFSdXE0TVBXZmhpV3ZLTnJMdm1fUzFrRk5yTTN2OFdfYmk1RG5mUE1w?oc=5",
+     "snippet": "Marijuana smoke and lung cancer: An unsettled and unsettling question&nbsp;&nbsp;American Council on Science and Health",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: No smoking",
+     "url": "https://en.wikipedia.org/wiki/No+smoking",
+     "snippet": "No smoking may refer to:\n\nSmoking ban\nNo Smoking (1951 film), a Disney cartoon featuring Goofy\nNo Smoking (1955 film), a British comedy film\nNo Smoking (2007 film), an Indian psychological thriller directed by Anurag Kashyap and starring John Abraham\n\"No Smoking\" (Cow and Chicken episode), an episode of an American animated comedy television series\nNo Smoking, one segment of the 1993 film Smoking/No Smoking directed by Alain Resnais\nThe No Smoking Orchestra, a Serbian rock band\nZabranjeno Pušenj",
+     "source_score": 0.65
+    },
+    {
+     "title": "Smoking and Lung Cancer: How Does Smoking Increase Your Ris…",
+     "url": "https://www.healthline.com/health/lung-cancer/smoking-lung-cancer",
+     "snippet": "Feb 20, 2026 · Smoking greatly raises your lung cancer risk. People who smoke are 15 to 30 times more likely to develop lung …",
+     "source_score": 0.5
+    },
+    {
+     "title": "Global surveys reveal little progress in tobacco risk awareness over two decades - News-Medical (News-Medical)",
+     "url": "https://news.google.com/rss/articles/CBMixwFBVV95cUxQbkN3bWpnZlk0STBLNTU3eUtwVU9hUzhMeW5aaGVwdXZDNkdtRUdHU2J5d1FjVUFtdHFsZHhqSHVJcDdFRXlSM3k4YVBUMFZrZmJuOEJ6SEFYS1ZXZUEzd09oMlF0Uk8xTUZZaEFLcWQxaEVfeWNCM1RuYk4zRVFFajJSMC1uSERVWm9ta1p2eEF3V0dyeGVxVzU3cWRCTVV4TFZ3UXpLeG1rTnE2MHk2eHRTb2dQZmJUNmo2TUFKdG5kbFJNMWlZ?oc=5",
+     "snippet": "Global surveys reveal little progress in tobacco risk awareness over two decades&nbsp;&nbsp;News-Medical",
+     "source_score": 0.5
+    }
+   ]
+  },
+  {
+   "expected": "true",
+   "claim": "The Earth orbits the Sun once per year.",
+   "evidence": [
+    {
+     "title": "Full Fact: False claims Bill Gates wrote an article on depopulating the earth with ‘forced vaccines’ recirculate",
+     "url": "https://fullfact.org/health/bill-gates-vaccine-depopulation-article/",
+     "snippet": "Several incorrect posts claiming that Mr Gates wrote an article about using vaccinations to control the population have been shared online.",
+     "source_score": 0.96
+    },
+    {
+     "title": "This Earth-like planet orbits the Sun's nearest neighbor every 11 days - pbs.org (pbs.org)",
+     "url": "https://news.google.com/rss/articles/CBMingFBVV95cUxQWkNUV2d5WVJzOEFVX0NvNXJTZEd2NVBiVnhIQUVOS0ZCSm1VYWNJd3hTTGNwM3pBX29hWTR4dW9wTV9hLXhEai0tbWVNOXp3Y2ZSZ29zZ0k5VnJGdXJWUmZBUjlDVWVnaWlqdV8xU0tCcGFEMGpGajhjT2RWYkJvODZqTlh1d0o3NWJRSGtyLS1CQkFLWTVyTHBXdG9pUdIBowFBVV95cUxNend3UzJUMF9qNnQwaGdzd2pKRHJzbE1lNzJOQjZ0bGMzZmx2a1RjdjY0Si1rZnl0ektyVjlpalhIa21XbFNjZjRmN2VpX0Zhc0wwX2JpN2h1VTVZZXFiWXBxX1ZrREk1eFRDOXZIaFE0NFNzMG9lZTJpUjlIS0Iya0kxa0lZV2taMVY0cG9Ga2tFNTJpSWpCcmpRZWxJX1dieWhF?oc=5",
+     "snippet": "This Earth-like planet orbits the Sun's nearest neighbor every 11 days&nbsp;&nbsp;pbs.org",
+     "source_score": 0.82
+    },
+    {
+     "title": "Mars - Red Planet, Orbit, Moons - britannica.com (britannica.com)",
+     "url": "https://news.google.com/rss/articles/CBMid0FVX3lxTE5NRG1TOFpVV3g1U3owUzB0Mmh5ZUtDdXgzTHRNRnpxUkVZYXRoSGtXczZDWXphSkQ3dUtLQW1qSVVrZXBEekNGTjdVVVVKNXV3ZEYtTWRsVXFiTVIwYzZsNUdCSVNRUTJjZC1sc0M3ZU1SNEVxc1VN?oc=5",
+     "snippet": "Mars - Red Planet, Orbit, Moons&nbsp;&nbsp;britannica.com",
+     "source_score": 0.8
+    },
+    {
+     "title": "Wikipedia: Sun",
+     "url": "https://en.wikipedia.org/wiki/Sun",
+     "snippet": "The Sun is the star located at the centre of the Solar System. It is a massive sphere of hot plasma, heated to incandescence by nuclear fusion reactions in its core, radiating the energy from its surface mainly as visible light and infrared radiation with 10% at ultraviolet energies. It is the main source of energy for life on Earth. The Sun has been an object of veneration in many cultures and a central subject of astronomical research since antiquity.\nThe Sun orbits the Galactic Center at a di",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Astronomical unit",
+     "url": "https://en.wikipedia.org/wiki/Astronomical+unit",
+     "snippet": "The astronomical unit (symbol: au or AU) is a unit of length defined as 149597870700 m. Historically, the astronomical unit was conceived as the average Earth-Sun distance (the average of Earth's aphelion and perihelion), before its modern redefinition in 2012.\nThe astronomical unit is used primarily for measuring distances within the Solar System or around other stars. It is also a fundamental component in the definition of another unit of astronomical length, the parsec. One au is approximatel",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Lagrange point",
+     "url": "https://en.wikipedia.org/wiki/Lagrange+point",
+     "snippet": "In celestial mechanics, the Lagrange points (), also called the Lagrangian points or libration points, are points of equilibrium for small-mass objects under the gravitational influence of two massive orbiting bodies. Mathematically, this involves the solution of the restricted three-body problem.\nNormally, the two massive bodies exert an unbalanced gravitational force at a point, altering the orbit of any other celestial body at that point. At the Lagrange points, the gravitational forces of th",
+     "source_score": 0.65
+    },
+    {
+     "title": "A Tilted Earth Nears the Balance Point - The Provincetown Independent (The Provincetown Independent)",
+     "url": "https://news.google.com/rss/articles/CBMipwFBVV95cUxNeXhWQzBXYThiTWhBM3NndHBVZVJTRkVyYTd5SXFEdHJYUjVEem1OS2FLU09ZTXVMZkxZN2JSQUdhckZMUWRnY3NKNWpxSFVjWlg0aG9oX0ZkQWoyVUpzZXN2dkcwdXlmSk5zbFU2MlV2LWZWRjJncVRFV28tTVZIM3VTcDR2MkZtZEhmQ213S2ZaUHE3amlfSjlaQmFfWDFBZFB4cmFPYw?oc=5",
+     "snippet": "A Tilted Earth Nears the Balance Point&nbsp;&nbsp;The Provincetown Independent",
+     "source_score": 0.65
+    },
+    {
+     "title": "Why eclipses are important for scientific discoveries - RTE.ie (RTE.ie)",
+     "url": "https://news.google.com/rss/articles/CBMiswFBVV95cUxNcGdqQk5rZFNYYkxWZTRvMGNBXzF0V0NUZmFiVzV2azBPVDh4bUpQZlF5ZHNjQ1pOZHJYS2JaMmNaMFk5bGoxeE5kOWlnVzB6cHRzemJSQ3dKc3JOaEh3VG5yMU8xam5IWTZiai14b3pXZDJheGlncWZaNmVpOXB6Xy1JdGJ5VU9HVHRPMTZtME9MMFhBT3VsdlAxR2Q2ZVVWT1N3RjQwejktN2ptMEpKREVYcw?oc=5",
+     "snippet": "Why eclipses are important for scientific discoveries&nbsp;&nbsp;RTE.ie",
+     "source_score": 0.5
+    },
+    {
+     "title": "How fast is Earth moving? - Space (Space)",
+     "url": "https://news.google.com/rss/articles/CBMiaEFVX3lxTFBqM1RtdXhXVmF6YVVnZUNhQ3ExRHphMU9pWW1qdlM0dFItN1B5THh1U3p1U05CekV4SXZQbDFvazNoUjh2aWZhOG42OVZhaFdOSi00Ty1kd1NvbGpyeXJ4eW1vMzRNOWZp?oc=5",
+     "snippet": "How fast is Earth moving?&nbsp;&nbsp;Space",
+     "source_score": 0.5
+    }
+   ]
+  },
+  {
+   "expected": "true",
+   "claim": "Paris is the capital of France.",
+   "evidence": [
+    {
+     "title": "Paris | Definition, Map, Population, Facts, & History | Britannica",
+     "url": "https://www.britannica.com/place/Paris",
+     "snippet": "4 days ago · Paris, city and capital of France, located along the Seine River, in the north-central part of the country. Paris is one of …",
+     "source_score": 0.8
+    },
+    {
+     "title": "Rosenior seeks to match Paris FC's capital ambition as Ligue 1 returns - France 24 (France 24)",
+     "url": "https://news.google.com/rss/articles/CBMiuAFBVV95cUxNSnhENmhJYV9WbFRob1REV0RST29hNWZ0Mm5jcUt4SXc0QnJKc1k3OG9YQkFobzJBUGJoSmpyT2tFbF9KS1E5b0s4clVMR0ZHc2FuRVhaYVJBT28wVy1KeUNjZWlzWkp4MmJFa0lPNTJJR3lrR3JyRWhWLXdLdVJtSnNfS1gtaHUtNmMtd09GVnhFaFkxbDE2dkFVZ05ocHNKcFhWa2ZMN2dXRVNmb21oTU1WbU9wTkJi?oc=5",
+     "snippet": "Rosenior seeks to match Paris FC's capital ambition as Ligue 1 returns&nbsp;&nbsp;France 24",
+     "source_score": 0.78
+    },
+    {
+     "title": "Wikidata: Paris France (Q7137285)",
+     "url": "https://www.wikidata.org/wiki/Q7137285",
+     "snippet": "Entity: Paris France. Description: novel by Gertrude Stein.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikidata: Paris-France (Q107228490)",
+     "url": "https://www.wikidata.org/wiki/Q107228490",
+     "snippet": "Entity: Paris-France. Description: business.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikipedia: Île-de-France",
+     "url": "https://en.wikipedia.org/wiki/%C3%8Ele-de-France",
+     "snippet": "The Île-de-France (; French: [il də fʁɑ̃s] ; lit. 'Island of France') is the most populous of the eighteen regions of France, with an official estimated population of 12,271,794 residents on 1 January 2023. Containing the capital city of France, Paris, it is located in the north-central part of the country and often called the Paris Region (French: Région parisienne, pronounced [ʁeʒjɔ̃ paʁizjɛn]). Île-de-France is densely populated and retains a prime economic position on the national stage. It ",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Catacombs of Paris",
+     "url": "https://en.wikipedia.org/wiki/Catacombs+of+Paris",
+     "snippet": "The Catacombs of Paris (French: Catacombes de Paris, )  are underground ossuaries in Paris, France, which hold the remains of more than six million people. Built to consolidate Paris's ancient stone quarries, they extend south from the Barrière d'Enfer (\"Gate of Hell\") former city gate. The ossuary was created as part of the effort to eliminate the effects of the city's overflowing cemeteries. Preparation work began shortly after a 1774 series of basement wall collapses around the Holy Innocents",
+     "source_score": 0.65
+    },
+    {
+     "title": "Paris - Wikipedia",
+     "url": "https://en.wikipedia.org/wiki/Paris",
+     "snippet": "Located on the Seine in the centre of the Île-de-France region, it is the largest metropolitan area and fourth-most populous city in the …",
+     "source_score": 0.65
+    },
+    {
+     "title": "Paris, Capital city of France - The World Countries",
+     "url": "https://www.theworldcountries.com/geo/capital-city/Paris",
+     "snippet": "6 days ago · Paris is the capital of France (French Republic), situated in the Western Europe subregion of Europe. In Paris, the …",
+     "source_score": 0.5
+    },
+    {
+     "title": "What is the Capital of France? - Mappr",
+     "url": "https://www.mappr.co/capital-cities/france/",
+     "snippet": "What is the Capital of France? Paris is the capital of France. Also known as the “City of Light,” is not only the capital but also the …",
+     "source_score": 0.5
+    },
+    {
+     "title": "What is the Capital of France? - WorldAtlas",
+     "url": "https://www.worldatlas.com/articles/what-is-the-capital-of-france.html",
+     "snippet": "Jun 29, 2018 · Tourism has always been a major source of income for Paris. Paris is the capital city of France. The city has an …",
+     "source_score": 0.5
+    },
+    {
+     "title": "Paris’ Greener Future: Why France’s Capital Is Trading Cars for Canopies - LUXUO (LUXUO)",
+     "url": "https://news.google.com/rss/articles/CBMisAFBVV95cUxNVFNLUk9UaHJwMDRYNzVMY2hvbHl4YjJLbHNDRWlSajZlb0dyWUdJdldQM21RaTluNUxqdC1zeGUtMU40S3p1YjNWRnBJYnRjdzdOYjVRcWViWUxNVEl1dTBGbkd2cXlpandWUUlCWUw4VXBheXFCMDlkWGFobmRvbmkwVTVJei1nbG9PYlR5N0JuVDFCY3F2VG9RbFczYVkyNzNac0VKS0pRZndsdzBfLQ?oc=5",
+     "snippet": "Paris’ Greener Future: Why France’s Capital Is Trading Cars for Canopies&nbsp;&nbsp;LUXUO",
+     "source_score": 0.5
+    },
+    {
+     "title": "Fashion capital Paris was 'epicentre' of Epstein network, new book claims - rfi.fr (rfi.fr)",
+     "url": "https://news.google.com/rss/articles/CBMirAFBVV95cUxOdnM3UDVMTW9Vajd4VTEya0ZEcnY5R3RuaHVhT1V5NUswX2xXNk1UbXBSZXZLc1kzT0QxdE93a1pYRnFEVDh6SmpYY3N3SS1xSXlXQzVubWV6bkFEX3R0MS1BemY3dDl1dGUwTkZSNGIzZUlhYk5MUW1XaklsS1RRa1ZYeE0tcnRQWS1mTGd3YXdjOENNQlJkLTJVQWJ5akpxVlk5WDVoRXllUFhE?oc=5",
+     "snippet": "Fashion capital Paris was 'epicentre' of Epstein network, new book claims&nbsp;&nbsp;rfi.fr",
+     "source_score": 0.5
+    },
+    {
+     "title": "End of the heatwave in Île-de-France: temperatures to fall as early as Friday - Sortir à Paris (Sortir à Paris)",
+     "url": "https://news.google.com/rss/articles/CBMi1gFBVV95cUxNdS0zaVlJSTJDVkJ3T0kxazR3X1JrV2tBVFlBSWxvUjJyMGtmMzdCSUotNHFBeEp5clhEVV8xTjhDNDhRSWd0aGF3bmhlYnhEeG16eFE3bjBtMW4tRV91djhlbUxtQlNiREl3Z2Fjd2RicUticHBVeXZSZXk0ZElUX19pVWtZck9pV1h2eDZvbmVESkt1VE95VmZETzBmYXVpSjBvOHRxMGlwUmVsMVJhYXZ2dlczTWsxc1VCN3Z6bE5WVDhsSmtkcFZoQWV6N3lnMmFqaWN3?oc=5",
+     "snippet": "End of the heatwave in Île-de-France: temperatures to fall as early as Friday&nbsp;&nbsp;Sortir à Paris",
+     "source_score": 0.5
+    },
+    {
+     "title": "Paris, a Capital in “Resistance”? - The Nation (The Nation)",
+     "url": "https://news.google.com/rss/articles/CBMiY0FVX3lxTE9NVWhtVVNFT1FvQ2NTNlhwQncyZ29mRTNOU2ZuOUJBSzVQSUIxTm5RbHZJc1RoN29HN1lfczBSY2RncHN1bERnVERlRDRVVDdVZ1FVUWluX05BN3NpYzVQWlJsb9IBrAFBVV95cUxNSG9MY2RlZDZIeFhxRDk4dU4tWkNBNXpNM09VUHFOdEpYLThYQ25NdjVGTmdqS2RRYTQxUGZ3QWtvSmx4MERRZm9zbnJhWmJ5UGJ0VlRIa2tUSWoxb0NIY3lWU242bUcwNE9DaFBMMkdxNEZKWkRyRFNPbndfWmgybGNvT1BHZ2ZsWGRmX0lNLVlDd25PYWlLNWpwMncxSlJlS3BzQXNRanRicUJ1?oc=5",
+     "snippet": "Paris, a Capital in “Resistance”?&nbsp;&nbsp;The Nation",
+     "source_score": 0.5
+    }
+   ]
+  },
+  {
+   "expected": "true",
+   "claim": "The Great Wall of China is located in China.",
+   "evidence": [
+    {
+     "title": "Explore the Great Wall of China - britannica.com (britannica.com)",
+     "url": "https://news.google.com/rss/articles/CBMieEFVX3lxTE9yeUxVMUlvNlNwR3QwSlhPSUJHUXJrcFh2N25HamtzcklYeWdCZ2ZTU0lWMXZNbzNSd3VlUzZBQ1p3dFJGM01fSnRhc1hoWE9PMjVxQlZfLXdsWEtiZ3B1TDkyWjNVZkpuNHRjMHh3dzlqaE1VaGNFVQ?oc=5",
+     "snippet": "Explore the Great Wall of China&nbsp;&nbsp;britannica.com",
+     "source_score": 0.8
+    },
+    {
+     "title": "Wikipedia: Great Wall of China",
+     "url": "https://en.wikipedia.org/wiki/Great+Wall+of+China",
+     "snippet": "The Great Wall of China is a series of fortifications in China. They were built across the historical northern borders of ancient Chinese states and Imperial China as protection against various nomadic groups from the Eurasian Steppe. The first walls date to the 7th century BC; these were joined together in the Qin dynasty. Successive dynasties expanded the wall system; the best-known sections were built by the Ming dynasty (1368–1644).\nTo aid in defense, the Great Wall utilized watchtowers, tro",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Great Green Wall (China)",
+     "url": "https://en.wikipedia.org/wiki/Great+Green+Wall+%28China%29",
+     "snippet": "The Great Green Wall, officially known as the Three-North Shelter Forest Program (simplified Chinese: 三北防护林; traditional Chinese: 三北防護林; pinyin: Sānběi Fánghùlín), is a series of human-planted windbreaking forest strips (shelterbelts) in China, designed to hold back the expansion of the Gobi Desert and provide timber to the local population. The program started in 1978 and is planned to complete around 2050, at which point it will be expected to have created a vast green barrier spanning approxi",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: The Great Wall (2016 film)",
+     "url": "https://en.wikipedia.org/wiki/The+Great+Wall+%282016+film%29",
+     "snippet": "The Great Wall (simplified Chinese: 长城; traditional Chinese: 長城) is a 2016 monster film directed by Zhang Yimou, with a screenplay by Carlo Bernard, Doug Miro and Tony Gilroy, from a story by Max Brooks, Edward Zwick and Marshall Herskovitz. An American and Chinese co-production starring Matt Damon, Jing Tian, Pedro Pascal, Willem Dafoe, and Andy Lau, the plot centers on two European mercenary warriors (Damon and Pascal) imprisoned by imperial Chinese forces within the Great Wall of China after ",
+     "source_score": 0.65
+    },
+    {
+     "title": "China’s Great Wall is being restored one brick at a time - NBC News (NBC News)",
+     "url": "https://news.google.com/rss/articles/CBMikAFBVV95cUxOTFVrRTdqS0N1NHotVkh5X1FxaF9jeWRNdEpibU94TVNST2FCOWZaTExEcFdLVDd5ejhfZWxQdUM4U0trRmF1WjhBQndBcDFkRm5OZ3ZaMEFkMWtZNnVDTzFDTGhJbjhRVE1IQm90RWstV2RxY1dheFBhX2tqczNlczBjcnNCQXlBSWFCYVBTR3I?oc=5",
+     "snippet": "China’s Great Wall is being restored one brick at a time&nbsp;&nbsp;NBC News",
+     "source_score": 0.5
+    },
+    {
+     "title": "Family of Gaza aid worker Jim Henderson to trek Great Wall of China in his memory - falmouthpacket.co.uk (falmouthpacket.co.uk)",
+     "url": "https://news.google.com/rss/articles/CBMilAFBVV95cUxPLWhUdjZZT3RIMUlfRndidWt3MV81ay1FTVozVThXWVRVcUVXeFhtdEQwRURIV3JKUkktRmR4cjRqZ1FjdERGMUkwaWJLN0pjSFZ5ZnVaSE1Sa2tLUm5TYWRzQ0o2Y1NKbHRORTZGWS04ZUliTXR4TEZHNkFOV1JCZEVCbm5vcWtzUGJBSE5pZWpMN0ZC?oc=5",
+     "snippet": "Family of Gaza aid worker Jim Henderson to trek Great Wall of China in his memory&nbsp;&nbsp;falmouthpacket.co.uk",
+     "source_score": 0.5
+    },
+    {
+     "title": "Archaeologists Broke Open the Great Wall of China—and Found a Treasure Trove of Artifacts - AOL.com (AOL.com)",
+     "url": "https://news.google.com/rss/articles/CBMihwFBVV95cUxQV2hDVEJGV3BmVlhMSmw0R3gyVHNsYTI0X3FhcjZpRk8yTDdPaEZ2ZUdSVWoxQ0lsY1RaZDF0R3dnd1J5OE51VHRvTnJmblpiNWpldDZRYzNUMFRmakdFUkYzemlYWjRrNDZyV1VrSHUtOFJWQUpxVFNXNm1mdnFJZFNDWlM1akU?oc=5",
+     "snippet": "Archaeologists Broke Open the Great Wall of China—and Found a Treasure Trove of Artifacts&nbsp;&nbsp;AOL.com",
+     "source_score": 0.5
+    },
+    {
+     "title": "2,300-year-old wine found near Great Wall ruin reveals ancient brewing secrets - SCMP (SCMP)",
+     "url": "https://news.google.com/rss/articles/CBMizgFBVV95cUxNWFNqdV9acWx2aWZNQkR1VHJxQ2ItZWNaTUozOFYzYjFEWFFLNVdoYTNZMzJPOUFNaWQwc1VKX0Y4dlZES1cyN0ktUHUwZDlXRTdTRDdZbl9sU0J5NXF3QktKLWF0ZS1mRUpwVkFJWG50TGc5d2JYTjE5VTJlc282RHpjOTlTSkFIZEJKekc3N2pScWUwWHZOd0pZV3NDOFp4dmRyYTdSNzlKOWJwVHZ3NjlvQTJIVE83V2dTaGNOVGtCQUJtYUQ1ZEUzLTFtd9IBzgFBVV95cUxOaDhCZjBjanVVUnNCQmtmRWM5NllubVNlQkN6Nk1pTlBxY1hfODFWSkRsTmZDbG8yX3pjOEtLNElBUFpfTkxpYkk5Wm1VZ1lCbWhleDF2R0N5Zy1QZWFUSWhjOVVuMFpSa0NDb0lsRy04cFVtdDhfUkhQTlBWMEtsZ2gya2Z1OXlEZHhfTlBIM1JwMG5SN0xZMk9sQVJPSUpTUFNmQjhsXzJUWDVCTEdCZGQtMU9EQTRTSzRYaWhhUVIzZElwbmFQaXE1T3ZHdw?oc=5",
+     "snippet": "2,300-year-old wine found near Great Wall ruin reveals ancient brewing secrets&nbsp;&nbsp;SCMP",
+     "source_score": 0.5
+    }
+   ]
+  },
+  {
+   "expected": "true",
+   "claim": "Vaccines are approved by regulators before public use.",
+   "evidence": [
+    {
+     "title": "MHRA reaffirms the safety of childhood vaccination - GOV.UK (GOV.UK)",
+     "url": "https://news.google.com/rss/articles/CBMijgFBVV95cUxOYVBEbkpUa1VlNDVObFg2VV9FTGppNDh0Z19mclhiRXBBWnVuaUNpSWtMUXF5SHlGdUFULUdyUzFvc1Vtd2NyQWRvSGVseU5KbGVnSHZYc3h2SHZqNS04aUh0bDdsS0djd2R0dzQ2d3haV09ValpCMVhSaUNfWGQzVFFHM1BBNTdzRkxHdDV3?oc=5",
+     "snippet": "MHRA reaffirms the safety of childhood vaccination&nbsp;&nbsp;GOV.UK",
+     "source_score": 1.0
+    },
+    {
+     "title": "How Vaccines are Developed and Approved for Use - Centers for Disease Control and Prevention | CDC (.gov) (Centers for Disease Control and Prevention | CDC (.gov))",
+     "url": "https://news.google.com/rss/articles/CBMicEFVX3lxTFA4VWF0aGM3eUpTYnJJSE5lYUk3c3dROFRsbXhodXprcVVZUlF4ZnJEbkhDSWpWWW5wVTZKRV9UY3pSSC05Mlh1OWdYMnRMV282ZW4yMThpSTZPaVd1Y0lWWkIxc3A0QUE4UjRMRURuQmE?oc=5",
+     "snippet": "How Vaccines are Developed and Approved for Use&nbsp;&nbsp;Centers for Disease Control and Prevention | CDC (.gov)",
+     "source_score": 0.98
+    },
+    {
+     "title": "Snopes: Images of Gazan child before deadly airstrike are from real video, but likely AI-enhanced",
+     "url": "https://www.snopes.com/news/2026/09/18/israel-airstrike-gaza-child-photos/",
+     "snippet": "An authentic video recorded in September 2026 reportedly shows the final moments of young Muhammad al-Zinati's life.",
+     "source_score": 0.96
+    },
+    {
+     "title": "Are mRNA vaccines safe? What scientists know so far - The London School of Hygiene & Tropical Medicine (The London School of Hygiene & Tropical Medicine)",
+     "url": "https://news.google.com/rss/articles/CBMiugFBVV95cUxPcGpiT1I0T3FZV2JtblVmSURfaUI5Y0lGdVc4eVVJRjJMcEZ0dl9VMWNuNThFWlNwWm5qdF9reEV3OEE4Nl9ieHVGb0lvUzBJTkVYVlZsbU1kd3FONDJYcXQ1TjQ4V0JEOXJ2OGhQUTUzOXlEeUdXODJ1N1pXdUtTZkJ2Wlp6MEhhQThrdFRTZnMtTVU3RWYwM0xKYkJsczFnMG9NX1FocEJrWTc4QWpGU0Z1RERKZVYyV0E?oc=5",
+     "snippet": "Are mRNA vaccines safe? What scientists know so far&nbsp;&nbsp;The London School of Hygiene & Tropical Medicine",
+     "source_score": 0.85
+    },
+    {
+     "title": "FDA to raise hurdles for vaccines, faulting COVID shots for 10 kids' deaths - NPR (NPR)",
+     "url": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxOU3dVRndQSU1xTUZDTFdKSWhMV2RHQlJNdDJsQWhheUN0eXJjTHp4aXN1RENNQWU3bWE4N0JaUTdEMC1Ldmk1SmNQQ29MVUQxWVI0Y0VKSUpaV1dNanNTNGZmRVNDT1BWYVk0eklJRURubGFUTFk1RXUxXy1lVEF0NV9zZDVHNFpRazB2SDFvYkxELWVxV2JVRjdxNHd0RUpGSkNyUjB6WUhndw?oc=5",
+     "snippet": "FDA to raise hurdles for vaccines, faulting COVID shots for 10 kids' deaths&nbsp;&nbsp;NPR",
+     "source_score": 0.82
+    },
+    {
+     "title": "Wikidata: vaccine (Q134808)",
+     "url": "https://www.wikidata.org/wiki/Q134808",
+     "snippet": "Entity: vaccine (also known as: vaccines). Description: substance used to stimulate the production of antibodies and provide immunity against one or several diseases, agent of a disease, its products, or a synthetic substitute.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikidata: Vaccines (Q27725508)",
+     "url": "https://www.wikidata.org/wiki/Q27725508",
+     "snippet": "Entity: Vaccines. Description: scientific journal.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikipedia: COVID-19 vaccine",
+     "url": "https://en.wikipedia.org/wiki/COVID-19+vaccine",
+     "snippet": "A COVID‑19 vaccine is designed to induce immunity against SARS-CoV-2, the virus responsible for coronavirus disease 2019 (COVID-19). COVID-19 vaccines help reduce the risk of severe illness, hospitalization and death from the virus.\nCOVID‑19 vaccines were developed at an unprecedented pace to tackle the COVID-19 pandemic, with the first clinical trials beginning in March 2020. Before approval, vaccines underwent the standard three phases of clinical trials, although phases were conducted in para",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Vaccine",
+     "url": "https://en.wikipedia.org/wiki/Vaccine",
+     "snippet": "A vaccine is a biological preparation that provides active acquired immunity to a particular infectious or malignant disease. The safety and effectiveness of vaccines has been widely studied and verified. A vaccine typically contains an agent that resembles a disease-causing microorganism and is often made from weakened or killed forms of the microbe, its toxins, or one of its surface proteins. The agent stimulates the immune system to recognize the agent as a threat, destroy it, and recognize f",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: The Vaccines",
+     "url": "https://en.wikipedia.org/wiki/The+Vaccines",
+     "snippet": "The Vaccines are an English indie rock band, formed in West London in 2010 by Justin Hayward-Young, Freddie Cowan, Arni Arnason and Pete Robertson. The band  currently consists of Young (lead vocals, guitars), Árni Árnason (bass, vocals), Timothy Lanham (guitars, keys, vocals) and Yoann Intonti (drums).\nThe Vaccines have toured extensively, playing with and opening up for acts such as the Rolling Stones, Arcade Fire, Arctic Monkeys, Kings of Leon, Phoenix, Red Hot Chili Peppers, Imagine Dragons,",
+     "source_score": 0.65
+    },
+    {
+     "title": "Is Moderna's melanoma vaccine approved by the FDA? What to know - Bergen Record (Bergen Record)",
+     "url": "https://news.google.com/rss/articles/CBMiqwFBVV95cUxOVTZFV0Jzam9SRW5idXNHdXJwd1N3UlBQQUZGeUo1MkpJZVpPZW5HR09UZmp4bFVnckcyc3lEM1NMX1BOdGNrR1A2aFJKZVJBS3lMUlhqZVFET3dyVkRTSDFxbTZ1cmFmUXA0SndyRWl2eDJSNC1NcDgxdURqNmQ1cjBnQ1ZXVjZvU2RHZkZjTGNGdGdoQmhBbXhjWDBnOU1KVldtSmxQWF9LRzQ?oc=5",
+     "snippet": "Is Moderna's melanoma vaccine approved by the FDA? What to know&nbsp;&nbsp;Bergen Record",
+     "source_score": 0.5
+    }
+   ]
+  },
+  {
+   "expected": "false",
+   "claim": "The Earth is flat and NASA has been hiding it for decades.",
+   "evidence": [
+    {
+     "title": "PolitiFact: Maine and Medicaid: Did Troy Jackson expand coverage and Susan Collins vote for cuts?",
+     "url": "https://politifact.com/factchecks/2026/sep/14/winsenate/maine-and-medicaid-did-troy-jackson-expand-coverage-and-susan-collins-vote-for-cuts/",
+     "snippet": "\"Troy Jackson expanded Medicaid health coverage in Maine. Susan Collins was the deciding vote for Trump's Medicaid cuts.”",
+     "source_score": 0.96
+    },
+    {
+     "title": "PolitiFact: RFK Jr.’s claim that the US has the ‘sickest children’ in world history is wrong",
+     "url": "https://politifact.com/factchecks/2026/sep/10/robert-f-kennedy-jr/children-health-history-midterm-convention/",
+     "snippet": "The U.S. has “the sickest children in the history of the world.”",
+     "source_score": 0.96
+    },
+    {
+     "title": "Full Fact: No, the NASA astronauts killed in the 1986 Challenger disaster are not still alive",
+     "url": "https://fullfact.org/technology/challenger-astronauts-not-still-alive/",
+     "snippet": "Social media posts are being shared promoting conspiracy theories that the 1986 space shuttle crash was faked and that deceased crew members are out living secret lives.",
+     "source_score": 0.96
+    },
+    {
+     "title": "Full Fact: False claims Bill Gates wrote an article on depopulating the earth with ‘forced vaccines’ recirculate",
+     "url": "https://fullfact.org/health/bill-gates-vaccine-depopulation-article/",
+     "snippet": "Several incorrect posts claiming that Mr Gates wrote an article about using vaccinations to control the population have been shared online.",
+     "source_score": 0.96
+    },
+    {
+     "title": "Wikidata: Earth (Q2)",
+     "url": "https://www.wikidata.org/wiki/Q2",
+     "snippet": "Entity: Earth (also known as: The Earth). Description: third planet from the Sun in the Solar System.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikidata: The earth (Q59825412)",
+     "url": "https://www.wikidata.org/wiki/Q59825412",
+     "snippet": "Entity: The earth. Description: painting by Martin de Vos.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikipedia: Earth",
+     "url": "https://en.wikipedia.org/wiki/Earth",
+     "snippet": "Earth is the third planet from the Sun and the only astronomical object known to harbor life. This is made possible by Earth being an ocean world, the only one in the Solar System sustaining liquid surface water. Almost all of Earth's water is contained in its ocean, which covers 70.8% of Earth's crust. The remaining 29.2% of Earth's crust is land, which is predominantly located within Earth's land hemisphere in the form of continental landmasses. Most of Earth's land is at least somewhat humid ",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: In the Earth",
+     "url": "https://en.wikipedia.org/wiki/In+the+Earth",
+     "snippet": "In the Earth (stylized as IN THE EⱯRTH) is a 2021 science fiction psychological horror film written and directed by Ben Wheatley. The film stars Joel Fry, Reece Shearsmith, Hayley Squires, Ellora Torchia, John Hollingworth, and Mark Monero.\nIn the Earth had its world premiere at the 2021 Sundance Film Festival on 29 January 2021, and was released in North America on 16 April 2021, by Neon.",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Moon",
+     "url": "https://en.wikipedia.org/wiki/Moon",
+     "snippet": "The Moon is the only natural satellite of Earth. It orbits Earth at an average distance of 384,399 kilometers (238,854 mi). Because the Moon follows an elliptical path, its distance from Earth varies over the year, ranging from 357,000–407,000 kilometers (222,000–253,000 mi), a distance roughly 30 times the width of Earth. It completes an orbit (lunar month) in relation to Earth and the Sun (synodically) every 29.5 days. The Moon and Earth are bound by gravitational attraction, which is stronger",
+     "source_score": 0.65
+    },
+    {
+     "title": "NASA has quietly accumulated more than 150 petabytes of data across decades of missions, and under a new White House initiative launched in November 2025, it's betting that AI can find discoveries still hiding in archives too vast to examine by hand - Space Daily (Space Daily)",
+     "url": "https://news.google.com/rss/articles/CBMixwJBVV95cUxQN1A0SWlSbmZDbXB6QzVJeHBBUjdxY3FZdnlCR2I4OFlzajMteGpudGVKdjVvRjZRZ2Z5U2NTdWFYeWc1MW0wdmdUTmxXdm1hd0ZJQlNqOS1pLVBhZGplUGJ5bk5IT3FibnphVW1qN3BVOGMyaHdaaUpqbFUwZXVka2NONnoxTFZSeW9RSWFJcF9Qb1F6LTNqU0MxbDdhenhrRDU4UjhUWDNyNkJRRzhlbnl6dERzdTZ1dXlUX2NjcV9wV3pBdXdNZHVjc2lVbXRSQkhIcm91dmNKcVVDc05ib1hBWW9jYjREVTdIQVBIRG1UWHBIQjNQdHBLVHhLRkNEMm5leDRXSzdXRXY5RmJLdVdnYm9XMVVqakY2Q1ZnYW1Hdl9La0ZET0ZjSUhCcDBKZXhDUXdwazFuQkFfSGYtZUNYQjZKTDA?oc=5",
+     "snippet": "NASA has quietly accumulated more than 150 petabytes of data across decades of missions, and under a new White House initiative launched in November 2025, it's betting that AI can find discoveries still hiding in archives too vast to examine by hand&nbsp;&nbsp;Space Daily",
+     "source_score": 0.5
+    },
+    {
+     "title": "Scientists are now seriously asking if humans were seeded by aliens. Here’s why - BBC Science Focus Magazine (BBC Science Focus Magazine)",
+     "url": "https://news.google.com/rss/articles/CBMid0FVX3lxTE8tMHJ2LXdHYXhvMkwwMFgzYWRSWE9yYzZxakJQZmdtSjV0Qy15Um8wXzVsLTVGSGh2SWRmcW9uNEg1ZHB4Ry1zaVctRDZsYmxzcFAwMUkzM2poYk1uSzc4ZmN3NVJpNU0xTnpQc1BQczFDMmE3S1FR?oc=5",
+     "snippet": "Scientists are now seriously asking if humans were seeded by aliens. Here’s why&nbsp;&nbsp;BBC Science Focus Magazine",
+     "source_score": 0.5
+    },
+    {
+     "title": "Mercury’s cratered surface has been hiding evidence of a much smaller planet - The Brighter Side of News (The Brighter Side of News)",
+     "url": "https://news.google.com/rss/articles/CBMitAFBVV95cUxPckh5YXdFWDkwYUZFQTBPV0dTX19odlZBbmI4V1NxTHJGSmNOR1F5MjFRUjdpMTF2MmZkS2x0UDdmRTNWRVpvcWw0NXltU0VGZWpYeW4xN3VvRE5GY3BXbzRHaW5kM00wVDlUTVJELTZ4RUtRaUw1QmZSWHI5WFpUSlIxZ0lqMjJHUzR2dDMxT0ZfcU15QnRYNGxoeVFrdWxDc2M3UDBocldwZ3NtRXBCQm9Geko?oc=5",
+     "snippet": "Mercury’s cratered surface has been hiding evidence of a much smaller planet&nbsp;&nbsp;The Brighter Side of News",
+     "source_score": 0.5
+    },
+    {
+     "title": "What the Moon Rocks Were Hiding - Universe Today (Universe Today)",
+     "url": "https://news.google.com/rss/articles/CBMiekFVX3lxTE1ZeXJRc3FLdXU5ZEFSX25OZU9oYmJvaGxleDJLV0JGVG9QX3U5Y293eUZkVUlyVVRLM3Q2MmNMZjhSTG5TaTdvTGNlRE9GSEc3Z081bDAxTGNod0ozODVOOUppcVFfUzVVWElpSlJqdHFFTWY1VS1qVm9R?oc=5",
+     "snippet": "What the Moon Rocks Were Hiding&nbsp;&nbsp;Universe Today",
+     "source_score": 0.5
+    },
+    {
+     "title": "The Photos That Shaped Our Understanding of Earth’s Shape - Nautilus | Science Connected (Nautilus | Science Connected)",
+     "url": "https://news.google.com/rss/articles/CBMiigFBVV95cUxOZlR6bU1ZaVhMbHpSRFU1QzhiaVJfNDdSR0JMWEU2NGVrT25yUzRvRVVRcDdxVkVxQWlyZ1pvT3d2clBRQnBjNUVkTW5fRnFDbS0wVVVCVnVKM0hSSjRidVBIX0NUbFFqWVVGX1dST01KbHpLREFxeUR1WjJiNy03MGV5VzhRRjdtRlE?oc=5",
+     "snippet": "The Photos That Shaped Our Understanding of Earth’s Shape&nbsp;&nbsp;Nautilus | Science Connected",
+     "source_score": 0.5
+    }
+   ]
+  },
+  {
+   "expected": "false",
+   "claim": "NASA confirmed the moon landing was filmed in a Hollywood studio.",
+   "evidence": [
+    {
+     "title": "Full Fact: The UK’s foreign-born population in 2024 was not ‘up 143% in a decade’",
+     "url": "https://fullfact.org/immigration/foreign-born-population-zia-yusuf/",
+     "snippet": "A figure quoted by Reform UK’s Zia Yusuf for the increase in the UK’s foreign-born population is far too high, and may refer to an estimate of the increase over 20 years.",
+     "source_score": 0.96
+    },
+    {
+     "title": "Full Fact: No, the NASA astronauts killed in the 1986 Challenger disaster are not still alive",
+     "url": "https://fullfact.org/technology/challenger-astronauts-not-still-alive/",
+     "snippet": "Social media posts are being shared promoting conspiracy theories that the 1986 space shuttle crash was faked and that deceased crew members are out living secret lives.",
+     "source_score": 0.96
+    },
+    {
+     "title": "Artemis II broadcast error used to stoke false claims mission was staged - AFP Fact Check (AFP Fact Check)",
+     "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE9VSGNMcGVzZDVyYnZuZ1BGMnVWOWJUSzY3ODF4S3BRNFFrcklaR2hmb2N0MmcycGQtZXBwa2VEbkFneDBOWEpTdU1DdDJ0T1BuNlZZNXRMUzc?oc=5",
+     "snippet": "Artemis II broadcast error used to stoke false claims mission was staged&nbsp;&nbsp;AFP Fact Check",
+     "source_score": 0.95
+    },
+    {
+     "title": "Apollo landing footage would have been impossible to fake. A film expert explains why. - pbs.org (pbs.org)",
+     "url": "https://news.google.com/rss/articles/CBMivgFBVV95cUxQTXZaQ2VjYTZCVzZGVXFhT1g5cmkzenpwelB3aTJjTmdZQ3I2eTRXbEhBcTRtejBVaS1HRTRxN2JrTkhodzRDcjRqQ3dHd1NUREFxOHpCc3AtNkw0SVFfS3dNLTR3NlBNZk56UE1TLW1DaWNmQmNISjVESjJveTRtV09nQ2EtTU9tQVd0MVN5Q1p4cUZtTjhKaGs3QmF2SGFyZWM4OWhEZ2pDcW1fazN0MUp6WWJ1NWVGTzNXZ3FR0gHDAUFVX3lxTFBjdUp4X090aDJkRlhDaEl5amliNFZsZ3dKaGFObm93VWdjSW5GQVlkbWE5bzVDQUxONUNuQUZGZ2xhSTBydmU2Z2J3UjZhcUxnLVY4MHEtSjFaaHRwTV9sRmpkaUZ2ZHpHam1ENUFCbVk1T1p5cDl6TjRuSm1kSGhCSTVmVF8xSzZDcDVXcTZqNDlnRTNQeFU0Z09FLXVFaE9hNXktaG5odVVScHdXM1BqQTUxclN1NTlJdlE1b2FYUUp6cw?oc=5",
+     "snippet": "Apollo landing footage would have been impossible to fake. A film expert explains why.&nbsp;&nbsp;pbs.org",
+     "source_score": 0.82
+    },
+    {
+     "title": "Shot In Studio, AI-Generated: Internet Calls Artemis II Moon Mission \"Fake\" - NDTV (NDTV)",
+     "url": "https://news.google.com/rss/articles/CBMisgFBVV95cUxNbHhMY0Y4THZDTktkOGJwTDFqTHI2cngyQzdoa09LMjNDMTdvbGNIYzV5blN3d1BhNXlTaWZ1MFRZb0FJZHlXYmxwV3hlakJvRlJXNnE2Q2s5VkV1akRPNF9XOHluS0wzcEtXQm02cVFra2hxdDNCcHFxUzdFUGc3LVNrSEdqazJuR09RcWd0YmhDaWJiWWtfS0hoT2tKR25OUDhjUnpvUUdCSWxXMG9NLWln0gG6AUFVX3lxTE9zNkF5eXZLcUVFVHJ1c3k2dF94Mzh4ZDRNTHZTWnJnVzktdEhTQ3B1UlFTNXAyaWNSVmNNcTZlQmVjVmhRZV91N1lSN21salpIQnRfYlY1eHNRYjR5RUxRd3VxbXZPVVF0S1FMczg4SHlCcVNfRjVZQjRqSTRTMXJmT2cyTkxTbUVGcnZzZDdPcVRJTm1nOU5RUzAwZDNHcnpKMkRJdklUS1RPQjZidVFQZ09oblZQRnVCUQ?oc=5",
+     "snippet": "Shot In Studio, AI-Generated: Internet Calls Artemis II Moon Mission \"Fake\"&nbsp;&nbsp;NDTV",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikidata: Hollywood (Q34006)",
+     "url": "https://www.wikidata.org/wiki/Q34006",
+     "snippet": "Entity: Hollywood. Description: neighborhood in Los Angeles, California, United States.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikidata: Hollywood (Q2292939)",
+     "url": "https://www.wikidata.org/wiki/Q2292939",
+     "snippet": "Entity: Hollywood. Description: song by Madonna.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikipedia: Hollywood",
+     "url": "https://en.wikipedia.org/wiki/Hollywood",
+     "snippet": "Hollywood usually refers to:\n\nHollywood, Los Angeles, a neighborhood widely recognized as the center of the U.S. film industry\nHollywood, a metonym for the commercial cinema of the United States\nHollywood may also refer to:\n\n",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Hollywood, Los Angeles",
+     "url": "https://en.wikipedia.org/wiki/Hollywood%2C+Los+Angeles",
+     "snippet": "Hollywood, sometimes informally called Tinseltown, is a neighborhood in Central Los Angeles, California. Its name has become synonymous with the American film industry and the people associated with it. Many notable film studios such as Universal Pictures, Paramount Pictures, Warner Bros., Walt Disney Studios and Sony Pictures are located in or near Hollywood.\nHollywood was incorporated as an independent municipality on November 9, 1903. The municipality of Hollywood was consolidated with the Ci",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Hollywood Arts",
+     "url": "https://en.wikipedia.org/wiki/Hollywood+Arts",
+     "snippet": "Hollywood Arts is an upcoming American teen sitcom developed by Jake Farrow and Samantha Martin, which serves as a sequel and spin-off to Victorious, with Daniella Monet reprising her role as Trina Vega. It is set to premiere on Netflix on October 15, 2026.\n\n",
+     "source_score": 0.65
+    },
+    {
+     "title": "How Stanley Kubrick Staged the Moon Landing by Rich Cohen - The Paris Review (The Paris Review)",
+     "url": "https://news.google.com/rss/articles/CBMirgFBVV95cUxQd3JISFFaSEJOQXAzd1liVjVsdWVwdm5mb091cFlocm81ZXJYS1M3YTA3QnNiYzhtT0lQVi1vLWFKckFjTnNpb0pmQTFHbUU5b3JNcXNLbS13TU5xdE5fa2dGaWFrYjNTSTNtbFFfZHplRFZMSEhyTzNwM2lGVHVIdGtYWTR1RUZYcDk3TENick1rVVhqVFBqZG1NVDFQOEdTTklwTDdkT3RhVjhENHc?oc=5",
+     "snippet": "How Stanley Kubrick Staged the Moon Landing by Rich Cohen&nbsp;&nbsp;The Paris Review",
+     "source_score": 0.65
+    },
+    {
+     "title": "Moon landing conspiracy theories, debunked - Royal Museums Greenwich (Royal Museums Greenwich)",
+     "url": "https://news.google.com/rss/articles/CBMikAFBVV95cUxQVEhJcVpCd2NqODJHRHhKaU9ZYmdUbWRzZ1o4UlRQd2MwQ2pwaXRFSnZRVm44WXVOZjMxQXp4cGNyaTZnS19ldm1LRmp1V3NkN3RDanlJSWpFVFV4bzlaS3UzMjlYUEVXODB0Qk5aWlFBc3JQME5BSnRscURrVmZMLU5oQV9LUXlrSzVVakp2ekc?oc=5",
+     "snippet": "Moon landing conspiracy theories, debunked&nbsp;&nbsp;Royal Museums Greenwich",
+     "source_score": 0.5
+    }
+   ]
+  },
+  {
+   "expected": "false",
+   "claim": "Drinking bleach cures COVID-19 within 24 hours.",
+   "evidence": [
+    {
+     "title": "Coronavirus: Outcry after Trump suggests injecting disinfectant as treatment - BBC (BBC)",
+     "url": "https://news.google.com/rss/articles/CBMiXkFVX3lxTE50QzVoazUxOENLakQtNlhCbVFDdk1rNHp2dGg4TnpadkM0REVHYnZKMEJPcmU5VFlFUU9pbmZfVlJyQW1fUk9mY2R2ZXhvRWx2VF9BbnBYMVZSLVhkRlE?oc=5",
+     "snippet": "Coronavirus: Outcry after Trump suggests injecting disinfectant as treatment&nbsp;&nbsp;BBC",
+     "source_score": 0.92
+    },
+    {
+     "title": "Report: No evidence bleach consumed to cure COVID-19 during pandemic - CIDRAP (CIDRAP)",
+     "url": "https://news.google.com/rss/articles/CBMiogFBVV95cUxNUFVqR3A5ZHZZQUI3ZnBiWkw0OWVLNHhCNjZRZldON1U4ci1QWW9oSU1wc2JheUhRQW83a2ZfOFFDTk5oMDhwRnhCM040Z3RlVnJwNll3aE0zOTlxQ0JQRVA1MFhhT2xFLXlLRXhTWFM0SXFkV2t3VFVrMHg0Ry1OdlZfNk1yUzRZWXRLcnBxOWZNVG1JYkExLTNtNjgtMVRPYlE?oc=5",
+     "snippet": "Report: No evidence bleach consumed to cure COVID-19 during pandemic&nbsp;&nbsp;CIDRAP",
+     "source_score": 0.85
+    },
+    {
+     "title": "Perspective | Garlic and bleach won’t cure coronavirus. How such myths originated — and why they’re wrong. - The Washington Post (The Washington Post)",
+     "url": "https://news.google.com/rss/articles/CBMi6AFBVV95cUxOSEtlMmpRZ1ZoZ3ROZ2tSaDNManRjdHlWcHlXMkVjdC0xdFAzeHhFdXJNejB1M2l3YmV2Nk1jb01kalV6VVZnT3ZXaGNQUld1TkdvUzB0a3J1MVFpaVp0ckhUOUNNTHFlc19PM1RxOUlseVlMRE9Sd2xsbGpFUldrTTh5bW5vYnFaTW93c2htRlE5a01KemJfYkhtQ0hCaVp5dF8wV19pMUdXUmdLRVVnUzlLSHBvOVNKd1VwaTREY0YyRmsyQ1J4MGl0blZlbURHWV92M0hwdnluMmZCU3hfVlh6NEMtaW16?oc=5",
+     "snippet": "Perspective | Garlic and bleach won’t cure coronavirus. How such myths originated — and why they’re wrong.&nbsp;&nbsp;The Washington Post",
+     "source_score": 0.85
+    },
+    {
+     "title": "Wikidata: alcohol consumption (Q2647488)",
+     "url": "https://www.wikidata.org/wiki/Q2647488",
+     "snippet": "Entity: alcohol consumption (also known as: drinking). Description: drinking of drinks that contain ethanol.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikidata: drinking (Q876776)",
+     "url": "https://www.wikidata.org/wiki/Q876776",
+     "snippet": "Entity: drinking. Description: ingesting water or other liquids into the body through the mouth.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikipedia: Drinking",
+     "url": "https://en.wikipedia.org/wiki/Drinking",
+     "snippet": "Drinking is the act of ingesting water or other liquids into the body through the mouth, proboscis, or elsewhere. Humans drink by swallowing, completed by peristalsis in the esophagus. The physiological processes of drinking vary widely among other animals.\nMost animals drink water to maintain bodily hydration, although many can survive on the water gained from their food. Water is required for many physiological processes. Both inadequate and (less commonly) excessive water intake are associate",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Drinking water",
+     "url": "https://en.wikipedia.org/wiki/Drinking+water",
+     "snippet": "Drinking water or potable water is water that is safe for ingestion, either when drunk directly in liquid form or consumed indirectly through food preparation. It is often supplied through taps, in which case it is also called tap water.\nThe amount of drinking water required to maintain good health varies, and depends on physical activity, age, health-related issues, and environmental conditions. For those who work in a hot climate, up to 16 liters (4.2 U.S. gal) a day may be required.\nAs many a",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Drink",
+     "url": "https://en.wikipedia.org/wiki/Drink",
+     "snippet": "A drink or beverage is a liquid intended for human consumption. Water is the common basis for drinks.  In addition to their vital function of satisfying thirst, drinks play important roles in human culture.  Common types of drinks include plain drinking water, milk, juice, smoothies and soft drinks. Traditionally warm beverages encompass coffee, tea, and hot chocolate. Caffeinated drinks that contain the stimulant caffeine have been consumed for centuries.\nIn addition, alcoholic drinks such as w",
+     "source_score": 0.65
+    },
+    {
+     "title": "Fact Check: Did Trump once tell Americans to inject bleach to fight COVID-19? - WUNC News (WUNC News)",
+     "url": "https://news.google.com/rss/articles/CBMiqwFBVV95cUxQQWtSd2N3blhUU0JvQk44b1JicUJxWnI2OFNEc0t5SmpKblVWSVpPR0ZlbkZoRHh1eTJqOERvMVRPLTlsRTBOWEFSLXhQNTVpbTBNSU9DNGZiSlltWlBTREFqQ1ZPdFcxSzFCeGxOMjRyb3lfUHBfSW9qUnJvRTVaaWdwb3hfV1FCRWR2Wkd6TjhaYldPb0VZRmZ4bmhRX3FSLUtHa1o5M1ZSbkk?oc=5",
+     "snippet": "Fact Check: Did Trump once tell Americans to inject bleach to fight COVID-19?&nbsp;&nbsp;WUNC News",
+     "source_score": 0.65
+    },
+    {
+     "title": "Did Americans Actually Drink Bleach During the COVID-19 Pandemic? | Health News | U.S. News - U.S. News & World Report (U.S. News & World Report)",
+     "url": "https://news.google.com/rss/articles/CBMiwgFBVV95cUxNcm9nY1pGOTdfbWUtckhneVR1akhIUkluc0g0QjQtWWpLTlB4STFmajhHZG9FX01XQUl0bEZQZlBITF9nVGtHRkJWTk45R1hrTUJxNTd3V3QycEdOX1V4aHJkSnJMc0g5UEJsay1lbDhoRWFQTkFNT3VJVlpFUno0anc2bUVMVVl4bU55WmwwOHhHTDhTcHRGQVNLRjRfTWJSTkxoYWpNM2ZHVl9mSnFubXZkaldyYnJUWUl2TENYZHZUdw?oc=5",
+     "snippet": "Did Americans Actually Drink Bleach During the COVID-19 Pandemic? | Health News | U.S. News&nbsp;&nbsp;U.S. News & World Report",
+     "source_score": 0.5
+    }
+   ]
+  },
+  {
+   "expected": "false",
+   "claim": "Vaccines cause autism according to a 2019 WHO study.",
+   "evidence": [
+    {
+     "title": "Full Fact: Covid vaccines have not been shown to cause ‘turbo cancer’",
+     "url": "https://fullfact.org/health/prostate-cancer-covid-vaccine/",
+     "snippet": "Social media posts suggest that Covid vaccinations are responsible for ‘turbo cancers’. There is no evidence to support this.",
+     "source_score": 0.96
+    },
+    {
+     "title": "CDC plans study on vaccines and autism despite research showing no link - The Washington Post (The Washington Post)",
+     "url": "https://news.google.com/rss/articles/CBMiiAFBVV95cUxOZGJiLVNQc3dVNDVWR2k1ZWQtYW1VRURXTWVOc3djTlZBaVdvR0ZLeU9yYVRFTzctSHdhc3VwelpnMUE0LTE3LWNZVllJSXlRVDhSNVBvMUUycjFJY2hmZF9UWE8zdFd3X0t4UGxzbTJyeWQ4UFdlSW9fRHQ4Z2M5aVpDNVZNNmZa?oc=5",
+     "snippet": "CDC plans study on vaccines and autism despite research showing no link&nbsp;&nbsp;The Washington Post",
+     "source_score": 0.85
+    },
+    {
+     "title": "3 thoughts from an autism researcher on Trump's acetaminophen and vaccine claims - NPR (NPR)",
+     "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxOQnRfWTl0Y05neXRTU2NBRGFGNl9wQzRvZ3J1WGZjdjRzTWd6V01jRGFoNUNlRGZiVVpFejFJSkdNN1l0QXRMNkw3cG5tQU9KTHc0ZjZIS0xrbWg4ZWd1ZnpIX3hnR0puVWtGTUFpQ0FscDRjVHpiQXZZTHdtUGdsaThXNS05d2JpaW5OdTk3LVNUZw?oc=5",
+     "snippet": "3 thoughts from an autism researcher on Trump's acetaminophen and vaccine claims&nbsp;&nbsp;NPR",
+     "source_score": 0.82
+    },
+    {
+     "title": "Wikidata: vaccine (Q134808)",
+     "url": "https://www.wikidata.org/wiki/Q134808",
+     "snippet": "Entity: vaccine (also known as: vaccines). Description: substance used to stimulate the production of antibodies and provide immunity against one or several diseases, agent of a disease, its products, or a synthetic substitute.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikidata: Vaccines (Q27725508)",
+     "url": "https://www.wikidata.org/wiki/Q27725508",
+     "snippet": "Entity: Vaccines. Description: scientific journal.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Can MMR vaccines cause autism? - Gavi, the Vaccine Alliance (Gavi, the Vaccine Alliance)",
+     "url": "https://news.google.com/rss/articles/CBMicEFVX3lxTE9JNUJDOGphZVNsVmxlQkFtZnVOcWRlcGd0TlBRbHR3emdyRm1IQkMxTVk5NFdESnRyR3VCR3N4UVNfTXVoN1lKN3BxWUNNTFpNMDByMHdodXhSS0ExNXJpQUtHMVdXdVhXcXIxVlR5clk?oc=5",
+     "snippet": "Can MMR vaccines cause autism?&nbsp;&nbsp;Gavi, the Vaccine Alliance",
+     "source_score": 0.65
+    },
+    {
+     "title": "CDC website now casts doubt on vaccines and their relationship to autism - CNS Maryland (CNS Maryland)",
+     "url": "https://news.google.com/rss/articles/CBMirAFBVV95cUxNYzJXQXdveVZUdVY0Wno3OXBQNlcxc1hJbHUxN1JodGlfb3VkNTJfenZQLU1VRzFzT1MxVDNJOUtBcmxHVUFHS3Q0dnRHdW5CcGpudTdBTGlaRWNtQVJlVVI3WXVWSEdNNVNaSFpGQjlfdEVsdmhGQUpWcVlFNi1zNVY0XzlUTENlWUN4NGlSOUQ4Wm84N1FwcHdsQ0RJWTYxMm5ZUnhTTHhHNDR0?oc=5",
+     "snippet": "CDC website now casts doubt on vaccines and their relationship to autism&nbsp;&nbsp;CNS Maryland",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Vaccine",
+     "url": "https://en.wikipedia.org/wiki/Vaccine",
+     "snippet": "A vaccine is a biological preparation that provides active acquired immunity to a particular infectious or malignant disease. The safety and effectiveness of vaccines has been widely studied and verified. A vaccine typically contains an agent that resembles a disease-causing microorganism and is often made from weakened or killed forms of the microbe, its toxins, or one of its surface proteins. The agent stimulates the immune system to recognize the agent as a threat, destroy it, and recognize f",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: COVID-19 vaccine",
+     "url": "https://en.wikipedia.org/wiki/COVID-19+vaccine",
+     "snippet": "A COVID‑19 vaccine is designed to induce immunity against SARS-CoV-2, the virus responsible for coronavirus disease 2019 (COVID-19). COVID-19 vaccines help reduce the risk of severe illness, hospitalization and death from the virus.\nCOVID‑19 vaccines were developed at an unprecedented pace to tackle the COVID-19 pandemic, with the first clinical trials beginning in March 2020. Before approval, vaccines underwent the standard three phases of clinical trials, although phases were conducted in para",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: The Vaccines",
+     "url": "https://en.wikipedia.org/wiki/The+Vaccines",
+     "snippet": "The Vaccines are an English indie rock band, formed in West London in 2010 by Justin Hayward-Young, Freddie Cowan, Arni Arnason and Pete Robertson. The band  currently consists of Young (lead vocals, guitars), Árni Árnason (bass, vocals), Timothy Lanham (guitars, keys, vocals) and Yoann Intonti (drums).\nThe Vaccines have toured extensively, playing with and opening up for acts such as the Rolling Stones, Arcade Fire, Arctic Monkeys, Kings of Leon, Phoenix, Red Hot Chili Peppers, Imagine Dragons,",
+     "source_score": 0.65
+    },
+    {
+     "title": "Trump pressured RFK Jr to slash childhood vaccines over autism fears: report - independent.co.uk (independent.co.uk)",
+     "url": "https://news.google.com/rss/articles/CBMirgFBVV95cUxPWlM3T3JaQ1ExemJGZGpLV05zWms1V0QzQ3BaM1ZqY1JSMzY4RmZDSjY2X1ZTQ3NyeXc1a2txTE15WDRhTjYxdzIxaXdIWWVocUlleDFqNWV0OW9pWm0tdjh4aFhwbk5IQkRGX3Q1Ukt4cl9PVW10OXdfXzE4eFlHVDBITEpGRmNOdkpRQzhmWW5LRENBVmpsNG1KaHByOGx0eDAyNmdSa1h1MG1ScVE?oc=5",
+     "snippet": "Trump pressured RFK Jr to slash childhood vaccines over autism fears: report&nbsp;&nbsp;independent.co.uk",
+     "source_score": 0.5
+    }
+   ]
+  },
+  {
+   "expected": "false",
+   "claim": "5G towers spread the coronavirus through radio waves.",
+   "evidence": [
+    {
+     "title": "COVID-19: 5G broadband conspiracy ‘a hoax with no technical basis’, UN telecoms agency - UN News (UN News)",
+     "url": "https://news.google.com/rss/articles/CBMiV0FVX3lxTE9sU2Q5VnVkM25QNFpGbWg0cmhKQTE2RkVFdnNETVVqVWJnZ1hTeTBmeDNLcVJCd2lNUWlFNHJoaS03NjdJd1NWaG1rbjVDZEFmdEZjQmRnQQ?oc=5",
+     "snippet": "COVID-19: 5G broadband conspiracy ‘a hoax with no technical basis’, UN telecoms agency&nbsp;&nbsp;UN News",
+     "source_score": 0.98
+    },
+    {
+     "title": "Coronavirus: Scientists brand 5G claims 'complete rubbish' - BBC (BBC)",
+     "url": "https://news.google.com/rss/articles/CBMiSEFVX3lxTE1rY3FhSVVnWTIyYUlOR3FtZ1RJVk1YQVd4dlBMaENDNWZlRTB1QXhBRXppX1BDYlpCSTFLN1QwbnZsREZKR1RXVg?oc=5",
+     "snippet": "Coronavirus: Scientists brand 5G claims 'complete rubbish'&nbsp;&nbsp;BBC",
+     "source_score": 0.92
+    },
+    {
+     "title": "DHS to advise telecom firms on preventing 5G cell tower attacks linked to coronavirus conspiracy theories - The Washington Post (The Washington Post)",
+     "url": "https://news.google.com/rss/articles/CBMiuAJBVV95cUxNVEFfenhfV09PeTA4R2MxeW9OZmxwQnVTTUlWMEhGVzFrUWxRb3dTQlN0UW1aUGlUZF9iT2Z5aU0wZ1F1dko1NExKb3B1V18xWlppcXFMNlRJcGlGYUJpOW04aTktMmNqVThBZS1FV0FZLUZvQUtma3FaSDJIMVJ5cVNEZGFKSjlPY0RLblR1VXp6V2RlTlpoRnhPYkdFa1dDOTJHblRLZUFLaWk4cnJ1b19uSHJET1dtaFViMDVVNVRXLVhpeDhDdXpvTkg4a0hPME5LWThJMUhzdmg3UnRSS0lua2V4RXR5NGZOWkRnSnJWMC0zZ05Jc3Z5dTNDTGtodlB1eFlLb0tMcUFsM1pxSW5iUDQtYnc2dDVHbzFlbkhoZFlLV3RlZk5BYmZnRXY0QU1vLTNObkM?oc=5",
+     "snippet": "DHS to advise telecom firms on preventing 5G cell tower attacks linked to coronavirus conspiracy theories&nbsp;&nbsp;The Washington Post",
+     "source_score": 0.85
+    },
+    {
+     "title": "Wikipedia: 5G misinformation",
+     "url": "https://en.wikipedia.org/wiki/5G+misinformation",
+     "snippet": "Misinformation related to 5G telecommunications technology was widespread in many countries of the world. False information and conspiracy theories were propagated by the general public and celebrities. In social media, misinformation related to 5G was presented as facts, and circulated extensively. There are no scientifically proven adverse health impacts from the exposure to 5G radio frequency radiation with levels below those suggested by the guidelines of regulating bodies, including the Int",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: COVID-19 misinformation",
+     "url": "https://en.wikipedia.org/wiki/COVID-19+misinformation",
+     "snippet": "False information, including disinformation and conspiracy theories about the scale of the COVID-19 pandemic and the origin, prevention, diagnosis, and treatment of the disease has been spread through social media, text messaging, and mass media. False information has been propagated by celebrities, politicians, and other prominent public figures. Many countries have passed laws against \"fake news\", and thousands of people have been arrested for spreading COVID-19 misinformation. The spread of C",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: COVID-19 pandemic in Iran",
+     "url": "https://en.wikipedia.org/wiki/COVID-19+pandemic+in+Iran",
+     "snippet": "The COVID-19 pandemic in Iran has resulted in 7,627,863 confirmed cases of COVID-19 and 146,837 deaths.\nOn 19 February 2020, Iran reported its first confirmed cases of infections in Qom. The virus may have been brought to the country by a merchant from Qom who had travelled to China. In response, the Government of Iran cancelled public events and Friday prayers; closed schools, universities, shopping centres, bazaars, and holy shrines; and banned festival celebrations. Economic measures were als",
+     "source_score": 0.65
+    },
+    {
+     "title": "No, 5G Didn’t Cause the Coronavirus Pandemic - Fair Observer (Fair Observer)",
+     "url": "https://news.google.com/rss/articles/CBMixwFBVV95cUxOYlJMUHh5N3RSa1p1V21mRkpjM0xvR3I0d0V6emFaUXF3MVZwTUVvSGY4anF1S0tKWEJuMWlPY0UwZzFwVC1DOTRNd0Z0YUFwYUthLU1qZ254WDRSMW1id09QMjZYVDFfODNXOXJkSXA1SjhpWWVxVmp5THlzTFh1WEZUZlVLOG5QdXpVbEsyelpfdGQteFlHUEg0VGh6LTliWVR1X2JvVDBueTk3MkwwMENseUh0b2FQaEQtZEtwWGVkdFRTbkQw?oc=5",
+     "snippet": "No, 5G Didn’t Cause the Coronavirus Pandemic&nbsp;&nbsp;Fair Observer",
+     "source_score": 0.5
+    },
+    {
+     "title": "Conspiracy theories about 5G networks have skyrocketed since COVID-19 - theconversation.com (theconversation.com)",
+     "url": "https://news.google.com/rss/articles/CBMipwFBVV95cUxNQ0pNSTBlcFkzZ0RqUFhsOWVKaUpXUnVPWUxrM3lKdVhJZlFRejB2VTBWMk5OY0tBQ3VhRFktOFdiSng4LW4tMmU1akZkYnFGWFB3OEhfUU9XNkxGeFo2aVk0eWttd3FQUmtXSzFKbDdyVFJmcUc5UDZIclJWZmZlWTVuWjFqanFSdzE2X0ZfeGxpekxaRkxqTEtSY1R4Umg4RDhNanpvdw?oc=5",
+     "snippet": "Conspiracy theories about 5G networks have skyrocketed since COVID-19&nbsp;&nbsp;theconversation.com",
+     "source_score": 0.5
+    }
+   ]
+  },
+  {
+   "expected": "false",
+   "claim": "Humans only use ten percent of their brains.",
+   "evidence": [
+    {
+     "title": "Do We Really Use Only 10 Percent of Our Brain? - britannica.com (britannica.com)",
+     "url": "https://news.google.com/rss/articles/CBMihAFBVV95cUxNWnFKWlZ0RXZseWdwOE1WZ2lpZTJINjVUa1R6ell6RHNla3lDZUpOTnhsMXEtXzZGQ1lUdGdfNWtEOWo0cWVSSjN0R2UzX3ZzakpndU82emM5bU4tSDRoY0ZEa3gyeERSUFZtc05iWWIxTTNaanNhcmh4UGJ5YkczNHZsaW4?oc=5",
+     "snippet": "Do We Really Use Only 10 Percent of Our Brain?&nbsp;&nbsp;britannica.com",
+     "source_score": 0.8
+    },
+    {
+     "title": "Wikidata: Homo sapiens (Q15978631)",
+     "url": "https://www.wikidata.org/wiki/Q15978631",
+     "snippet": "Entity: Homo sapiens (also known as: humans). Description: species of mammal.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikidata: Humans (Q140399174)",
+     "url": "https://www.wikidata.org/wiki/Q140399174",
+     "snippet": "Entity: Humans. Description: 2019 original song written by Josh Raven, Stephen Beerkens, Sam Tye, Linden Marisen, Bryce Fox, Patrick Morrissey and David Dahlquist, and performed by The Faim.",
+     "source_score": 0.75
+    },
+    {
+     "title": "Wikipedia: Human",
+     "url": "https://en.wikipedia.org/wiki/Human",
+     "snippet": "Humans (Homo sapiens, meaning 'thinking man' or 'wise man') are the most abundant and widespread species of primates, characterized by bipedalism, minimal body hair, and large, complex brains enabling the development of advanced technology, culture, and language. Humans are highly social beings and tend to live in complex social structures composed of many cooperating and competing groups, from families and kinship networks to political states. Social interactions between humans have established",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Human evolution",
+     "url": "https://en.wikipedia.org/wiki/Human+evolution",
+     "snippet": "Homo sapiens is a distinct species of the hominid family of primates, which includes all the great apes. Over their evolutionary history, humans gradually developed traits such as bipedalism, dexterity, and complex language. Modern humans interbred with archaic humans, indicating that their evolution was not linear but weblike. The study of the origins of humans involves several scientific disciplines, including physical and evolutionary anthropology, paleontology, and genetics; the field is als",
+     "source_score": 0.65
+    },
+    {
+     "title": "Wikipedia: Warcraft: Orcs & Humans",
+     "url": "https://en.wikipedia.org/wiki/Warcraft%3A+Orcs+%26+Humans",
+     "snippet": "Warcraft: Orcs & Humans is a real-time strategy game (RTS) developed and published by Blizzard Entertainment, and published by Interplay Productions in Europe. It was released for MS-DOS in North America on November 15, 1994, and for Mac OS in early 1996. The MS-DOS version was re-released by Sold-Out Software in 2002. It is the first game in the Warcraft fantasy game franchise.\nAlthough Warcraft: Orcs & Humans is not the first RTS game to have offered multiplayer gameplay, it persuaded a wider ",
+     "source_score": 0.65
+    },
+    {
+     "title": "Do People Only Use 10 Percent of Their Brains? - Scientific American (Scientific American)",
+     "url": "https://news.google.com/rss/articles/CBMikwFBVV95cUxNdVozR1loUndJajF0V2lBRzRBenVoSFl0V2EwVTFjV1hqMldkSDhkLWdtUGVyekRlRmE4ejJCSTljem1uZVhYc1RMWndtWWNJMmstcEZHY2RUNmNFV0JuVUs5TVJxak1jNnZPdUtzOGlJY25IeFZUSk9GOWZlMU1aalh0T1pZSE41ajFKUU5pMlM0VlU?oc=5",
+     "snippet": "Do People Only Use 10 Percent of Their Brains?&nbsp;&nbsp;Scientific American",
+     "source_score": 0.5
+    },
+    {
+     "title": "Do we only use 10 per cent of our brain? Here’s what science says - Il Sole 24 ORE (Il Sole 24 ORE)",
+     "url": "https://news.google.com/rss/articles/CBMipwFBVV95cUxPNHNJUXE1eDhzeklaQWZlZHZuZ29UQjhHZWpFaTZpT0stczc0amp3LUNZUENjeC16MVRGa0loSG9kdXZfcFkzMnpMZU5XQm1yeDdDajZPVzlJNTJvaDRhQVBJTEFBX0kweTFHVWZuczA5OEltdGxJVDc4d3ZFLXQ3WlBEcDlEaHk4X1E1N0JKaVRnSUtPaU1iZkFRdXIwZnpVU1hTcklGVQ?oc=5",
+     "snippet": "Do we only use 10 per cent of our brain? Here’s what science says&nbsp;&nbsp;Il Sole 24 ORE",
+     "source_score": 0.5
+    },
+    {
+     "title": "Humans Can Learn to Echolocate in Just 10 Weeks, And It Rewires The Brain - ScienceAlert (ScienceAlert)",
+     "url": "https://news.google.com/rss/articles/CBMikwFBVV95cUxNSkV2SWltTWlqMFJvamFTVWVKSkxYQVNSV0M5QzNfNVJTN2QzRkplWTJ1MWVBWUREaENmcG45SDQwM3dRVHh5VlVEZmNERmx6LVlIMDNKdTlBTGdYRGhCU254Q2dZLUdlVkZxRHVDWVg4YnZUVGtMMGNrM3NVLWZEd1dHS3pITlFhUlJoYzFUQVRqU1k?oc=5",
+     "snippet": "Humans Can Learn to Echolocate in Just 10 Weeks, And It Rewires The Brain&nbsp;&nbsp;ScienceAlert",
+     "source_score": 0.5
+    },
+    {
+     "title": "Your whole brain is always at work. - psychologytoday.com (psychologytoday.com)",
+     "url": "https://news.google.com/rss/articles/CBMiwwFBVV95cUxOQmN6SlJBTTdMMXBGM2NuMUpITm0zaHFmOFBuenRXTG9zS2tUY0xVOUZKZVl3d1ZXQjhQNWcydGtOcUFlR2FGcG81d0FiekIteW1SUUVybHhWclY3TVFvRlY0dllvVFV5c0VuU0N3bjJpM2RmaDJBMHZmMU85a3F1c2lnamtGUFp6YTVxenIxUDcwZklCOFBETG1lU2lSbkFpbXBhYVJnc3M2S0dYb3QxOHphT0w1YlY5WC1oaGRycTNaQTTSAcgBQVVfeXFMT2p4TkNfcF9XNzI5NzZBV2I0M2VsVDIwemhqVC1aSEFPT3MwUGdfUkk2VjdWdFRNSEVaWmtyMnUxUWVaaXJwdlVpR1JnOXMyVFFoNmxqNkowWW0zUWhvalFTMTl2QVhGMFJ6RmY2TnFteU9TZEtzWDd5QlpmMkVHODNabko2UjhtY1JZS2R1Y3BoaHdva1Z1LVY4bDRhM18xZmF6aXRzaEtLaENtelRiNmVBd2tGTE9QcGtPUnBERmF4S0xCME42RXQ?oc=5",
+     "snippet": "Your whole brain is always at work.&nbsp;&nbsp;psychologytoday.com",
+     "source_score": 0.5
+    }
+   ]
+  }
+ ]
+}

@@ -52,8 +52,10 @@ class TestTextProcessor:
 # ═══════════════════════════════════════════════
 
 class TestURLScraper:
-    @patch("backend.preprocessor.url_scraper.requests")
-    def test_scrape_success(self, mock_requests):
+    # Patches safe_get rather than requests: the scraper fetches through the
+    # SSRF guard now, so a mock on requests is never reached.
+    @patch("backend.preprocessor.url_scraper.safe_get")
+    def test_scrape_success(self, mock_get):
         from backend.preprocessor.url_scraper import URLScraper
 
         mock_response = MagicMock()
@@ -67,7 +69,7 @@ class TestURLScraper:
         <body><article><p>This is a test article with enough text to be extracted properly by the scraper.</p></article></body>
         </html>
         """
-        mock_requests.get.return_value = mock_response
+        mock_get.return_value = mock_response
 
         scraper = URLScraper()
         result = scraper.scrape("https://example.com/article")

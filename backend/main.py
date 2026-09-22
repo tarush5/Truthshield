@@ -183,6 +183,7 @@ try:
     from slowapi import Limiter, _rate_limit_exceeded_handler
     from slowapi.util import get_remote_address
     from slowapi.errors import RateLimitExceeded
+    from slowapi.middleware import SlowAPIMiddleware
 
     limiter = Limiter(
         key_func=get_remote_address,
@@ -192,7 +193,14 @@ try:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-    logger.info(f"Rate limiting enabled: {settings.RATE_LIMIT}")
+    # Without this middleware, slowapi's default_limits apply to nothing: they
+    # only take effect on routes carrying an explicit @limiter.limit decorator,
+    # and no route here had one. The startup log claimed "Rate limiting
+    # enabled" while every endpoint — including /auth/signin, which is a
+    # password oracle — was in fact unlimited.
+    app.add_middleware(SlowAPIMiddleware)
+
+    logger.info(f"Rate limiting enabled: {settings.RATE_LIMIT} (applied to all routes)")
 
 except ImportError:
     logger.warning("Rate limiting disabled: slowapi not installed")

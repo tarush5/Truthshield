@@ -75,7 +75,11 @@ class Settings(BaseSettings):
     EFFICIENTNET_MODEL: str = Field(default="efficientnet-b4")
 
     # ── App Settings ──────────────────────────────────────────
-    APP_ENV: str = Field(default="development")  # Use 'production' on Render/deployment
+    # Defaults to production deliberately. APP_ENV gates real security
+    # behaviour — the anonymous guest fallback in require_user_or_api_key,
+    # among others — so a deployment that forgets to set it must fail closed,
+    # not open. Set APP_ENV=development explicitly for local work.
+    APP_ENV: str = Field(default="production")
     APP_HOST: str = Field(default="0.0.0.0")
     APP_PORT: int = Field(default_factory=lambda: int(os.environ.get("PORT", 8000)))
     FRONTEND_URL: str = Field(default="http://localhost:5173")
@@ -106,14 +110,45 @@ class Settings(BaseSettings):
         return self.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
     @model_validator(mode="after")
-    def _warn_default_jwt_secret(self) -> "Settings":
-        if self.JWT_SECRET_KEY == "change-me-in-production" and self.APP_ENV != "development":
-            _logger = logging.getLogger("truthshield.config")
-            _logger.warning(
-                "SECURITY WARNING: JWT_SECRET_KEY is still the default value "
-                "'change-me-in-production' in %s mode. Set a strong secret "
-                "via the JWT_SECRET_KEY environment variable.",
-                self.APP_ENV,
+    def _reject_default_jwt_secret(self) -> "Settings":
+        """
+        Refuse to start in production with the shipped JWT secret.
+
+        This was a log warning. A warning scrolls past in a deploy log and the
+        service comes up anyway — with a signing key that is published in this
+        repository, so anyone can mint a valid session token for any account.
+        Outside development it is now fatal.
+        """
+        if self.JWT_SECRET_KEY in ("", "change-me-in-production"):
+            if self.APP_ENV == "development":
+                logging.getLogger("truthshield.config").warning(
+                    "JWT_SECRET_KEY is the default development value. This is "
+                    "only tolerated because APP_ENV=development."
+                )
+            else:
+                raise ValueError(
+                    "JWT_SECRET_KEY is unset or still the default value while "
+                    f"APP_ENV={self.APP_ENV!r}. The default key is public in the "
+                    "repository, so anyone could forge session tokens. Set "
+                    "JWT_SECRET_KEY to a random 64-character hex string "
+                    "(python -c \"import secrets; print(secrets.token_hex(32))\")."
+                )
+        return self
+
+    @model_validator(mode="after")
+    def _reject_wildcard_cors_with_credentials(self) -> "Settings":
+        """
+        A wildcard origin cannot be combined with credentialed requests.
+
+        The app sends Authorization headers and sets allow_credentials=True, so
+        "*" here is both rejected by browsers and, if it were honoured, would
+        let any site on the internet make authenticated calls on a visitor's
+        behalf. Caught at startup rather than discovered as a CORS error.
+        """
+        if any(o.strip() == "*" for o in self.CORS_ORIGINS.split(",")):
+            raise ValueError(
+                "CORS_ORIGINS contains '*', which cannot be used with credentialed "
+                "requests. List the exact frontend origins instead."
             )
         return self
 

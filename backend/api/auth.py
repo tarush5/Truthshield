@@ -49,27 +49,33 @@ def get_current_user(
     payload = None
 
     # 1. Try Supabase JWT secret first (if configured)
+    #
+    # The asymmetric branch here used to decode with verify_signature disabled,
+    # "to avoid PEM loading errors". That accepted any RS256/ES256/PS256 token
+    # whose payload an attacker chose: forge {"sub": ..., "email": "someone@
+    # else"}, sign it with your own key, and every endpoint behind
+    # get_current_user treated you as that user. Verifying an asymmetric token
+    # needs the provider's public keys, which this server does not fetch, so
+    # such tokens are now refused.
     if settings.SUPABASE_JWT_SECRET:
         try:
             header = jwt.get_unverified_header(token)
             alg = header.get("alg", "HS256")
-            
-            # If the algorithm is asymmetric (e.g. RS256), we cannot verify it with the symmetric SUPABASE_JWT_SECRET.
-            # We decode it without signature verification to avoid PEM loading errors.
-            if alg.startswith("RS") or alg.startswith("ES") or alg.startswith("PS"):
-                payload = jwt.decode(
-                    token,
-                    "",
-                    options={"verify_signature": False, "verify_aud": False},
+
+            if not alg.startswith("HS"):
+                logger.warning(
+                    "Rejecting token signed with %s: asymmetric signatures cannot be "
+                    "verified against the symmetric SUPABASE_JWT_SECRET", alg
                 )
+                payload = None
             else:
                 payload = jwt.decode(
                     token,
                     settings.SUPABASE_JWT_SECRET,
-                    algorithms=[alg, "HS256"],
+                    algorithms=["HS256", "HS384", "HS512"],
                     options={"verify_aud": False},
                 )
-            logger.debug("Token verified with Supabase JWT secret")
+                logger.debug("Token verified with Supabase JWT secret")
         except JWTError:
             logger.debug("Supabase JWT verification failed, trying local secret")
             payload = None

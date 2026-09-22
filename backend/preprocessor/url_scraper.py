@@ -12,6 +12,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from backend.models.schemas import ContentPacket, ContentType, Language
+from backend.security import BlockedURLError, safe_get
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,11 @@ class URLScraper:
             dict with 'text', 'title', 'og_image', 'domain', 'meta_description'
         """
         try:
-            response = requests.get(url, headers=self.HEADERS, timeout=4.0)
+            # Fetched through the SSRF guard: this URL comes straight from the
+            # caller of /analyze, and the page body is returned to them in the
+            # report. An unguarded requests.get here let a caller read cloud
+            # instance metadata and internal services off the server's network.
+            response = safe_get(url, headers=self.HEADERS)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")
 

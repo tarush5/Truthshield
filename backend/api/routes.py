@@ -5,6 +5,9 @@ FastAPI REST endpoints for content analysis, reporting, and feedback.
 
 import logging
 import os
+import re
+import secrets
+import time
 import uuid
 from typing import Optional
 
@@ -32,6 +35,7 @@ from backend.services.auth_service import AuthService
 from backend.services.analysis_service import AnalysisService
 from backend.services.analytics_service import AnalyticsService
 from backend.services.notification_service import NotificationService
+from backend.security import BlockedURLError, assert_url_is_public
 import json
 
 logger = logging.getLogger(__name__)
@@ -96,8 +100,13 @@ async def run_analysis_pipeline(
     return report
 
 
-# Temporary in-memory OTP store
-otp_store = {}
+# In-memory OTP store: {email: (code, issued_at, attempts)}.
+# Single-process only — a multi-worker deployment needs this in Redis, since a
+# code issued by one worker is invisible to the others.
+otp_store: dict = {}
+OTP_TTL_SECONDS = 600          # 10 minutes
+OTP_MAX_ATTEMPTS = 5
+OTP_STORE_MAX = 10_000
 
 
 @router.post("/auth/otp")
@@ -106,11 +115,22 @@ async def send_otp(email_data: dict, db: Session = Depends(get_db)):
     email = email_data.get("email")
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")
-        
-    import random
-    otp = str(random.randint(100000, 999999))
-    otp_store[email] = otp
-    
+
+    # Bound the store. It was an unbounded dict keyed by caller-supplied
+    # address, so anyone could grow it without limit by POSTing new addresses.
+    if len(otp_store) >= OTP_STORE_MAX:
+        cutoff = time.time() - OTP_TTL_SECONDS
+        for stale in [k for k, v in otp_store.items() if v[1] < cutoff]:
+            otp_store.pop(stale, None)
+        if len(otp_store) >= OTP_STORE_MAX:
+            raise HTTPException(status_code=503, detail="Try again shortly")
+
+    # secrets, not random: random is a Mersenne Twister seeded from system
+    # entropy but fully predictable once enough outputs are observed, and
+    # these codes are authentication material.
+    otp = f"{secrets.randbelow(1_000_000):06d}"
+    otp_store[email] = (otp, time.time(), 0)
+
     # In development, print to console
     logger.info("=" * 40)
     logger.info(f"  OTP for {email}: {otp}")
@@ -128,12 +148,35 @@ async def verify_otp(verify_data: dict, db: Session = Depends(get_db)):
     if not email or not token:
         raise HTTPException(status_code=400, detail="Email and OTP token are required")
         
-    expected_otp = otp_store.get(email)
-    if not expected_otp or expected_otp != token:
-        # Dev override to allow easy local verification
-        if token != "123456":
-            raise HTTPException(status_code=400, detail="Invalid OTP")
-            
+    # There used to be a hardcoded fallback here: any request presenting the
+    # literal OTP "123456" was accepted for any address, which minted a valid
+    # session for an arbitrary account without ever seeing the real code. It
+    # was labelled a dev convenience but ran unconditionally in every
+    # environment. Removed outright — a backdoor that only the operator is
+    # supposed to know about is still a backdoor.
+    record = otp_store.get(email)
+    if not record:
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+
+    expected_otp, issued_at, attempts = record
+
+    if attempts >= OTP_MAX_ATTEMPTS:
+        otp_store.pop(email, None)
+        raise HTTPException(status_code=429, detail="Too many attempts. Request a new code.")
+
+    if time.time() - issued_at > OTP_TTL_SECONDS:
+        otp_store.pop(email, None)
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+
+    # Constant-time: a plain != leaks how much of the code was right through
+    # timing, which matters for a 6-digit secret.
+    if not secrets.compare_digest(str(expected_otp), str(token)):
+        otp_store[email] = (expected_otp, issued_at, attempts + 1)
+        raise HTTPException(status_code=400, detail="Invalid or expired code")
+
+    # Single use.
+    otp_store.pop(email, None)
+
     # Auto-create user in database
     from backend.models.db import User
     db_user = db.query(User).filter(User.email == email).first()
@@ -326,41 +369,66 @@ async def demo_login(db: Session = Depends(get_db)):
 @router.post("/auth/oauth-verify")
 async def oauth_verify(payload: dict, db: Session = Depends(get_db)):
     """Verify Supabase OAuth session and return a local JWT token."""
-    email = payload.get("email")
     supabase_token = payload.get("supabase_token")
-    
+
+    # ── Identity comes from the verified token, never from the request body ──
+    #
+    # This endpoint previously trusted a caller-supplied `email` field and only
+    # consulted the token when SUPABASE_JWT_SECRET happened to be configured —
+    # which it is not by default. So an unauthenticated request of
+    #
+    #     POST /api/v1/auth/oauth-verify  {"email": "victim@example.com"}
+    #
+    # returned a valid session token for that account. Complete account
+    # takeover for any address, with no credential of any kind.
+    #
+    # Two further holes in the verification path itself:
+    #   * RS/ES/PS-signed tokens were decoded with verify_signature disabled,
+    #     so a forged token was accepted as readily as a genuine one;
+    #   * the email check was `if token_email and token_email != email`, so a
+    #     token carrying no email claim satisfied it.
+    if not settings.SUPABASE_JWT_SECRET:
+        raise HTTPException(
+            status_code=503,
+            detail="OAuth sign-in is not configured on this server.",
+        )
+    if not supabase_token:
+        raise HTTPException(status_code=401, detail="Missing session token")
+
+    from jose import jwt as jose_jwt, JWTError
+
+    try:
+        header = jose_jwt.get_unverified_header(supabase_token)
+        alg = header.get("alg", "HS256")
+
+        # Only symmetric algorithms can be verified with a shared secret.
+        # Asymmetric tokens need the provider's public keys, which this server
+        # does not fetch — so they are refused rather than waved through.
+        if not alg.startswith("HS"):
+            logger.warning("Rejected Supabase token signed with unsupported alg %s", alg)
+            raise HTTPException(
+                status_code=401,
+                detail="Unsupported token signature algorithm",
+            )
+
+        token_payload = jose_jwt.decode(
+            supabase_token,
+            settings.SUPABASE_JWT_SECRET,
+            algorithms=["HS256", "HS384", "HS512"],
+            options={"verify_aud": False},
+        )
+    except HTTPException:
+        raise
+    except JWTError:
+        # The underlying reason is logged, not returned: the exception text
+        # describes our verification setup and is of use only to an attacker.
+        logger.warning("Supabase token verification failed", exc_info=True)
+        raise HTTPException(status_code=401, detail="Invalid session token")
+
+    email = token_payload.get("email")
     if not email:
-        raise HTTPException(status_code=400, detail="Email is required")
-        
-    # If SUPABASE_JWT_SECRET is configured, verify the supabase_token
-    if settings.SUPABASE_JWT_SECRET and supabase_token:
-        try:
-            from jose import jwt as jose_jwt
-            header = jose_jwt.get_unverified_header(supabase_token)
-            alg = header.get("alg", "HS256")
-            
-            # If the algorithm is asymmetric (e.g. RS256), we cannot verify it with the symmetric SUPABASE_JWT_SECRET.
-            # We decode it without signature verification to avoid PEM loading errors.
-            if alg.startswith("RS") or alg.startswith("ES") or alg.startswith("PS"):
-                token_payload = jose_jwt.decode(
-                    supabase_token,
-                    "",
-                    options={"verify_signature": False, "verify_aud": False},
-                )
-            else:
-                token_payload = jose_jwt.decode(
-                    supabase_token,
-                    settings.SUPABASE_JWT_SECRET,
-                    algorithms=[alg, "HS256"],
-                    options={"verify_aud": False},
-                )
-            # Ensure email in token matches email in payload
-            token_email = token_payload.get("email")
-            if token_email and token_email != email:
-                raise HTTPException(status_code=401, detail="Token email mismatch")
-        except Exception as e:
-            raise HTTPException(status_code=401, detail=f"Invalid Supabase session token: {str(e)}")
-            
+        raise HTTPException(status_code=401, detail="Session token carries no email")
+
     # Auto-create user in database if they don't exist
     from backend.models.db import User
     db_user = db.query(User).filter(User.email == email).first()
@@ -517,11 +585,46 @@ async def analyze_content(
         else:
             content_type = ContentType.TEXT
 
+        # The extension is taken from the caller's filename, so constrain it to
+        # a known-safe set rather than interpolating it into a path. The stem
+        # is a fresh uuid4, so the caller never controls the filename itself.
+        if ext and not re.fullmatch(r"\.[A-Za-z0-9]{1,8}", ext):
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+
         os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
         file_path = str(settings.UPLOAD_DIR / f"{uuid.uuid4().hex}{ext}")
-        with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
+
+        # Streamed with a running size check. `await file.read()` pulled the
+        # whole upload into memory before anything looked at its size, so a
+        # single large POST could exhaust the process — MAX_UPLOAD_SIZE_MB was
+        # defined in config but never actually consulted anywhere.
+        max_bytes = settings.max_upload_bytes
+        written = 0
+        try:
+            with open(file_path, "wb") as f:
+                while True:
+                    chunk = await file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    written += len(chunk)
+                    if written > max_bytes:
+                        raise HTTPException(
+                            status_code=413,
+                            detail=f"File exceeds the {settings.MAX_UPLOAD_SIZE_MB} MB limit",
+                        )
+                    f.write(chunk)
+        except HTTPException:
+            # Don't leave the partial upload behind.
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
+            raise
+
+        content = b""
+        if content_type == ContentType.TEXT:
+            with open(file_path, "rb") as f:
+                content = f.read()
 
         if content_type == ContentType.TEXT:
             # Try PDF extraction for .pdf files
@@ -549,6 +652,14 @@ async def analyze_content(
                 resolved_text = content.decode("utf-8", errors="ignore")
 
     elif resolved_url:
+        # Reject unfetchable targets here rather than letting the scraper
+        # return an empty page: /analyze echoes the fetched body back to the
+        # caller, so this URL is the entry point for server-side request
+        # forgery and the refusal belongs at the boundary.
+        try:
+            resolved_url = assert_url_is_public(resolved_url)
+        except BlockedURLError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
         content_type = ContentType.URL
     elif resolved_text:
         content_type = ContentType.TEXT
@@ -651,14 +762,41 @@ async def analyze_content(
 
 
 @router.get("/report/{report_id}", response_model=AnalysisReport)
-async def get_report(report_id: str, db: Session = Depends(get_db)):
-    """Retrieve a full analysis report by ID."""
+async def get_report(
+    report_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[CurrentUser] = Depends(get_current_user),
+):
+    """
+    Retrieve a full analysis report by ID.
+
+    A report that belongs to a user is only served to that user, or to a member
+    of the workspace it was filed under. This endpoint previously took no
+    identity at all: the 128-bit id made reports impractical to enumerate, but
+    anyone who came by an id — a shared link, a proxy log, a browser history —
+    could read another workspace's analysis in full, including the submitted
+    content. Reports with no owner (anonymous submissions) stay public so
+    existing share links keep working.
+    """
     report = reports_store.get(report_id)
     if not report:
         from backend.models.db import Report as ReportDB
         db_report = db.query(ReportDB).filter(ReportDB.id == report_id).first()
         if not db_report:
             raise HTTPException(status_code=404, detail="Report not found")
+
+        if db_report.user_id is not None:
+            if not current_user:
+                raise HTTPException(status_code=401, detail="Authentication required")
+
+            caller_id = uuid.UUID(current_user.id)
+            allowed = db_report.user_id == caller_id
+            if not allowed and db_report.org_id is not None:
+                allowed = bool(AuthService.check_user_role(db, db_report.org_id, caller_id))
+            if not allowed:
+                # 404 rather than 403: confirming the id exists tells an
+                # unauthorised caller something they should not learn.
+                raise HTTPException(status_code=404, detail="Report not found")
         
         # Reconstruct AnalysisReport from db_report JSON fields
         import json

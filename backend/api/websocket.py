@@ -84,16 +84,14 @@ async def websocket_analyze(websocket: WebSocket):
                         import uuid
                         user_uuid = uuid.UUID(user_id)
                 except Exception:
-                    # Dev mode fallback
-                    if settings.APP_ENV == "development" and settings.JWT_SECRET_KEY == "change-me-in-production":
-                        try:
-                            unverified_payload = jwt.get_unverified_claims(token)
-                            user_id = unverified_payload.get("sub")
-                            if user_id:
-                                import uuid
-                                user_uuid = uuid.UUID(user_id)
-                        except Exception:
-                            pass
+                    # An unverified-claims fallback used to run here whenever
+                    # APP_ENV was "development" — which is the default value —
+                    # so any forged token was accepted and its "sub" used as
+                    # the owner of the resulting report. The connection simply
+                    # proceeds unauthenticated now; the report is returned to
+                    # the caller but not attributed to anyone.
+                    logger.warning("WebSocket token rejected; continuing unauthenticated")
+                    user_uuid = None
 
             # Run the full pipeline with streaming progress
             from backend.api.routes import run_analysis_pipeline

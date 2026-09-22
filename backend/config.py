@@ -8,6 +8,7 @@ import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import List
+from urllib.parse import urlparse
 
 from pydantic_settings import BaseSettings
 from pydantic import Field, model_validator
@@ -321,3 +322,98 @@ GEMINI_MAX_TOKENS = 1024
 
 # ── Supported Languages ──────────────────────────────────────
 SUPPORTED_LANGUAGES = {"en": "English", "hi": "Hindi", "ta": "Tamil"}
+
+
+# ── Canonical Domain Credibility Scoring ─────────────────────
+# Both SourceRanker and EvidenceRetriever previously carried their own copy of
+# this lookup. The copies had drifted apart — different unknown-domain defaults
+# (0.30 vs 0.50) and different TLD tiers — and SourceRanker.rank_evidence
+# overwrites whatever the retriever assigned, so the retriever's numbers were
+# dead code that still had to be kept in sync by hand. One implementation now
+# serves both.
+#
+# Both copies also matched with a naked substring test (`known_domain in
+# domain`). Because "gov" is a key worth 1.0, every host containing the letters
+# "gov" scored as an authoritative government source: govtjobsalert.blogspot.com,
+# thegovernor.com and mygov-scam.tk all came back 1.0, and pti.industries.com
+# inherited Press Trust of India's 0.93. Matching is now anchored to domain
+# label boundaries, so a pattern matches only the host itself or a subdomain of
+# it.
+
+# The score for a domain that is not in the table. The tier 8/9/10 entries above
+# are calibrated against this value — aggregators sit just below it and tabloids
+# below that — so it must stay 0.50 for those demotions to mean anything.
+UNKNOWN_DOMAIN_SCORE = 0.50
+
+
+def _normalize_host(host: str) -> str:
+    """Lowercase a hostname and strip the www. prefix and any port."""
+    host = host.lower().strip().rstrip(".")
+    if ":" in host:
+        host = host.split(":", 1)[0]
+    if host.startswith("www."):
+        host = host[4:]
+    return host
+
+
+def _host_matches(host: str, pattern: str) -> bool:
+    """
+    True when `host` is `pattern` or a subdomain of it.
+
+    Anchored at label boundaries: "gov" matches "cdc.gov" but not
+    "thegovernor.com", and "afp.com" matches "factcheck.afp.com" but not
+    "notafp.com.example".
+    """
+    return host == pattern or host.endswith("." + pattern)
+
+
+def score_domain(url: str) -> float:
+    """
+    Credibility score in [0.0, 1.0] for the source behind `url`.
+
+    Known disinformation domains score 0.0 so callers can drop them outright.
+    Where several table entries match, the most specific wins, so
+    factcheck.afp.com keeps its fact-checker score rather than inheriting the
+    wire service's.
+    """
+    try:
+        parsed = urlparse(url if "//" in url else "//" + url)
+        host = _normalize_host(parsed.netloc)
+        path = (parsed.path or "").lower()
+    except Exception:
+        return UNKNOWN_DOMAIN_SCORE
+
+    if not host:
+        return UNKNOWN_DOMAIN_SCORE
+
+    for disinfo_domain in KNOWN_DISINFO_DOMAINS:
+        if _host_matches(host, _normalize_host(disinfo_domain)):
+            return 0.0
+
+    # Most specific match wins; a few entries qualify a domain with a path
+    # prefix (thequint.com/news/webqoof), which is more specific still.
+    best_score = None
+    best_specificity = -1
+    for pattern, score in SOURCE_CREDIBILITY.items():
+        pattern_host, _, pattern_path = pattern.partition("/")
+        if not _host_matches(host, _normalize_host(pattern_host)):
+            continue
+        if pattern_path and not path.startswith("/" + pattern_path):
+            continue
+        specificity = len(pattern)
+        if specificity > best_specificity:
+            best_specificity = specificity
+            best_score = score
+
+    if best_score is not None:
+        return best_score
+
+    # TLD fallbacks for hosts the table does not name.
+    if host.endswith(".mil"):
+        return 0.90
+    if host.endswith((".edu", ".ac.in", ".ac.uk")):
+        return 0.85
+    if host.endswith(".org"):
+        return 0.65
+
+    return UNKNOWN_DOMAIN_SCORE

@@ -102,3 +102,60 @@ class TestNonNegation:
             "Paris is the capital of France",
             "Paris hosted the Olympics. Tickets were not cheap that summer.",
         ) is False
+
+
+class TestTypographicApostrophes:
+    """
+    Headlines use U+2019, and the word tokenizer only accepts [a-zA-Z'], so
+    "won’t" split into "won" + "t" and never matched the negation list.
+    """
+
+    @pytest.mark.parametrize("apostrophe", ["'", "\u2019", "\u02bc"])
+    def test_contraction_negation_is_detected(self, apostrophe):
+        evidence = f"Garlic and bleach won{apostrophe}t cure coronavirus"
+        assert negates("Drinking bleach cures COVID-19 within 24 hours.", evidence) is True
+
+    @pytest.mark.parametrize("apostrophe", ["'", "\u2019"])
+    def test_doesnt_is_detected(self, apostrophe):
+        evidence = f"The study doesn{apostrophe}t show vaccines cause autism"
+        assert negates("Vaccines cause autism", evidence) is True
+
+
+class TestInflectionMatching:
+    """
+    Evidence rarely repeats a claim's exact inflection. The claim says "cures",
+    the headline says "cure"; without stemming the negation scan looked for
+    "cures" in "...won't cure coronavirus" and found nothing, so an explicit
+    debunk registered as neutral.
+    """
+
+    def test_singular_evidence_matches_plural_claim(self):
+        assert negates(
+            "Drinking bleach cures COVID-19",
+            "Bleach does not cure COVID-19",
+        ) is True
+
+    def test_participle_evidence_matches_base_claim(self):
+        assert negates(
+            "The moon landing was staged",
+            "The moon landings were not staged",
+        ) is True
+
+    def test_stem_is_stable_across_a_word_family(self):
+        stem = VerdictEngine._stem
+        for family in [
+            ("cure", "cures", "cured", "curing"),
+            ("cause", "causes", "caused", "causing"),
+            ("land", "landing", "landings", "landed"),
+            ("box", "boxes"),
+            ("study", "studies"),
+        ]:
+            assert len({stem(w) for w in family}) == 1, family
+
+    def test_stemming_does_not_invent_negations(self):
+        # Over-stemming would collapse unrelated words and manufacture
+        # refutations, which is the costlier error of the two.
+        assert negates(
+            "Smoking tobacco causes lung cancer",
+            "Bleach is a household disinfectant used for cleaning surfaces",
+        ) is False

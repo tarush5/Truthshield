@@ -5,9 +5,8 @@ Score and rank evidence sources by credibility.
 
 import logging
 from typing import List
-from urllib.parse import urlparse
 
-from backend.config import KNOWN_DISINFO_DOMAINS, SOURCE_CREDIBILITY
+from backend.config import UNKNOWN_DOMAIN_SCORE, score_domain
 from backend.models.schemas import Evidence
 
 logger = logging.getLogger(__name__)
@@ -16,56 +15,28 @@ logger = logging.getLogger(__name__)
 class SourceRanker:
     """Rank evidence sources by credibility score."""
 
-    DEFAULT_SCORE = 0.3  # Unknown sources
+    # Kept as an alias so callers that referenced the old constant keep working.
+    # The value moved from 0.30 to the 0.50 the credibility table is calibrated
+    # against: the tier 8/9/10 entries in config describe themselves as sitting
+    # "below the 0.50 unknown-domain default", but against a 0.30 default the
+    # demotions inverted — news.google.com (0.45) and nypost.com (0.40) were
+    # outranking genuinely unknown domains instead of being outranked by them.
+    DEFAULT_SCORE = UNKNOWN_DOMAIN_SCORE
 
     def score_source(self, url: str) -> float:
         """
         Score a single source URL.
 
-        Scoring tiers:
-            Government (.gov/.gov.in)  = 1.0
-            Military (.mil)            = 0.90
-            Academic (.edu/.ac.in)     = 0.85
-            Major news outlets         = 0.7-0.95
-            Fact-checking sites        = 0.8-0.85
-            Wikipedia                  = 0.65
-            Unknown                    = 0.3
-            Known disinfo            = 0.0
+        Delegates to the shared table in backend.config so this and
+        EvidenceRetriever cannot drift apart again.
 
         Args:
             url: The source URL
 
         Returns:
-            Credibility score (0.0 to 1.0)
+            Credibility score (0.0 to 1.0); 0.0 marks a known disinfo domain.
         """
-        try:
-            domain = urlparse(url).netloc.lower()
-            # Remove www. prefix
-            domain = domain.replace("www.", "")
-        except Exception:
-            return self.DEFAULT_SCORE
-
-        # Check known disinfo domains
-        for disinfo_domain in KNOWN_DISINFO_DOMAINS:
-            if disinfo_domain in domain:
-                return 0.0
-
-        # Check exact matches in credibility database
-        for known_domain, score in SOURCE_CREDIBILITY.items():
-            if known_domain in domain:
-                return score
-
-        # Check TLD-based scoring
-        if domain.endswith(".gov") or domain.endswith(".gov.in") or domain.endswith(".gov.uk"):
-            return 1.0
-        elif domain.endswith(".edu") or domain.endswith(".ac.in"):
-            return 0.85
-        elif domain.endswith(".org"):
-            return 0.65
-        elif domain.endswith(".mil"):
-            return 0.90
-
-        return self.DEFAULT_SCORE
+        return score_domain(url)
 
     def rank_evidence(self, evidence: List[Evidence]) -> List[Evidence]:
         """
@@ -79,7 +50,12 @@ class SourceRanker:
         """
         scored_evidence = []
         for ev in evidence:
-            ev.source_score = self.score_source(ev.url)
+            # Score whoever actually published the item. `url` can be an
+            # aggregator interstitial that names nobody — scoring it rated
+            # every Google News article 0.45 regardless of whether Reuters or a
+            # content farm wrote it, and silently discarded the publisher the
+            # retriever had already resolved.
+            ev.source_score = self.score_source(getattr(ev, "source_domain", None) or ev.url)
             scored_evidence.append(ev)
 
         # Sort by source_score descending

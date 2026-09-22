@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Shield, AlertCircle } from 'lucide-react';
-import { supabase } from '../utils/supabase/client';
+import { getSupabase } from '../utils/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE, isBackendError, BACKEND_UNREACHABLE_MSG } from '../config';
 
@@ -68,7 +68,12 @@ export default function AuthCallback() {
     // the PKCE code exchange from the URL hash/query params.
     // This avoids the race condition where getSession() is called before
     // the auth state is fully updated.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    // The SDK loads on demand. This page is the one place that genuinely
+    // needs it, since it exists to receive the OAuth redirect.
+    let subscription;
+    getSupabase().then((supabase) => {
+      if (!active) return;
+      const result = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!active) return;
 
@@ -127,7 +132,9 @@ export default function AuthCallback() {
           // Ignore these events during callback
         }
       }
-    );
+      );
+      subscription = result?.data?.subscription;
+    });
 
     // Safety timeout: if no auth event fires within 10 seconds, show error
     const timeoutId = setTimeout(() => {

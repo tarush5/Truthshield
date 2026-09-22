@@ -239,7 +239,55 @@ ws.onmessage = (e) => console.log(JSON.parse(e.data));
 2. Copy `.env.example` to `.env` and add your API keys
 3. Run `docker-compose up --build` for full stack
 4. For development, run backend and frontend separately (see Quick Start)
-5. Run tests: `cd backend && pytest tests/`
+5. Run tests: `pytest tests/` (from the repo root — the suite imports `backend.*`)
+
+---
+
+## Testing & measuring accuracy
+
+`pytest tests/` is fast, offline and deterministic. Four layers matter:
+
+| Suite | What it pins |
+|---|---|
+| `test_pipeline.py` | Per-module behaviour, with mocked I/O |
+| `test_stance_detection.py` | Negation, inflection and apostrophe handling — cases a live run cannot pin reliably |
+| `test_scoring_integrity.py` | That a report never claims more than it actually checked |
+| `test_verdict_accuracy.py` | End-to-end verdict accuracy against **frozen** evidence |
+
+### Why the evidence is frozen
+
+Verdict accuracy used to be measured by hitting live search, which makes the
+number meaningless for judging a code change: the same build scored 6/8 and
+2/8 on consecutive runs purely on what the web returned that minute (one of
+those runs had DuckDuckGo timing out entirely).
+
+`tests/fixtures/evidence_fixture.json` holds real retrieved evidence for 12
+claims, captured once. `test_verdict_accuracy.py` scores against it, so a
+change in the score is a change in the code. It asserts two separate things:
+
+* **Precision** — no claim may be decided in the wrong direction. Calling a
+  true claim false, or a false claim true, is the failure this product exists
+  to avoid, and it is worse than abstaining.
+* **Coverage** — the engine must still commit on a reasonable share of claims,
+  since abstaining everywhere would satisfy the precision test while being
+  useless. The floor sits just under the measured baseline.
+
+Refresh the fixture deliberately (the web moves), never inside a test run:
+
+```bash
+python tests/capture_evidence_fixture.py
+```
+
+### Live smoke test
+
+`tests/benchmark_accuracy.py` runs the real stack against a live backend. Use
+it to confirm the whole path works, not to judge accuracy changes — its result
+moves with search:
+
+```bash
+uvicorn backend.main:app --port 8000   # one shell
+python tests/benchmark_accuracy.py     # another
+```
 
 ---
 

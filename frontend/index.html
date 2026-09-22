@@ -8,11 +8,23 @@
     <meta name="keywords" content="fact-check, misinformation, deepfake, AI, TruthShield" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <meta name="theme-color" content="#080B12" />
     <title>TruthShield — AI Misinformation Response System</title>
+    <script>
+      // Stamp the saved theme before first paint. Without this the page renders
+      // one frame in the default theme and visibly flips once React mounts.
+      (function () {
+        try {
+          var t = localStorage.getItem('theme') || 'dark';
+          var r = document.documentElement;
+          r.classList.remove('dark', 'light');
+          r.classList.add(t === 'light' ? 'light' : 'dark');
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body class="bg-surface-900 text-white antialiased">
+  <body class="bg-page text-ink-secondary antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

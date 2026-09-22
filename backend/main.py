@@ -112,6 +112,27 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(_warmup())
 
+    async def _rss_refresher():
+        """
+        Keep the fact-checker RSS cache warm off the request path.
+
+        The four feeds are query-independent, so they are cached with a TTL;
+        but whichever request arrives after each expiry would otherwise pay the
+        ~3s refetch on behalf of everyone. Refreshing on a timer just inside the
+        TTL means no user request ever pays it.
+        """
+        from backend.factcheck.evidence_retriever import EvidenceRetriever
+
+        while True:
+            try:
+                n = len(await asyncio.to_thread(EvidenceRetriever._rss_entries))
+                logger.info(f"Fact-check RSS cache warm ({n} entries)")
+            except Exception as e:
+                logger.warning(f"Fact-check RSS warm failed (non-fatal): {e}")
+            await asyncio.sleep(EvidenceRetriever._RSS_CACHE_TTL * 0.8)
+
+    asyncio.create_task(_rss_refresher())
+
     # Start real-time monitoring simulation task in background (disabled by default in dev)
     if os.getenv("RUN_SIMULATION") == "true":
         asyncio.create_task(start_realtime_ingestion_simulation())

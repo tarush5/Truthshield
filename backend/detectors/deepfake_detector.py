@@ -30,6 +30,7 @@ class DeepfakeDetector:
         self._model = None
         self._transform = None
         self._face_cascade = None
+        self._method_used = "unavailable"
 
     def _load_model(self):
         """Lazy-load the deepfake detection model (cached at class level)."""
@@ -115,6 +116,7 @@ class DeepfakeDetector:
             self._load_model()
             if self._model is None:
                 return self._fallback_analyze(image_path)
+            self._method_used = "efficientnet_b4"
 
             import torch
             from PIL import Image
@@ -147,7 +149,13 @@ class DeepfakeDetector:
             return self._fallback_analyze(image_path)
 
     def _fallback_analyze(self, image_path: str) -> float:
-        """Heuristic fallback for deepfake detection."""
+        """
+        Heuristic fallback for deepfake detection.
+
+        Records whether the heuristic actually ran: without OpenCV it cannot
+        inspect the image at all and returns 0.0, which reads identically to a
+        clean result.
+        """
         try:
             import cv2
             img = cv2.imread(image_path)
@@ -157,6 +165,8 @@ class DeepfakeDetector:
             # Simple heuristics: check for compression artifacts, noise patterns
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+
+            self._method_used = "heuristic"
 
             # Very high or very low variance can indicate manipulation
             if laplacian_var < 10 or laplacian_var > 5000:
@@ -178,6 +188,7 @@ class DeepfakeDetector:
         if not frame_paths:
             return DeepfakeResult()
 
+        self._method_used = "unavailable"
         scores = []
         flagged = []
 
@@ -210,5 +221,6 @@ class DeepfakeDetector:
             is_deepfake=is_deepfake,
             confidence=round(avg_score, 4),
             flagged_frames=flagged,
-            needs_human_review=(0.4 <= avg_score <= 0.7) or (temporal_anomaly > 0.2)
+            needs_human_review=(0.4 <= avg_score <= 0.7) or (temporal_anomaly > 0.2),
+            method=getattr(self, "_method_used", "unavailable"),
         )

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { supabase } from '../utils/supabase/client';
+import { getSupabase } from '../utils/supabase/client';
 import { API_BASE, isBackendError, BACKEND_UNREACHABLE_MSG } from '../config';
 
 const AuthContext = createContext(null);
@@ -70,8 +70,17 @@ export function AuthProvider({ children }) {
 
     // Also listen for Supabase auth state changes (handles OAuth redirects,
     // token refresh, and session recovery from URL fragments)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, supaSession) => {
+    // Subscribe once the SDK has loaded. This is deliberately not awaited
+    // before first paint: the listener only handles OAuth redirects, token
+    // refresh and remote sign-out, none of which can happen in the first
+    // frames, and blocking on it would put the whole SDK back on the critical
+    // path that the dynamic import exists to clear.
+    let subscription;
+    let cancelled = false;
+
+    getSupabase().then((supabase) => {
+      if (cancelled) return;
+      const result = supabase.auth.onAuthStateChange((event) => {
         // If Supabase detects a sign-in and we don't have a local session yet,
         // the AuthCallback page will handle the backend exchange.
         // This listener primarily handles token refresh and sign-out.
@@ -81,10 +90,12 @@ export function AuthProvider({ children }) {
           setUser(null);
           setSession(null);
         }
-      }
-    );
+      });
+      subscription = result?.data?.subscription;
+    });
 
     return () => {
+      cancelled = true;
       subscription?.unsubscribe();
     };
   }, []);
@@ -115,6 +126,7 @@ export function AuthProvider({ children }) {
 
   // Sign in with Google
   const signInWithGoogle = useCallback(async () => {
+    const supabase = await getSupabase();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -126,6 +138,7 @@ export function AuthProvider({ children }) {
 
   // Sign in with GitHub
   const signInWithGithub = useCallback(async () => {
+    const supabase = await getSupabase();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: {
@@ -187,6 +200,7 @@ export function AuthProvider({ children }) {
   // Sign out
   const signOut = useCallback(async () => {
     try {
+      const supabase = await getSupabase();
       await supabase.auth.signOut();
     } catch (e) {
       // ignore

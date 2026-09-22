@@ -6,7 +6,6 @@ import {
   Check, ChevronLeft, Plus, Loader2, AlertCircle, Sparkles, Github
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../utils/supabase/client';
 import InteractiveCard from '../components/InteractiveCard';
 
 

@@ -66,7 +66,7 @@ except ImportError:
     except ImportError:
         DDGS = None
 
-from backend.config import get_settings, SOURCE_CREDIBILITY
+from backend.config import get_settings, score_domain
 from backend.models.schemas import Claim, Evidence
 
 logger = logging.getLogger(__name__)
@@ -376,11 +376,32 @@ class EvidenceRetriever:
             except Exception as e:
                 logger.warning(f"Fact-check web search retry failed: {e}")
 
-        # Deep Page Scraping on top 2 candidate URLs (skip on Render)
+        # ── Deep Page Scraping (conditional) ─────────────────────
+        # This runs *after* the concurrent fan-out, so its cost lands directly
+        # on the critical path. Measured over five claims it cost 0.91s mean
+        # (3.04s worst) and returned 0.2 items per claim, 0.0 of them relevant:
+        # most candidate pages are paywalled, JS-rendered or simply refuse the
+        # request, and the ones that work are usually already represented by
+        # their search snippet.
+        #
+        # It is worth that cost only when the snippets we have are too thin to
+        # decide the claim, which is exactly when a full page body might change
+        # the verdict. With enough on-topic evidence already in hand, skip it.
+        needs_deeper_evidence = relevant_count < self.MIN_USABLE_EVIDENCE
+
         urls_to_scrape = []
-        seen_urls = set()
-        for ev in all_evidence:
-            if ev.url and ev.url not in seen_urls:
+        if needs_deeper_evidence:
+            seen_urls = set()
+            # Prefer candidates that already look on-topic — scraping the most
+            # credible off-topic page cannot help this claim.
+            ranked = sorted(
+                (ev for ev in all_evidence if ev.url),
+                key=lambda e: self._relevance(claim.text, e),
+                reverse=True,
+            )
+            for ev in ranked:
+                if ev.url in seen_urls:
+                    continue
                 seen_urls.add(ev.url)
                 domain = urlparse(ev.url).netloc.lower()
                 if not any(skip in domain for skip in [
@@ -389,8 +410,7 @@ class EvidenceRetriever:
                 ]):
                     urls_to_scrape.append(ev.url)
 
-        # Deep scraping is a refinement, not a requirement — only run it with
-        # budget left over, and never let it extend past the deadline.
+        # Never let the refinement extend past the deadline.
         scrape_budget = deadline - time.monotonic()
         if urls_to_scrape and not is_render and scrape_budget > 1.0:
             try:
@@ -468,9 +488,13 @@ class EvidenceRetriever:
             settings = get_settings()
             key = settings.GOOGLE_FACTCHECK_API_KEY
 
-            params = {"query": query, "languageCode": "en"}
-            if key and len(key) > 5:
-                params["key"] = key
+            # The endpoint requires a key: without one it answers 403, but only
+            # after a full round trip, and the call was issued anyway. Measured
+            # up to 3.4s spent per claim on a request that cannot succeed.
+            if not key or len(key) <= 5:
+                return []
+
+            params = {"query": query, "languageCode": "en", "key": key}
 
             resp = self._get_session().get(
                 "https://factchecktools.googleapis.com/v1alpha1/claims:search",
@@ -501,69 +525,123 @@ class EvidenceRetriever:
             logger.warning(f"Google Fact Check API failed: {e}")
             return []
 
+    # Fact-checker RSS feeds are site-wide "latest N fact-checks" lists: their
+    # contents do not depend on the query, and they change on the order of
+    # hours. They were nonetheless re-downloaded and re-parsed once per claim,
+    # so a 3-claim submission issued 12 feed requests and ran feedparser 12
+    # times. Measured, this source cost 3.02s mean — the single slowest source
+    # and the one setting the latency floor for the whole retrieve() fan-out,
+    # while contributing 0.0 relevant items per claim.
+    #
+    # The parsed entries are now cached at class level, so only the first
+    # request in the TTL window pays for the fetch and everything after it
+    # matches against an in-memory list.
+    _RSS_FEEDS = (
+        ("Snopes", "https://www.snopes.com/feed/"),
+        ("PolitiFact", "https://www.politifact.com/rss/factchecks/"),
+        ("FactCheck.org", "https://www.factcheck.org/feed/"),
+        ("Full Fact", "https://fullfact.org/feed/"),
+    )
+    _RSS_CACHE: Optional[List[tuple]] = None   # [(name, title, link, snippet, title_words)]
+    _RSS_CACHE_AT: float = 0.0
+    _RSS_CACHE_TTL = 900.0                     # 15 minutes
+    _RSS_LOCK = threading.Lock()
+
+    @classmethod
+    def _rss_entries(cls) -> List[tuple]:
+        """Return cached fact-checker feed entries, refreshing past the TTL."""
+        now = time.time()
+        if cls._RSS_CACHE is not None and (now - cls._RSS_CACHE_AT) < cls._RSS_CACHE_TTL:
+            return cls._RSS_CACHE
+
+        # One refresh at a time. Concurrent claims would otherwise each see a
+        # cold cache and start their own fan-out, which is the stampede this
+        # cache exists to prevent.
+        with cls._RSS_LOCK:
+            if cls._RSS_CACHE is not None and (time.time() - cls._RSS_CACHE_AT) < cls._RSS_CACHE_TTL:
+                return cls._RSS_CACHE
+
+            from concurrent.futures import ThreadPoolExecutor
+
+            def _fetch(feed_spec):
+                name, url = feed_spec
+                try:
+                    resp = cls._get_session().get(url, timeout=(2, 2))
+                    if resp.status_code != 200:
+                        return name, None
+                    return name, resp.content
+                except Exception as e:
+                    logger.debug(f"RSS feed '{name}' failed: {e}")
+                    return name, None
+
+            with ThreadPoolExecutor(max_workers=len(cls._RSS_FEEDS)) as pool:
+                fetched = list(pool.map(_fetch, cls._RSS_FEEDS))
+
+            entries: List[tuple] = []
+            for name, content in fetched:
+                if content is None:
+                    continue
+                try:
+                    feed = feedparser.parse(content)
+                    for entry in feed.entries[:15]:
+                        title = entry.get("title", "")
+                        link = entry.get("link", "")
+                        summary = re.sub(r"<[^>]+>", "", entry.get("summary", "")).strip()
+                        # Tokenized once at cache time rather than per query.
+                        title_words = set(re.findall(r"\b[a-zA-Z]{3,}\b", title.lower()))
+                        entries.append((name, title, link, summary, title_words))
+                except Exception as e:
+                    logger.debug(f"RSS feed '{name}' parse failed: {e}")
+
+            # Keep a stale cache rather than none: an upstream blip should not
+            # turn every later request back into a 3s fetch.
+            if entries or cls._RSS_CACHE is None:
+                cls._RSS_CACHE = entries
+                cls._RSS_CACHE_AT = time.time()
+                logger.info(f"Fact-check RSS cache refreshed: {len(entries)} entries")
+            else:
+                cls._RSS_CACHE_AT = time.time()
+                logger.info("Fact-check RSS refresh returned nothing; keeping previous entries")
+
+            return cls._RSS_CACHE
+
     def _rss_fact_check_feeds(self, query: str) -> List[Evidence]:
-        """Fetch and locally search RSS feeds from major fact-checking organizations."""
+        """Locally search cached RSS feeds from major fact-checking organizations."""
         if feedparser is None:
             return []
 
-        feeds = [
-            ("Snopes", "https://www.snopes.com/feed/"),
-            ("PolitiFact", "https://www.politifact.com/rss/factchecks/"),
-            ("FactCheck.org", "https://www.factcheck.org/feed/"),
-            ("Full Fact", "https://fullfact.org/feed/"),
-        ]
+        try:
+            entries = self._rss_entries()
+        except Exception as e:
+            logger.warning(f"Fact-check RSS unavailable: {e}")
+            return []
+
+        query_lower = query.lower()
+        query_words = set(re.findall(r"\b[a-zA-Z]{3,}\b", query_lower))
 
         results = []
-        query_words = set(re.findall(r"\b[a-zA-Z]{3,}\b", query.lower()))
+        for name, title, link, summary, title_words in entries:
+            overlap = query_words & title_words
+            # Fuzzy matching is the expensive half of the match, so only run it
+            # when the cheap word-overlap test has not already decided.
+            if len(overlap) >= 2:
+                matched = True
+            elif fuzz and not overlap:
+                matched = False          # no shared word at all — skip the ratio
+            elif fuzz:
+                matched = fuzz.token_set_ratio(query_lower, title.lower()) > 60
+            else:
+                matched = False
 
-        # Fetch all feeds concurrently — serially these cost 4x the slowest feed
-        # and routinely consumed the whole evidence budget on their own.
-        from concurrent.futures import ThreadPoolExecutor
-
-        def _fetch(feed_spec):
-            name, url = feed_spec
-            try:
-                resp = self._get_session().get(url, timeout=(2, 2))
-                if resp.status_code != 200:
-                    return name, None
-                return name, resp.content
-            except Exception as e:
-                logger.debug(f"RSS feed '{name}' failed: {e}")
-                return name, None
-
-        with ThreadPoolExecutor(max_workers=len(feeds)) as pool:
-            fetched = list(pool.map(_fetch, feeds))
-
-        for name, content in fetched:
-            if content is None:
-                continue
-            try:
-                feed = feedparser.parse(content)
-                for entry in feed.entries[:15]:
-                    title = entry.get("title", "")
-                    link = entry.get("link", "")
-                    summary = entry.get("summary", "")
-                    summary_clean = re.sub(r"<[^>]+>", "", summary).strip()
-
-                    title_words = set(re.findall(r"\b[a-zA-Z]{3,}\b", title.lower()))
-                    overlap = query_words.intersection(title_words)
-
-                    # Use fuzzy matching if fuzzywuzzy is available
-                    ratio = 0
-                    if fuzz:
-                        ratio = fuzz.token_set_ratio(query.lower(), title.lower())
-
-                    if len(overlap) >= 2 or ratio > 60:
-                        results.append(
-                            Evidence(
-                                title=f"{name}: {title}",
-                                url=link,
-                                snippet=summary_clean[:500] or title,
-                                source_score=0.95,
-                            )
-                        )
-            except Exception as e:
-                logger.debug(f"RSS feed '{name}' failed: {e}")
+            if matched:
+                results.append(
+                    Evidence(
+                        title=f"{name}: {title}",
+                        url=link,
+                        snippet=summary[:500] or title,
+                        source_score=0.95,
+                    )
+                )
 
         return results
 
@@ -867,32 +945,46 @@ class EvidenceRetriever:
                 if m:
                     real_link = m.group(1)
 
+                # Every item carries a <source> element with BOTH the
+                # publisher's display name and — crucially — the href of their
+                # actual site:
+                #     {'href': 'https://www.reuters.com', 'title': 'Reuters'}
                 publisher = ""
+                publisher_url = ""
                 src = entry.get("source")
-                if isinstance(src, dict):
-                    publisher = src.get("title") or src.get("href") or ""
+                if isinstance(src, dict) or hasattr(src, "get"):
+                    publisher = src.get("title") or ""
+                    publisher_url = src.get("href") or ""
                 elif src:
                     publisher = str(src)
                 # Google formats titles as "Headline - Publisher".
                 if not publisher and " - " in title:
                     publisher = title.rsplit(" - ", 1)[1].strip()
 
-                # Score against the publisher's own domain when we recovered a
-                # real link. Otherwise try the publisher name, but only accept
-                # it if it actually matched a known outlet — _score_source
-                # returns the 0.50 unknown-domain default for anything it does
-                # not recognise, and a plain name like "Space.com" resolving to
-                # 0.50 would rank the aggregator link *above* its own 0.20
-                # penalty rather than below it.
+                # Score the publisher's domain, never the aggregator shell.
+                #
+                # Both previous recovery paths silently failed, so every item
+                # from this source landed on the 0.45 aggregator score:
+                #
+                #   * the summary's href is itself a news.google.com link, so
+                #     the `real_link` regex (which excludes news.google) never
+                #     matched and `real_link == link` always held;
+                #   * the fallback scored the publisher *name* — "Reuters",
+                #     "Britannica" — with a function that parses URLs, so it
+                #     returned the 0.50 unknown default and was then rejected
+                #     for being the default.
+                #
+                # The effect was that CDC, GOV.UK, Britannica and Scientific
+                # American articles all scored 0.45, below the 0.50 floor that
+                # every stance path requires, so they could never support or
+                # refute anything. Whole claims went unverified for want of
+                # evidence that had in fact been retrieved.
                 if real_link != link:
                     score = self._score_source(real_link)
+                elif publisher_url:
+                    score = self._score_source(publisher_url)
                 else:
-                    aggregator_score = self._score_source(link)
-                    score = aggregator_score
-                    if publisher:
-                        pub_score = self._score_source(publisher)
-                        if pub_score != 0.50:  # recognised, not the default
-                            score = pub_score
+                    score = self._score_source(link)
 
                 display = title if not publisher else f"{title} ({publisher})"
                 results.append(
@@ -901,6 +993,9 @@ class EvidenceRetriever:
                         url=real_link,
                         snippet=summary_clean[:500] or title,
                         source_score=score,
+                        # Recorded so SourceRanker scores the publisher rather
+                        # than re-deriving 0.45 from the interstitial URL.
+                        source_domain=publisher_url or None,
                     )
                 )
             return results
@@ -1316,19 +1411,12 @@ class EvidenceRetriever:
 
     @staticmethod
     def _score_source(url: str) -> float:
-        """Score a source URL based on known credibility database."""
-        try:
-            domain = urlparse(url).netloc.lower().replace("www.", "")
-            for known_domain, score in SOURCE_CREDIBILITY.items():
-                if known_domain in domain:
-                    return score
-            # TLD-based scoring for unknown domains
-            if domain.endswith((".gov", ".gov.in", ".gov.uk", ".gov.au")):
-                return 0.95
-            if domain.endswith((".edu", ".ac.in", ".ac.uk")):
-                return 0.80
-            if domain.endswith(".org"):
-                return 0.60
-            return 0.50
-        except Exception:
-            return 0.50
+        """
+        Score a source URL based on the known credibility database.
+
+        Delegates to backend.config.score_domain. This used to be a second,
+        subtly different implementation: it matched domains by naked substring
+        (so any host containing "gov" scored 1.0) and used different TLD tiers
+        than SourceRanker, whose scores overwrite these anyway.
+        """
+        return score_domain(url)

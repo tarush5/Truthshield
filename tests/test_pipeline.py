@@ -206,10 +206,14 @@ class TestSourceRanker:
         assert score == 0.0
 
     def test_unknown_source(self):
+        from backend.config import UNKNOWN_DOMAIN_SCORE
         from backend.factcheck.source_ranker import SourceRanker
         ranker = SourceRanker()
         score = ranker.score_source("https://randomsite.xyz/article")
-        assert score == 0.3
+        # 0.50, not the old 0.30: the tier 8/9/10 entries in config are written
+        # against a 0.50 unknown-domain default, and at 0.30 their demotions
+        # inverted — aggregators and tabloids outranked unknown domains.
+        assert score == UNKNOWN_DOMAIN_SCORE == 0.50
 
     def test_news_source(self):
         from backend.factcheck.source_ranker import SourceRanker
@@ -235,7 +239,22 @@ class TestSourceRanker:
 # ═══════════════════════════════════════════════
 
 class TestVerdictEngine:
-    def test_fallback_with_evidence(self):
+    def test_single_weak_source_does_not_decide(self):
+        """
+        One brief snippet is not a verdict.
+
+        This previously asserted TRUE. It reached TRUE only because the item was
+        classified NEUTRAL and neutral evidence still contributed to the support
+        total, so a single topical page carried the claim. In the wild that let
+        "The Earth is flat and NASA has been hiding it for decades" come back
+        TRUE at "support strength 4.3x" on the strength of one story titled
+        "NASA has quietly accumulated more than 150 petabytes of data", which
+        merely shared vocabulary with the claim.
+
+        A directional verdict now needs two independent sources on the same
+        side, one professional fact-check rating, or a lone source that is both
+        authoritative and squarely on topic.
+        """
         from backend.factcheck.verdict_engine import VerdictEngine
         from backend.models.schemas import Claim, Evidence
 
@@ -245,7 +264,50 @@ class TestVerdictEngine:
             Evidence(title="Official stats", url="https://gov.in/gdp", snippet="GDP growth 8.2%", source_score=0.9),
         ]
         result = engine._fallback_evaluate(claim, evidence)
+        assert result.verdict.value == "UNVERIFIED"
+        assert "too thin" in result.reasoning.lower()
+
+    def test_corroborating_sources_do_decide(self):
+        """The counterpart: with real corroboration the engine still commits."""
+        from backend.factcheck.verdict_engine import VerdictEngine
+        from backend.models.schemas import Claim, Evidence
+
+        engine = VerdictEngine()
+        claim = Claim(text="India's GDP grew by 8 percent in 2024", entity="India")
+        evidence = [
+            Evidence(
+                title="India GDP grew 8 percent in 2024, official data shows",
+                url="https://pib.gov.in/release/1",
+                snippet="India's GDP grew by 8 percent during 2024 according to official data released today.",
+                source_score=1.0,
+            ),
+            Evidence(
+                title="India GDP growth hit 8 percent in 2024",
+                url="https://www.reuters.com/world/india-gdp",
+                snippet="India's economy grew by 8 percent in 2024, the statistics ministry said.",
+                source_score=0.95,
+            ),
+        ]
+        result = engine._fallback_evaluate(claim, evidence)
         assert result.verdict.value == "TRUE"
+
+    def test_fact_check_rating_alone_is_enough(self):
+        """A professional adjudication of the claim stands on its own."""
+        from backend.factcheck.verdict_engine import VerdictEngine
+        from backend.models.schemas import Claim, Evidence
+
+        engine = VerdictEngine()
+        claim = Claim(text="Drinking bleach cures COVID-19")
+        evidence = [
+            Evidence(
+                title="Snopes: Does drinking bleach cure COVID-19?",
+                url="https://www.snopes.com/fact-check/bleach-covid",
+                snippet="Claim Reviewed: Drinking bleach cures COVID-19 — Rating: FALSE",
+                source_score=0.96,
+            ),
+        ]
+        result = engine._fallback_evaluate(claim, evidence)
+        assert result.verdict.value == "FALSE"
 
     def test_fallback_no_evidence(self):
         from backend.factcheck.verdict_engine import VerdictEngine

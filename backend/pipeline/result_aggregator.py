@@ -110,16 +110,21 @@ class ResultAggregator:
         refute_scores = []
 
         if not context.claim_verdicts:
-            # Fallback based on ML Model score cleanliness
-            if ml_model_score >= 0.70:
-                support_score = ml_model_score
-                refute_score = 0.0
-            elif ml_model_score <= 0.40:
-                support_score = 0.0
-                refute_score = 1.0 - ml_model_score
-            else:
-                support_score = 0.0
-                refute_score = 0.0
+            # No claim was checked, so there is no evidence either way.
+            #
+            # This branch used to promote ml_model_score straight into
+            # support_score, but the ML score measures manipulation, not truth:
+            # it answers "does this look doctored", never "is this claim
+            # correct". Worse, every detector fails open — a deepfake detector
+            # that cannot load torch returns confidence 0.0, which scores as
+            # 1.0 "perfectly clean". So an image whose OCR, captioning and
+            # deepfake model had all failed produced support_score 1.0 and came
+            # back VERIFIED at 85 trust, with nothing whatsoever verified.
+            #
+            # Manipulation evidence can still argue *against* the content;
+            # it can never argue for it.
+            support_score = 0.0
+            refute_score = max(0.0, 1.0 - ml_model_score) if ml_model_score <= 0.40 else 0.0
         else:
             for cv in context.claim_verdicts:
                 v = cv.verdict.value.upper() if hasattr(cv.verdict, "value") else str(cv.verdict).upper()
@@ -190,6 +195,21 @@ class ResultAggregator:
             context, signal_correlations, risk_factors
         )
         weighted_score += correlation_adjustment
+
+        # ── 8b. Say so when there was nothing to fact-check ───────
+        # Otherwise a submission whose text extraction failed (no OCR binary,
+        # an image with no legible text, an unreadable upload) is scored purely
+        # from component defaults and reads like a real assessment.
+        if not context.claim_verdicts:
+            packet_text = getattr(getattr(context, "packet", None), "text", None)
+            if not (packet_text or "").strip():
+                risk_factors.append(
+                    "No readable text could be extracted, so no claim was fact-checked"
+                )
+            else:
+                risk_factors.append(
+                    "No verifiable claim was extracted from this content"
+                )
 
         # ── 9. Crisis amplification ──────────────────────────────
         if context.is_crisis:
@@ -276,14 +296,16 @@ class ResultAggregator:
             verdict_reasons.append(f"High-credibility source ({sources_str}) matches claim")
 
         # 4. Deepfake check
+        # Reported only when the check actually ran. Both of these used to fall
+        # through to a reassuring "no anomalies detected" / "authenticity
+        # verified" line even when there was no media to check — every
+        # text-only submission claimed its video and audio had been cleared.
         df = context.deepfake_result
         if df:
             if df.is_deepfake:
                 verdict_reasons.append(f"Visual deepfake anomaly detected (confidence: {df.confidence:.0%})")
-            else:
+            elif getattr(df, "method", "unavailable") != "unavailable":
                 verdict_reasons.append("No contradicting visual deepfake or anomalies detected")
-        else:
-            verdict_reasons.append("No contradicting visual deepfake or anomalies detected")
 
         # 5. Voice clone check
         vc = context.voice_clone_result
@@ -292,8 +314,6 @@ class ResultAggregator:
                 verdict_reasons.append(f"Voice clone pattern detected (anomaly: {vc.anomaly_score:.0%})")
             else:
                 verdict_reasons.append("Voice authenticity verified (no cloning detected)")
-        else:
-            verdict_reasons.append("Voice authenticity verified (no cloning detected)")
                 
         # 6. AI text generation check
         ai = context.ai_content_result
@@ -427,9 +447,12 @@ class ResultAggregator:
             ml_scores.append(tc_score)
             scores["text_classifier"] = round(tc_score * 100, 1)
 
-        # Deepfake
+        # Deepfake.
+        # A detector whose model failed to load returns confidence 0.0, which
+        # scores here as 1.0 — a perfect clean bill of health earned by not
+        # running. Skip it so the average reflects checks that happened.
         df = context.deepfake_result
-        if df:
+        if df and getattr(df, "method", "unavailable") != "unavailable":
             df_score = 1.0 - df.confidence
             ml_scores.append(df_score)
             scores["deepfake_detector"] = round(df_score * 100, 1)
@@ -626,6 +649,31 @@ class ResultAggregator:
         refute_score: float = 0.0,
     ) -> str:
         """Determine overall verdict from support and refute scores."""
+        # Nothing was fact-checked, so no verdict about the content's truth is
+        # available. Without this gate the derivation below turned the neutral
+        # component defaults (fact_check 0.70, source 0.50, evidence 0.50) into
+        # a trust score near 58 and reported it as PARTIALLY TRUE — an opinion
+        # manufactured entirely out of defaults. The one thing still worth
+        # saying is when the detectors positively flagged manipulation.
+        if not context.claim_verdicts:
+            if refute_score >= 0.55:
+                return "LIKELY FALSE"
+            return "INSUFFICIENT EVIDENCE"
+
+        # Claims were checked but none could be settled. "We could not
+        # determine this" is not "this is partly true": the derivation below
+        # turns the UNVERIFIED fact-check default (0.70) plus the neutral
+        # component defaults into a trust score near 64 and labels it PARTIALLY
+        # TRUE. Two flagship false claims — a flat Earth and a staged moon
+        # landing — were reported that way whenever evidence retrieval came
+        # back thin, which reads as partial endorsement of the claim.
+        if all(
+            (cv.verdict.value.upper() if hasattr(cv.verdict, "value") else str(cv.verdict).upper())
+            == "UNVERIFIED"
+            for cv in context.claim_verdicts
+        ):
+            return "INSUFFICIENT EVIDENCE"
+
         # If no support/refute scores are provided, derive them from trust_score
         if support_score == 0.0 and refute_score == 0.0:
             if trust_score >= 85:

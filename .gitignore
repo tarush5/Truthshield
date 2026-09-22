@@ -1,4 +1,3 @@
-**/.env.example
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -117,3 +116,12 @@ backend/uploads/
 .venv/
 venv/
 env/
+
+# v2 additions
+.venv/
+venv/
+.uploads/
+.model_cache/
+*.db
+truthshield_*.db
+.pytest_cache/

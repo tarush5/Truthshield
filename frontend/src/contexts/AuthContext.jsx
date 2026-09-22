@@ -1,286 +1,62 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getSupabase } from '../utils/supabase/client';
-import { API_BASE, isBackendError, BACKEND_UNREACHABLE_MSG } from '../config';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-const AuthContext = createContext(null);
+import { api, tokenStore } from '../lib/api';
 
 /**
- * Wraps a fetch call with proper error handling:
- * - Detects network/backend-unreachable errors and shows a clear message
- * - Parses JSON error detail from the backend
+ * Session state.
+ *
+ * Restores optimistically from localStorage so the first paint is not a
+ * spinner, then confirms with the server. If that confirmation fails the
+ * session is cleared — the previous version kept a rejected token in storage
+ * and rendered a signed-in shell whose every request 401'd.
  */
-async function safeFetch(url, options = {}) {
-  let res;
-  try {
-    res = await fetch(url, options);
-  } catch (err) {
-    if (isBackendError(err)) {
-      throw new Error(BACKEND_UNREACHABLE_MSG);
-    }
-    throw err;
-  }
-
-  if (!res.ok) {
-    // Try to extract detail from backend JSON response
-    let detail = '';
-    try {
-      const body = await res.json();
-      detail = body.detail || '';
-    } catch {
-      // not JSON
-    }
-
-    if (res.status === 404) {
-      throw new Error(
-        detail || 'API endpoint not found (404). Make sure the backend server is running and VITE_API_URL is configured.'
-      );
-    }
-    throw new Error(detail || `Request failed with status ${res.status}`);
-  }
-
-  return res.json();
-}
+const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [activeOrg, setActiveOrg] = useState(() => ({
-    id: localStorage.getItem('active_org_id') || null,
-    name: localStorage.getItem('active_org_name') || null,
-  }));
+  const [user, setUser] = useState(() => tokenStore.user());
+  const [checking, setChecking] = useState(() => Boolean(tokenStore.get()));
 
-  // Initialize auth state
   useEffect(() => {
-    // Get initial session from localStorage for self-contained local auth
-    const token = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-    if (token && savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        setSession({ access_token: token });
-        setUser(parsedUser);
-      } catch (e) {
-        console.error('Failed to parse saved user:', e);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      }
-    }
-    setLoading(false);
+    if (!tokenStore.get()) return undefined;
 
-    // Also listen for Supabase auth state changes (handles OAuth redirects,
-    // token refresh, and session recovery from URL fragments)
-    // Subscribe once the SDK has loaded. This is deliberately not awaited
-    // before first paint: the listener only handles OAuth redirects, token
-    // refresh and remote sign-out, none of which can happen in the first
-    // frames, and blocking on it would put the whole SDK back on the critical
-    // path that the dynamic import exists to clear.
-    let subscription;
-    let cancelled = false;
+    let alive = true;
+    api.me()
+      .then((me) => { if (alive) setUser(me); })
+      .catch(() => {
+        if (!alive) return;
+        tokenStore.clear();
+        setUser(null);
+      })
+      .finally(() => { if (alive) setChecking(false); });
 
-    getSupabase().then((supabase) => {
-      if (cancelled) return;
-      const result = supabase.auth.onAuthStateChange((event) => {
-        // If Supabase detects a sign-in and we don't have a local session yet,
-        // the AuthCallback page will handle the backend exchange.
-        // This listener primarily handles token refresh and sign-out.
-        if (event === 'SIGNED_OUT') {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          setUser(null);
-          setSession(null);
-        }
-      });
-      subscription = result?.data?.subscription;
-    });
-
-    return () => {
-      cancelled = true;
-      subscription?.unsubscribe();
-    };
+    return () => { alive = false; };
   }, []);
 
-  // Sign in with OTP via backend auth
-  const signInWithOtp = useCallback(async (email) => {
-    await safeFetch(`${API_BASE}/auth/otp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    return true;
+  const adopt = useCallback((payload) => {
+    tokenStore.set(payload.access_token, payload.user);
+    setUser(payload.user);
+    return payload.user;
   }, []);
 
-  // Verify OTP via backend auth
-  const verifyOtp = useCallback(async (email, token) => {
-    const data = await safeFetch(`${API_BASE}/auth/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, token }),
-    });
-    setSession({ access_token: data.access_token });
-    setUser(data.user);
-    localStorage.setItem('token', data.access_token);
-    localStorage.setItem('user', JSON.stringify(data.user));
-    return data;
-  }, []);
-
-  // Sign in with Google
-  const signInWithGoogle = useCallback(async () => {
-    const supabase = await getSupabase();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    if (error) throw error;
-  }, []);
-
-  // Sign in with GitHub
-  const signInWithGithub = useCallback(async () => {
-    const supabase = await getSupabase();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'github',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    if (error) throw error;
-  }, []);
-
-  // Sign up with Password
-  const signUpWithPassword = useCallback(async (email, password) => {
-    const data = await safeFetch(`${API_BASE}/auth/signup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    setSession({ access_token: data.access_token });
-    setUser(data.user);
-    localStorage.setItem('token', data.access_token);
-    localStorage.setItem('user', JSON.stringify(data.user));
-    return data;
-  }, []);
-
-  // Sign in with Password
-  const signInWithPassword = useCallback(async (email, password) => {
-    const data = await safeFetch(`${API_BASE}/auth/signin`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    setSession({ access_token: data.access_token });
-    setUser(data.user);
-    localStorage.setItem('token', data.access_token);
-    localStorage.setItem('user', JSON.stringify(data.user));
-    return data;
-  }, []);
-
-  // Sign in as Demo
-  const signInAsDemo = useCallback(async () => {
-    const data = await safeFetch(`${API_BASE}/auth/demo`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    setSession({ access_token: data.access_token });
-    setUser(data.user);
-    localStorage.setItem('token', data.access_token);
-    localStorage.setItem('user', JSON.stringify(data.user));
-    return data;
-  }, []);
-
-  // Complete OAuth login callback flow
-  const completeOAuthLogin = useCallback((token, user) => {
-    setSession({ access_token: token });
-    setUser(user);
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-  }, []);
-
-  // Sign out
-  const signOut = useCallback(async () => {
-    try {
-      const supabase = await getSupabase();
-      await supabase.auth.signOut();
-    } catch (e) {
-      // ignore
-    }
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('active_org_id');
-    localStorage.removeItem('active_org_name');
-    setUser(null);
-    setSession(null);
-    setActiveOrg({ id: null, name: null });
-  }, []);
-
-  // Get auth header for API calls
-  const getAuthHeader = useCallback(() => {
-    const token = session?.access_token || localStorage.getItem('token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }, [session]);
-
-  // Set active organization
-  const setOrganization = useCallback((orgId, orgName) => {
-    setActiveOrg({ id: orgId, name: orgName });
-    localStorage.setItem('active_org_id', orgId);
-    localStorage.setItem('active_org_name', orgName);
-  }, []);
-
-  // Fetch user's organizations (supports array or nested object payload)
-  const fetchOrganizations = useCallback(async () => {
-    const token = session?.access_token || localStorage.getItem('token');
-    if (!token) return [];
-    try {
-      const data = await safeFetch(`${API_BASE}/organizations`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return Array.isArray(data) ? data : (data.organizations || []);
-    } catch {
-      return [];
-    }
-  }, [session]);
-
-  // Create workspace
-  const createOrganization = useCallback(async (name) => {
-    const token = session?.access_token || localStorage.getItem('token');
-    const data = await safeFetch(`${API_BASE}/organizations`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ name }),
-    });
-    return data;
-  }, [session]);
-
-  const value = {
+  const value = useMemo(() => ({
     user,
-    session,
-    loading,
-    activeOrg,
-    signInWithOtp,
-    verifyOtp,
-    signInWithGoogle,
-    signInWithGithub,
-    signUpWithPassword,
-    signInWithPassword,
-    signInAsDemo,
-    completeOAuthLogin,
-    signOut,
-    getAuthHeader,
-    setOrganization,
-    fetchOrganizations,
-    createOrganization,
-    isAuthenticated: !!session,
-  };
+    checking,
+    isAuthenticated: Boolean(user),
+    signIn: async (email, password) => adopt(await api.signin(email, password)),
+    signUp: async (email, password) => adopt(await api.signup(email, password)),
+    requestOtp: (email) => api.requestOtp(email),
+    verifyOtp: async (email, code) => adopt(await api.verifyOtp(email, code)),
+    signOut: () => {
+      tokenStore.clear();
+      setUser(null);
+    },
+  }), [user, checking, adopt]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used inside AuthProvider');
+  return context;
 }

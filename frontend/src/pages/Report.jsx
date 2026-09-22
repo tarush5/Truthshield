@@ -1,421 +1,453 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { motion } from 'framer-motion';
-import { 
-  ArrowLeft, Share2, Clock, Globe, AlertTriangle, 
-  CheckCircle, BarChart3, Copy, Check, Download, ExternalLink, 
-  Info, ShieldCheck, Activity, Terminal
+import React, { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import {
+  AlertTriangle, ArrowLeft, Check, ChevronDown, Clock, Copy,
+  ExternalLink, Info, Loader2,
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
 import TrustGauge from '../components/TrustGauge';
-import ClaimTable from '../components/ClaimTable';
-import CounterNarrative from '../components/CounterNarrative';
-import { API_BASE } from '../config';
-import InteractiveCard from '../components/InteractiveCard';
+import { api, ApiError } from '../lib/api';
+import {
+  TONE_TEXT_VAR, TONE_VAR, getDetectorStatus, getStance, getVerdict, hostOf,
+} from '../lib/verdict';
 
-
-const COMPONENT_COLORS = {
-  source_credibility: '#10b981', // Emerald green
-  fact_match: '#3b82f6',         // Royal blue
-  evidence_strength: '#8b5cf6',  // Aurora purple/violet
-  manipulation_risk: '#f59e0b',  // Amber/orange
-  bias_risk: '#ef4444',          // Red
-  // Backwards compatibility
-  text: '#38bdf8',
-  deepfake: '#ef4444',
-  voice: '#a78bfa',
-  ai_content: '#22d3ee',
-};
-
-const fadeUp = {
-  initial: { opacity: 0, y: 15 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.4 },
-};
-
+/**
+ * The analysis report.
+ *
+ * Structured so the verdict can be interrogated rather than just read: every
+ * claim shows the sources behind it and which way each one cut, the four
+ * score components are broken out, and anything the system could not check is
+ * stated explicitly instead of being silently omitted.
+ *
+ * The previous version had `lg:col-span-8` inside a three-column grid, so the
+ * right-hand column silently wrapped onto its own row at every breakpoint.
+ */
 export default function Report() {
   const { id } = useParams();
-  const { t, i18n } = useTranslation();
-  const navigate = useNavigate();
   const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetchReport();
+    let alive = true;
+    api.report(id)
+      .then((data) => alive && setReport(data))
+      .catch((err) => alive && setError(err));
+    return () => { alive = false; };
   }, [id]);
 
-  const fetchReport = async () => {
+  const share = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await fetch(`${API_BASE}/report/${id}`, { headers });
-      if (!res.ok) throw new Error('Report not found');
-      const data = await res.json();
-      setReport(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleShare = async () => {
-    const url = window.location.href;
-    try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // fallback
-    }
+    } catch { /* clipboard blocked — the URL is in the address bar anyway */ }
   };
 
-  if (loading) {
-    return (
-      <div className="max-w-5xl mx-auto px-4 flex items-center justify-center min-h-[50vh] relative z-10">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-white/40 font-mono animate-pulse">{t('report.decompressing_briefing')}</p>
-        </div>
-      </div>
-    );
-  }
+  if (error) return <ReportError error={error} />;
+  if (!report) return <ReportSkeleton />;
 
-  if (error || !report) {
-    return (
-      <div className="max-w-xl mx-auto px-4 text-center py-20 relative z-10 space-y-6">
-        <AlertTriangle className="w-12 h-12 text-amber-500/60 mx-auto" />
-        <div className="space-y-2">
-          <h2 className="text-lg font-bold text-white">{t('report.unavailable')}</h2>
-          <p className="text-xs text-white/40">{error || t('report.unavailable_hint')}</p>
-        </div>
-        <div>
-          <Link to="/analyze" className="btn-secondary inline-flex items-center gap-2 text-xs py-2 px-5">
-            <ArrowLeft className="w-4 h-4" /> {t('report.back_to_ingestion')}
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const componentData = Object.entries(report.credibility?.component_scores || {}).map(([key, value]) => ({
-    name: t(`report.scores.${key}`) || key.charAt(0).toUpperCase() + key.slice(1).replace('_', ' '),
-    score: value,
-    color: COMPONENT_COLORS[key] || '#475569',
-  }));
-
-  const explanationText = report.explanation
-    ? report.explanation[`text_${i18n.language}`] || report.explanation.text_en
-    : null;
-
-  const getVerdictStyle = (verdict) => {
-    const v = (verdict || '').toUpperCase();
-    if (v === 'PARTIALLY TRUE') return 'badge-warning';
-    if (v === 'VERIFIED' || v.includes('TRUE') || v.includes('AUTHENTIC')) return 'badge-success';
-    if (v === 'LIKELY TRUE') return 'badge-success opacity-85';
-    if (v === 'FALSE') return 'badge-danger';
-    if (v === 'LIKELY FALSE') return 'badge-danger opacity-85';
-    if (v === 'MIXED EVIDENCE' || v.includes('MISLEADING')) return 'badge-warning';
-    if (v === 'INSUFFICIENT EVIDENCE' || v.includes('UNVERIFIED') || v.includes('ERROR')) return 'badge-info';
-    return 'badge-info';
-  };
-
-  const isLight = document.documentElement.classList.contains('light');
-  const xAxisTickColor = isLight ? 'rgba(71, 85, 105, 0.5)' : 'rgba(255,255,255,0.2)';
-  const yAxisTickColor = isLight ? 'rgba(71, 85, 105, 0.85)' : 'rgba(255,255,255,0.5)';
-  const tooltipBg = isLight ? '#ffffff' : '#071124';
-  const tooltipBorder = isLight ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255,255,255,0.08)';
-  const tooltipColor = isLight ? '#1e293b' : '#ffffff';
+  const meta = getVerdict(report.verdict);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-8">
-      
-      {/* Header briefing controls */}
-      <motion.div {...fadeUp} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/5">
-        <div className="flex items-start gap-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all border border-white/5"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-sky-400 uppercase tracking-widest font-mono">{t('report.verification_dossier')}</span>
-              <span className="text-white/10">|</span>
-              <span className="text-[10px] text-white/40 font-mono">{t('report.id')}: {report.id?.slice(0, 8)}...</span>
-            </div>
-            <h1 className="text-2xl font-bold font-display text-white mt-1">{t('report.title')}</h1>
-          </div>
-        </div>
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <Link
+          to="/analyze"
+          className="btn-ghost -ml-3"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          New analysis
+        </Link>
 
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-white/30 font-mono flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5">
-            <Clock className="w-3.5 h-3.5" />
-            {new Date(report.created_at).toLocaleDateString()}
+          <span className="inline-flex items-center gap-1.5 text-2xs text-ink-muted">
+            <Clock className="h-3.5 w-3.5" />
+            {new Date(report.created_at).toLocaleString()}
+            {report.processing_time_seconds > 0 && (
+              <> · {report.processing_time_seconds.toFixed(1)}s</>
+            )}
           </span>
-          <button
-            onClick={handleShare}
-            className="btn-secondary flex items-center gap-2 text-xs py-1.5 px-4"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
-            {copied ? t('report.copied') : t('report.share_dossier')}
+          <button onClick={share} className="btn-secondary !px-3 !py-1.5 text-2xs">
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? 'Copied' : 'Share'}
           </button>
         </div>
-      </motion.div>
+      </header>
 
-      {/* Main briefing cards */}
-      <div className="grid lg:grid-cols-3 gap-8">
-        
-        {/* Left main: core summary & details */}
-        <div className="lg:col-span-2 space-y-8">
-          
-          {/* Core verdict card */}
-          <InteractiveCard className="border border-white/10 bg-[#030712]/40 backdrop-blur-xl">
-            <div className="p-6 md:p-8 flex flex-col md:flex-row items-center md:items-start gap-8">
-              
-              {/* Trust Gauge */}
-              <div className="shrink-0 flex flex-col items-center">
-                <TrustGauge score={report.credibility?.trust_score || 50} />
-                <span className={`badge ${getVerdictStyle(report.credibility?.verdict)} mt-4`}>
-                  {t(`verdicts.${report.credibility?.verdict}`) || report.credibility?.verdict || t('verdicts.UNVERIFIED')}
-                </span>
+      {/* ── Verdict ─────────────────────────────────────────── */}
+      <section className="card p-6 sm:p-8">
+        <div className="flex flex-col items-center gap-8 md:flex-row md:items-start">
+          <div className="shrink-0">
+            <TrustGauge
+              score={report.trust_score}
+              verdict={report.verdict}
+              confidenceBand={report.confidence_band}
+            />
+          </div>
 
-                {/* Misinformation likelihood, stated outright rather than left
-                    for the reader to infer from the trust score. */}
-                {typeof report.credibility?.fake_probability === 'number' && (
-                  <div className="mt-4 w-full text-center">
-                    <div className="section-label mb-1">Chance of being fake</div>
-                    <div
-                      className={`text-2xl font-bold tabular-nums ${
-                        report.credibility.fake_probability >= 56
-                          ? 'text-rose-400'
-                          : report.credibility.fake_probability > 44
-                            ? 'text-amber-400'
-                            : 'text-emerald-400'
-                      }`}
-                    >
-                      {report.credibility.fake_probability}%
-                    </div>
-                    <div className="text-[11px] uppercase tracking-wide text-white/50 mt-0.5">
-                      {report.credibility.fake_likelihood_label}
-                    </div>
-                    <div
-                      className="mt-2 h-1.5 w-full rounded-full bg-white/10 overflow-hidden"
-                      role="progressbar"
-                      aria-valuenow={report.credibility.fake_probability}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-label="Chance of being fake"
-                    >
-                      <div
-                        className={`h-full rounded-full ${
-                          report.credibility.fake_probability >= 56
-                            ? 'bg-rose-400'
-                            : report.credibility.fake_probability > 44
-                              ? 'bg-amber-400'
-                              : 'bg-emerald-400'
-                        }`}
-                        style={{ width: `${report.credibility.fake_probability}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Explanations */}
-              <div className="flex-1 space-y-4 text-center md:text-left">
-                <div className="space-y-1">
-                  <span className="section-label">{t('report.verdict_summary')}</span>
-                  <p className="text-sm text-white/80 leading-relaxed font-sans">
-                    {explanationText || t('report.no_explanation')}
-                  </p>
-                </div>
-              </div>
-
+          <div className="min-w-0 flex-1 space-y-5 text-center md:text-left">
+            <div>
+              <p className="section-label mb-1.5">What we found</p>
+              <p className="text-base leading-relaxed text-ink-secondary">
+                {report.summary || meta.gist}
+              </p>
             </div>
 
-            {/* Signal scores chart */}
-            {report.credibility?.component_scores && (
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="p-5 space-y-4"
-              >
-              <h3 className="section-label">{t('report.signal_vectors')}</h3>
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={componentData} layout="vertical" margin={{ left: -10, right: 10, top: 0, bottom: 0 }}>
-                  <XAxis type="number" domain={[0, 100]} tick={{ fill: xAxisTickColor, fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fill: yAxisTickColor, fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: '8px', color: tooltipColor, fontSize: '11px' }}
-                    formatter={(val) => [`${val.toFixed(0)}%`, 'Accuracy']}
-                  />
-                  <Bar dataKey="score" radius={[0, 4, 4, 0]} barSize={12}>
-                    {componentData.map((entry, idx) => (
-                      <Cell key={idx} fill={entry.color} fillOpacity={0.7} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              </motion.div>
-            )}
-          </InteractiveCard>
-
-          {/* Timeline Process Profile */}
-          {report.credibility?.confidence_profile && (
-            <InteractiveCard className="border border-white/5 bg-[#071124]/30 backdrop-blur-xl">
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25 }}
-                className="p-5 space-y-4"
-              >
-              <h3 className="section-label">{t('report.risk_profile')}</h3>
-              <div className="space-y-3.5">
-                {Object.entries(report.credibility.confidence_profile).map(([key, value]) => (
-                  <div key={key} className="space-y-1">
-                    <div className="flex justify-between text-[11px] font-mono">
-                      <span className="text-white/40 capitalize">{key.replace('_', ' ')}</span>
-                      <span className="text-white/70">{typeof value === 'number' ? `${(value * 100).toFixed(0)}%` : value}</span>
-                    </div>
-                    {typeof value === 'number' && (
-                      <div className="progress-bar">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${value * 100}%` }}
-                          transition={{ duration: 1, delay: 0.3 }}
-                          className="progress-fill bg-gradient-to-r from-sky-400 to-indigo-500"
-                        />
-                      </div>
-                    )}
-                  </div>
+            {report.reasons?.length > 0 && (
+              <ul className="space-y-1.5">
+                {report.reasons.map((reason, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-ink-secondary">
+                    <Check
+                      className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                      style={{ color: `rgb(var(${TONE_TEXT_VAR[meta.tone]}))` }}
+                    />
+                    <span>{reason}</span>
+                  </li>
                 ))}
-              </div>
-              </motion.div>
-            </InteractiveCard>
-          )}
+              </ul>
+            )}
 
-          {/* Audit Trail Checklist */}
-          {report.verdict_reasons && report.verdict_reasons.length > 0 && (
-            <InteractiveCard className="border border-white/5 bg-[#071124]/30 backdrop-blur-xl">
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="p-5 space-y-4"
-              >
-                <h3 className="section-label">{t('report.audit_trail')}</h3>
-                <div className="space-y-3 font-sans">
-                  {report.verdict_reasons.map((reason, idx) => (
-                    <div key={idx} className="flex items-start gap-2.5 text-xs text-white/75">
-                      <div className="mt-0.5 shrink-0 flex items-center justify-center w-4 h-4 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.2)]">
-                        <Check className="w-2.5 h-2.5 stroke-[3]" />
-                      </div>
-                      <span className="leading-tight">{reason}</span>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            </InteractiveCard>
-          )}
-
+            <FakeProbability value={report.fake_probability} tone={meta.tone} />
+          </div>
         </div>
+      </section>
 
-        {/* Right Column: AI Research Details (8 cols) */}
-        <div className="lg:col-span-8 space-y-6">
-          
-          {/* Explanation briefing */}
-          {explanationText && (
-            <InteractiveCard className="border border-white/10 bg-[#030712]/40 backdrop-blur-xl">
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-                className="p-6 space-y-3"
-              >
-              <h3 className="section-label">{t('report.explanation_header')}</h3>
-              <p className="text-white/85 text-xs sm:text-sm leading-relaxed font-sans">{explanationText}</p>
-              </motion.div>
-            </InteractiveCard>
-          )}
+      {/* ── Limitations ─────────────────────────────────────── */}
+      {report.limitations?.length > 0 && <Limitations items={report.limitations} />}
 
-          {/* Original Input Text / Meta */}
-          {report.original_text && (
-            <InteractiveCard className="border border-white/5 bg-[#071124]/30 backdrop-blur-xl">
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="p-6 space-y-4"
-              >
-              <h3 className="section-label">{t('report.ingested_material')}</h3>
-              <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5 max-h-40 overflow-y-auto">
-                <p className="text-xs text-white/60 leading-relaxed italic">
-                  "{report.original_text}"
-                </p>
-              </div>
+      {/* ── Score components ────────────────────────────────── */}
+      <Breakdown breakdown={report.breakdown} />
 
-              {/* Inconsistencies Found list */}
-              {report.inconsistencies && report.inconsistencies.length > 0 && (
-                <div className="space-y-3 pt-2">
-                  <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-                    {t('report.conflict_anomalies')} ({report.inconsistencies.length})
-                  </span>
-                  <div className="space-y-2">
-                    {report.inconsistencies.map((inc, idx) => (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, x: -8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="flex items-start gap-2.5 p-2 rounded-lg bg-red-500/[0.02] border border-red-500/10 text-xs"
-                      >
-                        <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase shrink-0 mt-0.5 ${
-                          inc.severity === 'high' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
-                        }`}>
-                          {inc.severity} {t('report.severity')}
-                        </span>
-                        <span className="text-white/60 leading-normal">{inc.reason}</span>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              </motion.div>
-            </InteractiveCard>
-          )}
+      {/* ── Claims ──────────────────────────────────────────── */}
+      {report.claims?.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="section-title">
+            {report.claims.length === 1
+              ? 'The claim we checked'
+              : `The ${report.claims.length} claims we checked`}
+          </h2>
+          {report.claims.map((claim, i) => <ClaimCard key={i} claim={claim} />)}
+        </section>
+      )}
 
-          {/* Claim table listings */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-            className="space-y-3"
-          >
-            <h3 className="section-label">{t('report.claims_table_header')}</h3>
-            <ClaimTable claims={report.claims} />
-          </motion.div>
+      {/* ── Detectors ───────────────────────────────────────── */}
+      <Detectors detectors={report.detectors} />
 
-          {/* Counter Narrative section */}
-          {report.counter_narrative && (
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
+      {/* ── Submitted content ───────────────────────────────── */}
+      {report.original_text && (
+        <section className="card p-5 space-y-2">
+          <h2 className="section-label">What was submitted</h2>
+          {report.source_url && (
+            <a
+              href={report.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-brand-400 hover:underline"
             >
-              <CounterNarrative narrative={report.counter_narrative} />
-            </motion.div>
+              {hostOf(report.source_url)}
+              <ExternalLink className="h-3 w-3" />
+            </a>
           )}
+          <p className="max-h-52 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-ink-secondary">
+            {report.original_text}
+          </p>
+        </section>
+      )}
+    </div>
+  );
+}
 
+/* ─────────────────────────────────────────────────────────── */
+
+function FakeProbability({ value, tone }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="section-label">Chance this is misinformation</span>
+        <span
+          className="text-lg font-bold"
+          style={{ color: `rgb(var(${TONE_TEXT_VAR[tone]}))` }}
+        >
+          {value}%
+        </span>
+      </div>
+      <div
+        className="progress-bar"
+        role="progressbar"
+        aria-valuenow={value}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Chance this is misinformation"
+      >
+        <div
+          className="progress-fill"
+          style={{ width: `${value}%`, background: `rgb(var(${TONE_VAR[tone]}))` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Limitations({ items }) {
+  return (
+    <section
+      className="card-flat p-4"
+      style={{ boxShadow: 'inset 0 0 0 1px rgb(var(--c-warning) / 0.28)' }}
+    >
+      <div className="flex items-start gap-2.5">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-status-warning-text" />
+        <div className="space-y-1.5">
+          <h2 className="text-sm font-semibold text-ink">What this analysis could not check</h2>
+          <ul className="space-y-1">
+            {items.map((item, i) => (
+              <li key={i} className="text-sm text-ink-secondary">· {item}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const COMPONENT_LABELS = {
+  fact_match: 'Fact match',
+  source_credibility: 'Source credibility',
+  evidence_strength: 'Evidence strength',
+  manipulation_risk: 'Manipulation risk',
+};
+
+const COMPONENT_HELP = {
+  fact_match: 'How the checked claims came out',
+  source_credibility: 'How trustworthy the sources that took a side are',
+  evidence_strength: 'How much evidence actually took a position',
+  manipulation_risk: 'Signs the media itself was altered. 50% means not assessed.',
+};
+
+function Breakdown({ breakdown }) {
+  if (!breakdown) return null;
+  const entries = Object.entries(breakdown);
+
+  return (
+    <section className="card p-5 space-y-4">
+      <h2 className="section-title">How the score breaks down</h2>
+      <div className="space-y-3.5">
+        {entries.map(([key, value]) => (
+          <div key={key} className="space-y-1.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-sm font-medium text-ink">
+                {COMPONENT_LABELS[key] || key}
+              </span>
+              <span className="tabular-nums text-sm text-ink-secondary">
+                {Math.round(value)}%
+              </span>
+            </div>
+            <div className="progress-bar">
+              {/* One series, one colour: the axis already names each row, so
+                  a different hue per bar would be decoration. */}
+              <div
+                className="progress-fill"
+                style={{ width: `${value}%`, background: 'rgb(var(--c-series-1))' }}
+              />
+            </div>
+            <p className="text-2xs text-ink-muted">{COMPONENT_HELP[key]}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ClaimCard({ claim }) {
+  const [open, setOpen] = useState(false);
+  const meta = getVerdict(claim.verdict);
+  const Icon = meta.icon;
+  const hasEvidence = claim.evidence?.length > 0;
+
+  return (
+    <article className="card overflow-hidden">
+      <div className="space-y-3 p-5">
+        <div className="flex items-start gap-3">
+          <span
+            className="mt-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-2xs font-bold uppercase tracking-wide"
+            style={{
+              color: `rgb(var(${TONE_TEXT_VAR[meta.tone]}))`,
+              background: `rgb(var(${TONE_VAR[meta.tone]}) / 0.14)`,
+              boxShadow: `inset 0 0 0 1px rgb(var(${TONE_VAR[meta.tone]}) / 0.32)`,
+            }}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {meta.headline}
+          </span>
+          <p className="min-w-0 flex-1 text-sm font-medium leading-relaxed text-ink">
+            {claim.text}
+          </p>
         </div>
 
+        {claim.reasoning && (
+          <p className="text-sm leading-relaxed text-ink-secondary">{claim.reasoning}</p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs text-ink-muted">
+          <span>Confidence {Math.round(claim.confidence * 100)}%</span>
+          {claim.supporting_count > 0 && (
+            <span className="text-status-good-text">
+              {claim.supporting_count} supporting
+            </span>
+          )}
+          {claim.refuting_count > 0 && (
+            <span className="text-status-critical-text">
+              {claim.refuting_count} contradicting
+            </span>
+          )}
+        </div>
       </div>
 
+      {hasEvidence && (
+        <>
+          <button
+            onClick={() => setOpen(!open)}
+            className="flex w-full items-center justify-between border-t border-line px-5 py-2.5 text-2xs font-semibold uppercase tracking-wide text-ink-muted transition-colors hover:text-ink"
+            aria-expanded={open}
+          >
+            {open ? 'Hide' : 'Show'} {claim.evidence.length} source
+            {claim.evidence.length !== 1 ? 's' : ''}
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`}
+            />
+          </button>
+          {open && (
+            <ul className="divide-y divide-line border-t border-line">
+              {claim.evidence.map((item, i) => <EvidenceRow key={i} item={item} />)}
+            </ul>
+          )}
+        </>
+      )}
+    </article>
+  );
+}
+
+function EvidenceRow({ item }) {
+  const stance = getStance(item.stance);
+  const StanceIcon = stance.icon;
+
+  return (
+    <li className="space-y-1.5 px-5 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="min-w-0 flex-1 text-sm font-medium text-ink hover:text-brand-400"
+        >
+          {item.title}
+        </a>
+        <span
+          className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-semibold"
+          style={{
+            color: `rgb(var(${TONE_TEXT_VAR[stance.tone]}))`,
+            background: `rgb(var(${TONE_VAR[stance.tone]}) / 0.12)`,
+          }}
+        >
+          <StanceIcon className="h-3 w-3" />
+          {stance.label}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-ink-muted">
+        <span>{hostOf(item.source_domain || item.url)}</span>
+        <span>·</span>
+        {/* The credibility label comes from the API so the UI and the scorer
+            cannot disagree about what a score means. */}
+        <span>{item.credibility_label}</span>
+      </div>
+
+      {item.snippet && (
+        <p className="line-clamp-2 text-2xs leading-relaxed text-ink-muted">{item.snippet}</p>
+      )}
+    </li>
+  );
+}
+
+function Detectors({ detectors }) {
+  if (!detectors?.length) return null;
+  // A check that never applied is noise; one that failed is worth showing.
+  const shown = detectors.filter((d) => d.status !== 'not_applicable');
+  if (!shown.length) return null;
+
+  return (
+    <section className="card p-5 space-y-3">
+      <h2 className="section-title">Media checks</h2>
+      <ul className="space-y-2.5">
+        {shown.map((d) => {
+          const status = getDetectorStatus(d.status);
+          return (
+            <li key={d.name} className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium capitalize text-ink">
+                  {d.name.replace(/_/g, ' ')}
+                </p>
+                {d.detail && (
+                  <p className="text-2xs leading-relaxed text-ink-muted">{d.detail}</p>
+                )}
+              </div>
+              <span
+                className="shrink-0 rounded-md px-2 py-0.5 text-2xs font-semibold"
+                style={{
+                  color: `rgb(var(${TONE_TEXT_VAR[status.tone]}))`,
+                  background: `rgb(var(${TONE_VAR[status.tone]}) / 0.12)`,
+                }}
+              >
+                {status.label}
+                {d.counted_toward_score && ` · ${Math.round(d.score * 100)}%`}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function ReportSkeleton() {
+  return (
+    <div className="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+      <div className="skeleton h-8 w-40" />
+      <div className="card p-8">
+        <div className="flex flex-col items-center gap-8 md:flex-row md:items-start">
+          <div className="skeleton h-48 w-48 shrink-0 rounded-full" />
+          <div className="w-full space-y-3">
+            <div className="skeleton h-4 w-24" />
+            <div className="skeleton h-4 w-full" />
+            <div className="skeleton h-4 w-4/5" />
+            <div className="skeleton h-4 w-2/3" />
+          </div>
+        </div>
+      </div>
+      <div className="skeleton h-40 w-full rounded-2xl" />
+    </div>
+  );
+}
+
+function ReportError({ error }) {
+  const notFound = error instanceof ApiError && error.status === 404;
+  return (
+    <div className="mx-auto max-w-md space-y-5 px-4 py-20 text-center">
+      <AlertTriangle className="mx-auto h-10 w-10 text-status-warning-text" />
+      <div className="space-y-2">
+        <h1 className="text-lg font-bold text-ink">
+          {notFound ? 'Report not available' : 'Could not load this report'}
+        </h1>
+        <p className="text-sm text-ink-secondary">
+          {notFound
+            ? 'It may have been deleted, or it belongs to another account.'
+            : error.message}
+        </p>
+      </div>
+      <Link to="/analyze" className="btn-primary inline-flex">
+        <ArrowLeft className="h-4 w-4" />
+        Analyze something
+      </Link>
     </div>
   );
 }

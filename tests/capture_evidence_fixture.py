@@ -28,9 +28,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from backend.factcheck.evidence_retriever import EvidenceRetriever
-from backend.factcheck.source_ranker import SourceRanker
-from backend.models.schemas import Claim
+from truthshield.infra.evidence.retriever import EvidenceRetriever
+from truthshield.domain.evidence.ranker import SourceRanker
+from truthshield.domain.verdict.legacy_types import Claim
 
 # Expected verdict direction per claim: "true", "false", or "unsure" where even
 # a careful reader could not settle it from open sources.

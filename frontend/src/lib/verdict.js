@@ -120,7 +120,9 @@ export const STANCE = {
   SUPPORTS: { label: 'Supports', tone: 'good', icon: CheckCircle2 },
   REFUTES: { label: 'Refutes', tone: 'critical', icon: XCircle },
   NEUTRAL: { label: 'Neutral', tone: 'neutral', icon: Scale },
-  INSUFFICIENT: { label: 'Off-topic', tone: 'neutral', icon: HelpCircle },
+  // The API calls this OFF_TOPIC: the source was retrieved but does not
+  // address the claim, which is different from taking no side on it.
+  OFF_TOPIC: { label: 'Off-topic', tone: 'neutral', icon: HelpCircle },
 };
 
 export function getStance(stance) {
@@ -128,7 +130,25 @@ export function getStance(stance) {
 }
 
 /**
- * Source credibility tiers, mirroring backend/config.py.
+ * How a detector's outcome should be shown.
+ *
+ * `unavailable` and `error` must never render as a pass. A detector that
+ * could not run once contributed a clean 0.0 score, which is how an
+ * unreadable image came to be reported as verified.
+ */
+export const DETECTOR_STATUS = {
+  ok: { label: 'Checked', tone: 'good' },
+  unavailable: { label: 'Not checked', tone: 'warning' },
+  error: { label: 'Check failed', tone: 'critical' },
+  not_applicable: { label: 'Not applicable', tone: 'neutral' },
+};
+
+export function getDetectorStatus(status) {
+  return DETECTOR_STATUS[String(status || '').toLowerCase()] || DETECTOR_STATUS.not_applicable;
+}
+
+/**
+ * Source credibility tiers, mirroring truthshield/domain/credibility.py.
  * 0.50 is the unknown-domain default; anything below it is a demoted tier.
  */
 export function sourceTier(score) {

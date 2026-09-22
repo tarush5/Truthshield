@@ -1,440 +1,292 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Shield, Zap, ArrowRight, Loader2, CheckCircle2, 
-  XCircle, Brain, Eye, FileSearch, HelpCircle, 
-  RefreshCw, Check, AlertCircle, FileText
+import {
+  AlertCircle, ArrowRight, FileText, Link2, Loader2, Upload, X,
 } from 'lucide-react';
-import UploadZone from '../components/UploadZone';
-import TrustGauge from '../components/TrustGauge';
-import { API_BASE, getWsUrl } from '../config';
-import InteractiveCard from '../components/InteractiveCard';
 
+import { ApiError, api, pollReport } from '../lib/api';
 
-const PIPELINE_STAGES = [
-  { key: 'preprocessing', label: 'landing.stage_title_0', icon: FileSearch },
-  { key: 'detecting', label: 'landing.stage_title_1', icon: Eye },
-  { key: 'verifying', label: 'landing.stage_title_2', icon: Shield },
-  { key: 'explaining', label: 'landing.stage_title_3', icon: Brain },
-  { key: 'done', label: 'landing.stage_title_4', icon: CheckCircle2 }
+/**
+ * The submission surface.
+ *
+ * One decision shapes this page: the analysis takes seconds, so the wait has
+ * to be honest. The previous version ran a timer that advanced fake pipeline
+ * stages on a fixed interval regardless of what the server was doing — it
+ * showed "Verifying" while the request was still queued, and reached the last
+ * stage before any result existed. Progress here is either real (polled from
+ * the server for queued jobs) or simply a spinner.
+ */
+
+const MODES = [
+  { id: 'text', label: 'Text', icon: FileText },
+  { id: 'url', label: 'Link', icon: Link2 },
+  { id: 'file', label: 'File', icon: Upload },
 ];
 
+const MAX_FILE_MB = 25;
+
 export default function Analyze() {
-  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
 
-  const [file, setFile] = useState(null);
-  const [url, setUrl] = useState('');
+  const [mode, setMode] = useState('text');
   const [text, setText] = useState('');
-  const [analyzing, setAnalyzing] = useState(false);
-  const [currentStage, setCurrentStage] = useState(null);
-  const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState(null);
+  const [url, setUrl] = useState('');
+  const [file, setFile] = useState(null);
+  const [dragging, setDragging] = useState(false);
+
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState('');
   const [error, setError] = useState(null);
-  
-  // Track ticks for each stage
-  const [completedStages, setCompletedStages] = useState([]);
-  const wsRef = useRef(null);
 
-  const handleCancel = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+  const fileInput = useRef(null);
+  const abort = useRef(null);
+
+  const ready =
+    (mode === 'text' && text.trim().length >= 15) ||
+    (mode === 'url' && url.trim().length > 4) ||
+    (mode === 'file' && file);
+
+  const pickFile = useCallback((chosen) => {
+    if (!chosen) return;
+    if (chosen.size > MAX_FILE_MB * 1024 * 1024) {
+      setError(new Error(`That file is larger than the ${MAX_FILE_MB} MB limit.`));
+      return;
     }
-    setAnalyzing(false);
-    setCurrentStage(null);
-    setProgress(0);
-    setResult(null);
     setError(null);
-    setCompletedStages([]);
-  };
+    setFile(chosen);
+  }, []);
 
-  const handleAnalyze = async () => {
-    if (!file && !url && !text) return;
+  const submit = async () => {
+    if (!ready || busy) return;
 
-    setAnalyzing(true);
+    setBusy(true);
     setError(null);
-    setResult(null);
-    setCompletedStages([]);
-    setCurrentStage('preprocessing');
-    setProgress(5);
+    setStatus('Reading your submission');
+    abort.current = new AbortController();
 
     try {
-      // ── WebSocket for Text or URL ──
-      if (!file) {
-        const wsUrl = getWsUrl();
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-          ws.send(JSON.stringify({
-            text: text || null,
-            url: url || null,
-            lang: i18n.language || 'en',
-            token: localStorage.getItem('token'),
-            org_id: localStorage.getItem('active_org_id') || null
-          }));
-        };
-
-        ws.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          
-          if (data.stage === 'error') {
-            setError(data.message);
-            setAnalyzing(false);
-            ws.close();
-            return;
-          }
-
-          if (data.stage === 'done') {
-            // Check off everything
-            setCompletedStages(PIPELINE_STAGES.map(s => s.key));
-            setProgress(100);
-            setCurrentStage('done');
-            setResult({
-              id: data.partial_result.report_id,
-              credibility: {
-                trust_score: data.partial_result.trust_score,
-                verdict: data.partial_result.verdict
-              }
-            });
-            setTimeout(() => navigate(`/report/${data.partial_result.report_id}`), 1800);
-            ws.close();
-            return;
-          }
-
-          // Advance stages dynamically
-          setCurrentStage(data.stage);
-          setProgress(data.progress * 100);
-
-          // Update ticks
-          const stageIdx = PIPELINE_STAGES.findIndex(s => s.key === data.stage);
-          if (stageIdx !== -1) {
-            const completed = PIPELINE_STAGES.slice(0, stageIdx).map(s => s.key);
-            setCompletedStages(completed);
-          }
-        };
-
-        ws.onerror = async () => {
-          ws.close();
-          // Fallback: retry via HTTP POST when WebSocket fails
-          console.warn('[TruthShield] WebSocket failed, falling back to HTTP POST');
-          try {
-            const formData = new FormData();
-            if (text) formData.append('text', text);
-            if (url) formData.append('url', url);
-            formData.append('lang', i18n.language || 'en');
-            const orgId = localStorage.getItem('active_org_id');
-            if (orgId) formData.append('org_id', orgId);
-
-            const token = localStorage.getItem('token');
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            // Simulate pipeline stages during HTTP wait
-            const stagesKeys = PIPELINE_STAGES.map(s => s.key);
-            let stepIdx = 0;
-            const interval = setInterval(() => {
-              if (stepIdx < stagesKeys.length - 1) {
-                const current = stagesKeys[stepIdx];
-                setCurrentStage(current);
-                setCompletedStages(prev => [...new Set([...prev, current])]);
-                setProgress((stepIdx + 1) * 20);
-                stepIdx++;
-              }
-            }, 2000);
-
-            const response = await fetch(`${API_BASE}/analyze`, {
-              method: 'POST',
-              headers,
-              body: formData,
-            });
-            clearInterval(interval);
-
-            if (response.status === 401 || response.status === 403) {
-              throw new Error('Authentication required. Please log in to analyze claims.');
-            }
-            if (!response.ok) throw new Error(`Analysis failed: ${response.statusText}`);
-
-            const data = await response.json();
-            setCompletedStages(stagesKeys);
-            setProgress(100);
-            setCurrentStage('done');
-            setResult(data);
-            setTimeout(() => navigate(`/report/${data.id}`), 1800);
-          } catch (httpErr) {
-            console.error('HTTP fallback also failed:', httpErr);
-            if (httpErr.message && httpErr.message.includes('Authentication required')) {
-              setError(httpErr.message);
-            } else {
-              setError('Connection failed. Please check if the backend is running.');
-            }
-            setAnalyzing(false);
-            setCurrentStage(null);
-            setProgress(0);
-            setCompletedStages([]);
-          }
-        };
-
-        return;
-      }
-
-      // ── HTTP POST for File Uploads ──
-      const formData = new FormData();
-      if (file) formData.append('file', file);
-      if (url) formData.append('url', url);
-      if (text) formData.append('text', text);
-      formData.append('lang', i18n.language || 'en');
-      const orgId = localStorage.getItem('active_org_id');
-      if (orgId) formData.append('org_id', orgId);
-
-      // Simulate steps progression visually
-      const stagesKeys = PIPELINE_STAGES.map(s => s.key);
-      let stepIdx = 0;
-      
-      const interval = setInterval(() => {
-        if (stepIdx < stagesKeys.length - 1) {
-          const current = stagesKeys[stepIdx];
-          setCurrentStage(current);
-          setCompletedStages(prev => [...new Set([...prev, current])]);
-          setProgress((stepIdx + 1) * 20);
-          stepIdx++;
-        }
-      }, 1500);
-
-      const token = localStorage.getItem('token');
-      const headers = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const response = await fetch(`${API_BASE}/analyze`, {
-        method: 'POST',
-        headers,
-        body: formData,
+      const result = await api.analyze({
+        text: mode === 'text' ? text.trim() : undefined,
+        url: mode === 'url' ? url.trim() : undefined,
+        file: mode === 'file' ? file : undefined,
+        signal: abort.current.signal,
       });
 
-      clearInterval(interval);
-
-      if (response.status === 401 || response.status === 403) {
-        throw new Error('Authentication required. Please log in to analyze claims.');
+      // Large media is queued to a worker; poll until it settles rather than
+      // holding the request open.
+      if (result.status === 'queued') {
+        setStatus('Queued — this one runs in the background');
+        await pollReport(result.id, {
+          signal: abort.current.signal,
+          onTick: (r) => setStatus(
+            r.status === 'running' ? 'Analyzing' : 'Waiting for a free worker',
+          ),
+        });
       }
-      if (!response.ok) throw new Error(`Analysis failed: ${response.statusText}`);
 
-      const data = await response.json();
-      setCompletedStages(stagesKeys);
-      setProgress(100);
-      setCurrentStage('done');
-      setResult(data);
-      setTimeout(() => navigate(`/report/${data.id}`), 1800);
-
+      navigate(`/report/${result.id}`);
     } catch (err) {
-      console.error('Analysis error:', err);
-      setError(err.message || 'Analysis failed. Please try again.');
-      setAnalyzing(false);
-      setCurrentStage(null);
-      setProgress(0);
-      setCompletedStages([]);
+      if (err.name === 'AbortError') return;
+      setError(err);
+      setBusy(false);
+      setStatus('');
     }
   };
 
-  const hasInput = file || url || text;
+  const cancel = () => {
+    abort.current?.abort();
+    setBusy(false);
+    setStatus('');
+  };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-10">
-      
-      {/* Page header section */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center space-y-4"
-      >
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/20">
-          <Brain className="w-3.5 h-3.5 text-sky-400" />
-          <span className="text-[10px] font-bold uppercase tracking-wider text-sky-300">{t('analyze.badge')}</span>
-        </div>
-        <h1 className="text-4xl sm:text-5xl font-extrabold font-display text-white tracking-tight">
-          {t('landing.demo_label')}
+    <div className="mx-auto max-w-3xl space-y-8 px-4 sm:px-6 lg:px-8">
+      <header className="space-y-3 text-center">
+        <p className="eyebrow justify-center">Check a claim</p>
+        <h1 className="text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
+          Is this true?
         </h1>
-        <p className="text-sm text-white/45 max-w-xl mx-auto">
-          {t('analyze.subtitle')}
+        <p className="mx-auto max-w-lg text-pretty text-sm text-ink-secondary">
+          Paste a claim, link an article, or upload a file. You will get a verdict,
+          the sources behind it, and an explicit list of anything that could not
+          be checked.
         </p>
-      </motion.div>
+      </header>
 
-      {/* Input panel wrapper */}
-      {!analyzing && (
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="space-y-6"
+      <div className="card overflow-hidden">
+        {/* Mode selector */}
+        <div
+          role="tablist"
+          aria-label="What are you checking?"
+          className="flex border-b border-line"
         >
-          <UploadZone
-            onFileSelect={setFile}
-            onUrlSubmit={setUrl}
-            onTextSubmit={setText}
-            disabled={analyzing}
-          />
-
-          <div className="flex justify-center gap-3">
+          {MODES.map(({ id, label, icon: Icon }) => (
             <button
-              onClick={handleAnalyze}
-              disabled={!hasInput || analyzing}
-              className="btn-primary flex items-center gap-2 text-sm"
+              key={id}
+              role="tab"
+              aria-selected={mode === id}
+              disabled={busy}
+              onClick={() => { setMode(id); setError(null); }}
+              className={`flex flex-1 items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition-colors disabled:opacity-50 ${
+                mode === id
+                  ? 'bg-brand-500/10 text-brand-400'
+                  : 'text-ink-muted hover:bg-white/[0.03] hover:text-ink'
+              }`}
             >
-              {t('analyze.btn_analyze')}
-              <ArrowRight className="w-4 h-4" />
+              <Icon className="h-4 w-4" />
+              {label}
             </button>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Dynamic Processing Pipeline (Replaces basic loaders) */}
-      <AnimatePresence>
-        {analyzing && (
-          <InteractiveCard className="border border-white/10 bg-[#030712]/40 backdrop-blur-xl">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="p-8 relative overflow-hidden space-y-8"
-            >
-            {/* Ambient Aurora Glow inside loader */}
-            <div className="absolute -top-12 -right-12 w-48 h-48 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-white">{t('analyze.running')}</h3>
-                <p className="text-xs text-white/40 mt-0.5">{t('analyze.running_desc')}</p>
-              </div>
-              <button onClick={handleCancel} className="btn-secondary text-[10px] py-1 px-4 hover:border-red-500/30 hover:text-red-400 transition-colors">
-                {t('analyze.btn_cancel')}
-              </button>
-            </div>
-
-            {/* Simulated Live Ticks Pipeline */}
-            <div className="space-y-4">
-              {PIPELINE_STAGES.map((stage, idx) => {
-                const isCompleted = completedStages.includes(stage.key);
-                const isActive = currentStage === stage.key;
-                const StageIcon = stage.icon;
-
-                return (
-                  <div 
-                    key={stage.key}
-                    className={`flex items-center gap-4 p-3.5 rounded-xl border transition-all duration-300 ${
-                      isActive 
-                        ? 'bg-sky-500/5 border-sky-400/30 shadow-[0_0_15px_rgba(14,165,233,0.05)] electric-glow laser-sweep' 
-                        : isCompleted
-                        ? 'bg-white/[0.01] border-white/5 opacity-80'
-                        : 'border-transparent opacity-25'
-                    }`}
-
-                  >
-                    {/* Status Circle */}
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                      isCompleted 
-                        ? 'bg-emerald-500/15 text-emerald-400' 
-                        : isActive 
-                        ? 'bg-sky-500/15 text-sky-400 animate-pulse' 
-                        : 'bg-white/5 text-white/30'
-                    }`}>
-                      {isCompleted ? (
-                        <Check className="w-3.5 h-3.5" />
-                      ) : isActive ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <StageIcon className="w-3.5 h-3.5" />
-                      )}
-                    </div>
-
-                    <span className={`text-xs font-semibold ${
-                      isActive ? 'text-sky-300 font-bold' : isCompleted ? 'text-white/70' : 'text-white/30'
-                    }`}>
-                      {t(stage.label)}
-                    </span>
-
-                    {isActive && (
-                      <span className="text-[10px] font-mono text-sky-400 ml-auto animate-pulse">{t('analyze.active')}</span>
-                    )}
-                    {isCompleted && (
-                      <span className="text-[10px] font-mono text-emerald-400 ml-auto font-bold">{t('analyze.done_badge')}</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Overall Progress Slider */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-[10px] font-mono text-white/40">
-                <span>{t('analyze.pipeline_capacity')}</span>
-                <span>{progress}%</span>
-              </div>
-              <div className="progress-bar">
-                <motion.div 
-                  className="progress-fill bg-gradient-to-r from-sky-400 to-indigo-500" 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.3 }}
-                />
-              </div>
-            </div>
-            </motion.div>
-          </InteractiveCard>
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="p-5 glass-card border-red-500/25 bg-red-500/[0.02] text-center space-y-3"
-          >
-            <div className="flex items-center justify-center gap-2 text-red-400 text-xs font-bold uppercase tracking-wider">
-              <AlertCircle className="w-4 h-4" />
-              {t('analyze.failure')}
-            </div>
-            <p className="text-xs text-white/75">{error}</p>
-            <div>
-              <button
-                onClick={() => { setError(null); handleAnalyze(); }}
-                className="btn-secondary text-[10px] py-1.5 px-5"
-              >
-                {t('analyze.btn_retry')}
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Technology parameters grid (rendered when idle) */}
-      {!analyzing && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-4"
-        >
-          {[
-            { title: t('analyze.tech_title_0'), desc: t('analyze.tech_desc_0'), icon: Eye },
-            { title: t('analyze.tech_title_1'), desc: t('analyze.tech_desc_1'), icon: FileSearch },
-            { title: t('analyze.tech_title_2'), desc: t('analyze.tech_desc_2'), icon: Brain },
-          ].map((item, i) => (
-            <InteractiveCard key={i} className="border border-white/5 bg-[#071124]/30 backdrop-blur-xl">
-              <div className="p-5 space-y-3">
-                <div className="w-8 h-8 rounded-lg bg-sky-500/10 flex items-center justify-center">
-                  <item.icon className="w-4 h-4 text-sky-400" />
-                </div>
-                <h4 className="text-xs font-bold text-white">{item.title}</h4>
-                <p className="text-[10px] text-white/45 leading-relaxed">{item.desc}</p>
-              </div>
-            </InteractiveCard>
           ))}
-        </motion.div>
-      )}
+        </div>
 
+        <div className="p-5">
+          {mode === 'text' && (
+            <div className="space-y-2">
+              <label htmlFor="claim" className="sr-only">Claim to check</label>
+              <textarea
+                id="claim"
+                rows={6}
+                value={text}
+                disabled={busy}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Paste the claim, post, or article text here…"
+                className="input-field resize-y"
+              />
+              <div className="flex items-center justify-between text-2xs text-ink-muted">
+                <span>
+                  {text.trim().length < 15 && text.length > 0
+                    ? 'A little more text gives a better result'
+                    : 'Tip: one specific claim works better than a whole article'}
+                </span>
+                <span className="tabular-nums">{text.length.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+
+          {mode === 'url' && (
+            <div className="space-y-2">
+              <label htmlFor="url" className="sr-only">Article link</label>
+              <input
+                id="url"
+                type="url"
+                value={url}
+                disabled={busy}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://example.com/article"
+                className="input-field"
+              />
+              <p className="text-2xs text-ink-muted">
+                We fetch the page and check the claims in it. Links to private or
+                internal addresses are refused.
+              </p>
+            </div>
+          )}
+
+          {mode === 'file' && (
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                pickFile(e.dataTransfer.files?.[0]);
+              }}
+              onClick={() => !busy && fileInput.current?.click()}
+              className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-colors ${
+                dragging
+                  ? 'border-brand-400 bg-brand-500/10'
+                  : 'border-line hover:border-line-strong hover:bg-white/[0.02]'
+              } ${busy ? 'pointer-events-none opacity-50' : ''}`}
+            >
+              <input
+                ref={fileInput}
+                type="file"
+                className="hidden"
+                disabled={busy}
+                accept="image/*,audio/*,video/*,.pdf,.txt"
+                onChange={(e) => pickFile(e.target.files?.[0])}
+              />
+              {file ? (
+                <div className="flex items-center justify-center gap-3">
+                  <FileText className="h-5 w-5 text-brand-400" />
+                  <div className="min-w-0 text-left">
+                    <p className="truncate text-sm font-medium text-ink">{file.name}</p>
+                    <p className="text-2xs text-ink-muted">
+                      {(file.size / 1024 / 1024).toFixed(1)} MB
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                    className="btn-ghost !p-1.5"
+                    aria-label="Remove file"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Upload className="mx-auto h-7 w-7 text-ink-muted" />
+                  <p className="text-sm font-medium text-ink">
+                    Drop a file, or click to choose
+                  </p>
+                  <p className="text-2xs text-ink-muted">
+                    Image, audio, video, PDF or text · up to {MAX_FILE_MB} MB
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-line px-5 py-4">
+          <p className="text-2xs text-ink-muted">
+            {busy ? status : 'Usually takes a few seconds'}
+          </p>
+          {busy ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-brand-400" />
+              <button onClick={cancel} className="btn-secondary !px-4 !py-2 text-2xs">
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button onClick={submit} disabled={!ready} className="btn-primary">
+              Check it
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {error && <ErrorPanel error={error} onRetry={() => { setError(null); submit(); }} />}
+    </div>
+  );
+}
+
+function ErrorPanel({ error, onRetry }) {
+  const offline = error instanceof ApiError && error.isOffline;
+  const auth = error instanceof ApiError && error.isAuthError;
+
+  return (
+    <div
+      className="card-flat p-4"
+      style={{ boxShadow: 'inset 0 0 0 1px rgb(var(--c-critical) / 0.3)' }}
+      role="alert"
+    >
+      <div className="flex items-start gap-3">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-status-critical-text" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="text-sm font-medium text-ink">
+            {auth ? 'Please sign in again' : offline ? 'Cannot reach the server' : 'That did not work'}
+          </p>
+          <p className="text-sm text-ink-secondary">{error.message}</p>
+          {!auth && (
+            <button onClick={onRetry} className="btn-secondary !px-4 !py-1.5 text-2xs">
+              Try again
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

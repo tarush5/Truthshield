@@ -1,296 +1,199 @@
-# 🛡️ TruthShield — AI Misinformation Response System
+# TruthShield
 
-> A production-ready, multimodal AI system that detects misinformation across text, images, audio, and video — with fact-verification, counter-narrative generation, and multilingual support (English, Hindi, Tamil).
+Misinformation analysis: extract the checkable claims from a piece of content,
+find evidence, work out which way each source cuts, and report a verdict —
+**along with everything that could not be checked**.
 
----
-
-## 📋 Problem Statement
-
-Misinformation spreads 6x faster than factual content online. In multilingual markets like India, false claims in Hindi, Tamil, and English go viral before fact-checkers can respond. **TruthShield** is an AI-powered system that:
-
-- **Detects** fake news, deepfakes, voice clones, and AI-generated content
-- **Verifies** claims against trusted sources in real-time
-- **Generates** counter-narratives in the user's language
-- **Deploys** across web, WhatsApp, and browser extension
+That last part is the design constraint. A fact-checking tool that confidently
+mislabels what it could not establish is worse than one that says so.
 
 ---
 
-## 🏗️ Architecture
+## What it does
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    TruthShield Architecture                  │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────┐  │
-│  │  Web UI  │  │ WhatsApp │  │ Browser  │  │  REST API │  │
-│  │ (React)  │  │   Bot    │  │Extension │  │  Clients  │  │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └─────┬─────┘  │
-│       │              │             │              │         │
-│       └──────────────┴─────────────┴──────────────┘         │
-│                          │                                   │
-│              ┌───────────▼──────────────┐                   │
-│              │    FastAPI REST + WS      │                   │
-│              │   /analyze  /report      │                   │
-│              └───────────┬──────────────┘                   │
-│                          │                                   │
-│         ┌────────────────▼────────────────┐                 │
-│         │    MULTIMODAL PREPROCESSOR      │                 │
-│         │ Text │ Image │ Audio │ Video │ URL                │
-│         └────────────────┬────────────────┘                 │
-│                          │                                   │
-│    ┌─────────────────────▼─────────────────────┐            │
-│    │          DETECTION LAYER                   │            │
-│    │ ┌───────────┐ ┌──────────┐ ┌────────────┐ │            │
-│    │ │XLM-RoBERTa│ │EfficientN│ │ECAPA-TDNN  │ │            │
-│    │ │Text Class.│ │Deepfake  │ │Voice Clone │ │            │
-│    │ └───────────┘ └──────────┘ └────────────┘ │            │
-│    │ ┌───────────┐ ┌──────────────────────────┐│            │
-│    │ │GPT-2 Perp.│ │ Credibility Scorer       ││            │
-│    │ │AI Content │ │ (Weighted Fusion)         ││            │
-│    │ └───────────┘ └──────────────────────────┘│            │
-│    └─────────────────────┬─────────────────────┘            │
-│                          │                                   │
-│    ┌─────────────────────▼─────────────────────┐            │
-│    │     FACT VERIFICATION PIPELINE             │            │
-│    │ Claims → Evidence → Verdict → Ranking      │            │
-│    │ (spaCy)  (SerpAPI)  (Claude)  (Source DB)  │            │
-│    └─────────────────────┬─────────────────────┘            │
-│                          │                                   │
-│    ┌─────────────────────▼─────────────────────┐            │
-│    │      COUNTER-RESPONSE ENGINE               │            │
-│    │ Explainer │ Highlighter │ Narrative Gen     │            │
-│    │         (Claude API — claude-sonnet-4-20250514)       │            │
-│    └─────────────────────┬─────────────────────┘            │
-│                          │                                   │
-│              ┌───────────▼──────────────┐                   │
-│              │   PostgreSQL  │  Redis    │                   │
-│              │   (Storage)   │  (Cache)  │                   │
-│              └──────────────────────────┘                   │
-└─────────────────────────────────────────────────────────────┘
-```
+Submit text, a link, or a file. You get back:
 
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Docker & Docker Compose
-- (Optional) Anthropic API key for Claude-powered features
-
-### 1. Clone & Configure
+- a **verdict** from an eight-value vocabulary, including
+  `INSUFFICIENT EVIDENCE` as a first-class outcome;
+- a **trust score** (0–100) whose four components are broken out;
+- **each claim** with the sources behind it and which way each one cut;
+- **each source** with its publisher, credibility tier and stance;
+- an explicit list of **limitations** — checks that could not run, and why.
 
 ```bash
-git clone https://github.com/your-team/truthshield.git
-cd truthshield
-cp .env.example .env
-# Edit .env with your API keys
-```
-
-### 2. Launch with Docker
-
-```bash
-docker-compose up --build
-```
-
-### 3. Access Services
-
-| Service        | URL                        |
-|----------------|----------------------------|
-| Frontend       | http://localhost:3000       |
-| Backend API    | http://localhost:8000       |
-| API Docs       | http://localhost:8000/docs  |
-| WhatsApp Bot   | http://localhost:8001       |
-
-### Local Development (without Docker)
-
-```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-uvicorn backend.main:app --reload --port 8000
-
-# Frontend
-cd frontend
-npm install
-npm run dev
-```
-
----
-
-## 📡 API Documentation
-
-### `POST /api/v1/analyze`
-Analyze content for misinformation.
-
-```bash
-# Text analysis
 curl -X POST http://localhost:8000/api/v1/analyze \
-  -F "text=India's GDP grew by 500% last quarter according to anonymous sources" \
-  -F "lang=en"
-
-# URL analysis
-curl -X POST http://localhost:8000/api/v1/analyze \
-  -F "url=https://example.com/article" \
-  -F "lang=en"
-
-# File upload
-curl -X POST http://localhost:8000/api/v1/analyze \
-  -F "file=@suspicious_image.jpg" \
-  -F "lang=en"
+  -H "Authorization: Bearer $TOKEN" \
+  -F "text=Drinking bleach cures COVID-19 within 24 hours."
 ```
 
-### `GET /api/v1/report/{id}`
-Retrieve a full analysis report.
+```json
+{
+  "verdict": "LIKELY FALSE",
+  "trust_score": 44,
+  "fake_probability": 55,
+  "confidence_band": "MODERATE",
+  "breakdown": {
+    "fact_match": 30.7,
+    "source_credibility": 79.5,
+    "evidence_strength": 56.0,
+    "manipulation_risk": 50.0
+  },
+  "reasons": ["Authoritative source(s) addressed this claim (www.who.int)",
+              "Contradicted by 4 sources"],
+  "limitations": []
+}
+```
+
+`manipulation_risk: 50` means *not assessed* — the submission was text, so
+there was no image or audio to check. It does not mean "50% risky".
+
+---
+
+## Running it
+
+### Docker (everything)
 
 ```bash
-curl http://localhost:8000/api/v1/report/abc123def456
+export JWT_SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+docker compose up --build
 ```
 
-### `POST /api/v1/feedback`
-Submit user feedback on a report.
+Postgres, Redis, the API, a Celery worker and the web app. Migrations run
+before the API accepts traffic.
+
+| Service | URL |
+|---|---|
+| Web | http://localhost:5173 |
+| API | http://localhost:8000 |
+| API docs | http://localhost:8000/docs |
+
+### Locally, without Docker
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/feedback \
-  -H "Content-Type: application/json" \
-  -d '{"report_id": "abc123", "user_verdict": "FALSE", "comment": "This is confirmed fake"}'
+python -m venv .venv && .venv/Scripts/activate      # or source .venv/bin/activate
+pip install -r requirements-dev.txt
+
+cp .env.example .env                                 # then edit it
+alembic upgrade head
+uvicorn truthshield.main:app --reload --port 8000
+
+cd frontend && npm install && npm run dev
 ```
 
-### `GET /api/v1/stats`
-Dashboard statistics.
+SQLite and an in-process cache are allowed outside production, so this works
+with nothing else running. Both are refused when `APP_ENV=production`.
+
+### Optional: local ML detectors
 
 ```bash
-curl http://localhost:8000/api/v1/stats
+pip install -r requirements-ml.txt    # ~2 GB
+# then set ENABLE_ML_DETECTORS=true
 ```
 
-### `WebSocket /ws/analyze`
-Real-time streaming analysis.
+Without them the image, video and audio detectors report `unavailable` and the
+report says so. They never report a clean result for a check that did not run.
 
-```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/analyze');
-ws.send(JSON.stringify({ text: "Content to analyze", lang: "en" }));
-ws.onmessage = (e) => console.log(JSON.parse(e.data));
+`GET /api/v1/health` lists what is actually available:
+
+```json
+{"capabilities": {"torch": true, "opencv": true, "tesseract_ocr": false, ...}}
 ```
 
----
-
-## 📊 Evaluation Criteria
-
-| Criterion              | How TruthShield Addresses It                                      |
-|------------------------|-------------------------------------------------------------------|
-| **Multimodal Input**   | Text, image, audio, video, URL — all processed through unified pipeline |
-| **Multilingual**       | Hindi, Tamil, English — detection + explanation in all 3 languages  |
-| **AI Detection**       | XLM-RoBERTa, EfficientNet-B4, ECAPA-TDNN, GPT-2 perplexity       |
-| **Fact Verification**  | Claim extraction → evidence retrieval → Claude-powered verdicts   |
-| **Counter-Narrative**  | Grounded counter-narratives with source citations in 3 languages   |
-| **Deepfake Detection** | EfficientNet-B4 on video frames with face region analysis         |
-| **Voice Cloning**      | ECAPA-TDNN embeddings + spectral anomaly analysis                  |
-| **Accessibility**      | Web dashboard, WhatsApp bot, Chrome extension                      |
-| **Scalability**        | Docker Compose, Redis caching, horizontal scaling ready            |
-| **Source Credibility** | Tiered scoring: gov=0.9, major news=0.7, unknown=0.3, disinfo=0.0 |
+`tesseract_ocr` needs the Tesseract **binary**, not just the Python package —
+importing `pytesseract` succeeds on a machine with no OCR installed.
 
 ---
 
-## 🔧 Tech Stack
+## Architecture
 
-| Component        | Technology                                    |
-|------------------|-----------------------------------------------|
-| Backend          | Python 3.11, FastAPI, Pydantic                |
-| Frontend         | React 18, Vite, Tailwind CSS, Recharts        |
-| AI Orchestrator  | Anthropic Claude (claude-sonnet-4-20250514)             |
-| Text Detection   | XLM-RoBERTa (zero-shot classification)        |
-| Deepfake         | EfficientNet-B4 + OpenCV                      |
-| Voice Analysis   | ECAPA-TDNN (SpeechBrain) + librosa            |
-| AI Detection     | GPT-2 perplexity scoring                      |
-| Speech-to-Text   | OpenAI Whisper                                |
-| NLP              | spaCy (multilingual NER)                      |
-| OCR              | Tesseract (eng + hin + tam)                   |
-| Evidence Search  | SerpAPI / DuckDuckGo / Wikipedia / PIB India  |
-| Database         | PostgreSQL 16                                 |
-| Cache            | Redis 7                                       |
-| Deployment       | Docker Compose                                |
+```
+truthshield/
+├── api/          HTTP layer — routing and serialization only
+├── domain/       Pure logic, no I/O
+│   ├── credibility.py    source scoring
+│   ├── verdict/          claim extraction, stance, verdicts
+│   ├── evidence/         ranking
+│   ├── scoring/          trust score and verdict fusion
+│   └── types.py          the vocabulary everything shares
+├── detectors/    manipulation checks, each reporting whether it ran
+├── infra/        database, cache, Celery, evidence retrieval
+├── security/     SSRF guard
+└── services/     orchestration — pipeline, analysis, auth
+```
 
----
-
-## ⚠️ Limitations & Future Work
-
-### Current Limitations
-- ML models use base/pretrained weights (no fine-tuned checkpoints included)
-- Deepfake detection uses ImageNet-pretrained EfficientNet (not FaceForensics++)
-- In-memory report storage (PostgreSQL integration is infrastructure-ready)
-- Rate-limited by API key quotas (Anthropic, SerpAPI)
-
-### Future Roadmap
-- [ ] Fine-tune XLM-RoBERTa on LIAR + translated Hindi/Tamil datasets
-- [ ] Train EfficientNet-B4 on FaceForensics++ for real deepfake detection
-- [ ] Add AASIST anti-spoofing model for voice clone detection
-- [ ] PostgreSQL persistence with SQLAlchemy ORM
-- [ ] Redis caching for repeat URL analysis
-- [ ] Kubernetes deployment with horizontal pod autoscaling
-- [ ] Mobile app (React Native)
-- [ ] Crowdsourced fact-checking community features
-- [ ] Real-time social media monitoring (Twitter/X API)
+`domain/` has no database, no HTTP and no framework, so the analysis logic can
+be tested and reasoned about without a request in flight.
 
 ---
 
-## 👥 Team Setup Guide
+## Testing
 
-1. Fork the repository
-2. Copy `.env.example` to `.env` and add your API keys
-3. Run `docker-compose up --build` for full stack
-4. For development, run backend and frontend separately (see Quick Start)
-5. Run tests: `pytest tests/` (from the repo root — the suite imports `backend.*`)
-
----
-
-## Testing & measuring accuracy
-
-`pytest tests/` is fast, offline and deterministic. Four layers matter:
+```bash
+pytest tests/          # fast, offline, deterministic
+```
 
 | Suite | What it pins |
 |---|---|
-| `test_pipeline.py` | Per-module behaviour, with mocked I/O |
-| `test_stance_detection.py` | Negation, inflection and apostrophe handling — cases a live run cannot pin reliably |
-| `test_scoring_integrity.py` | That a report never claims more than it actually checked |
-| `test_verdict_accuracy.py` | End-to-end verdict accuracy against **frozen** evidence |
+| `test_api.py` | Auth, access control, validation — through the real app |
+| `test_scoring.py` | That a report never claims more than it checked; verdict accuracy |
+| `test_security.py` | SSRF, fail-closed config, token verification, password handling |
 
 ### Why the evidence is frozen
 
-Verdict accuracy used to be measured by hitting live search, which makes the
-number meaningless for judging a code change: the same build scored 6/8 and
-2/8 on consecutive runs purely on what the web returned that minute (one of
-those runs had DuckDuckGo timing out entirely).
+Verdict accuracy used to be measured against live search, which makes the
+number meaningless for judging a change: the same build scored 6/8 and 2/8 on
+consecutive runs purely on what the web returned that minute — one of those
+runs had DuckDuckGo timing out entirely.
 
 `tests/fixtures/evidence_fixture.json` holds real retrieved evidence for 12
-claims, captured once. `test_verdict_accuracy.py` scores against it, so a
-change in the score is a change in the code. It asserts two separate things:
+claims, captured once. Two properties are asserted separately:
 
-* **Precision** — no claim may be decided in the wrong direction. Calling a
-  true claim false, or a false claim true, is the failure this product exists
-  to avoid, and it is worse than abstaining.
-* **Coverage** — the engine must still commit on a reasonable share of claims,
-  since abstaining everywhere would satisfy the precision test while being
-  useless. The floor sits just under the measured baseline.
+- **Precision** — no claim may be decided in the wrong direction. Currently
+  **0 wrong**.
+- **Coverage** — the engine must still commit on most claims, since abstaining
+  everywhere would satisfy precision while being useless. Currently **9/12**.
 
-Refresh the fixture deliberately (the web moves), never inside a test run:
+Refresh the fixture deliberately, never inside a test run:
 
 ```bash
 python tests/capture_evidence_fixture.py
 ```
 
-### Live smoke test
+---
 
-`tests/benchmark_accuracy.py` runs the real stack against a live backend. Use
-it to confirm the whole path works, not to judge accuracy changes — its result
-moves with search:
+## Configuration
 
-```bash
-uvicorn backend.main:app --port 8000   # one shell
-python tests/benchmark_accuracy.py     # another
-```
+Everything is environment variables; see `.env.example`. The settings that
+matter:
+
+| Variable | Default | Notes |
+|---|---|---|
+| `APP_ENV` | `production` | Defaults to the strict value. A deployment that forgets it fails closed. |
+| `JWT_SECRET_KEY` | *(none)* | **Startup fails** in production without a real one. |
+| `DATABASE_URL` | Postgres | SQLite is refused in production. |
+| `CORS_ORIGINS` | `localhost:5173` | Exact origins. `*` is rejected. |
+| `ENABLE_ML_DETECTORS` | `false` | Local inference; needs `requirements-ml.txt`. |
+
+Misconfiguration raises at startup rather than surfacing later as a 500.
 
 ---
 
-## 📄 License
+## Known limitations
 
-MIT License — Built for the fight against misinformation.
+- **Evidence quality is bounded by search.** With no API keys configured it
+  falls back to DuckDuckGo and Wikipedia, which is why three of the twelve
+  benchmark claims abstain — the debunks exist but are headlined as questions
+  with no body text in the snippet.
+- **The detectors are heuristics, not trained classifiers.** They measure real
+  signals and say which method produced a result, but a fine-tuned deepfake
+  model would be better and is not shipped.
+- **OTP codes are logged, not emailed.** Wiring an email provider is the
+  remaining step for passwordless sign-in in production.
+- **Two npm advisories remain**, both needing react-router 7 — a breaking major
+  left for a deliberate upgrade.
+
+---
+
+## License
+
+MIT.

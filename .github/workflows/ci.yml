@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  # A new push supersedes the run in flight for the same ref.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    # The suite runs against real Postgres and Redis rather than stubs, so
+    # what CI proves is what production does. SQLite and an in-memory cache
+    # would hide the differences that actually bite: foreign keys, JSONB,
+    # cross-worker cache visibility.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: truthshield
+          POSTGRES_PASSWORD: truthshield
+          POSTGRES_DB: truthshield_test
+        options: >-
+          --health-cmd "pg_isready -U truthshield"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+        ports: ["5432:5432"]
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+        ports: ["6379:6379"]
+
+    env:
+      APP_ENV: test
+      JWT_SECRET_KEY: ci-only-secret-key-long-enough-to-pass-validation
+      DATABASE_URL: postgresql+psycopg2://truthshield:truthshield@localhost:5432/truthshield_test
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_TASK_ALWAYS_EAGER: "true"
+      CORS_ORIGINS: http://localhost:5173
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements-dev.txt
+
+      - name: Migrations apply cleanly from empty
+        # Catches the migration that works only against a database which
+        # already has the tables — which is how an empty initial migration
+        # got generated in the first place.
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
+      - name: Tests
+        run: pytest tests_v2/ -q --maxfail=1
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Guard the initial payload
+        # First paint is the thing users wait for. This failed silently before:
+        # the Supabase SDK sat on every page's critical path for months because
+        # nothing measured it.
+        run: |
+          BYTES=$(gzip -c dist/assets/react-*.js dist/assets/index-*.js dist/assets/index-*.css | wc -c)
+          echo "initial payload: $BYTES bytes gzipped"
+          if [ "$BYTES" -gt 120000 ]; then
+            echo "::error::Initial payload $BYTES exceeds the 120 kB budget"
+            exit 1
+          fi
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Building both images catches a broken Dockerfile before a deploy does.
+      - run: docker build -t truthshield-api .
+      - run: docker build -t truthshield-web ./frontend

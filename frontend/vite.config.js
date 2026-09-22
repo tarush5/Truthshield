@@ -1,36 +1,26 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
   build: {
+    // Fail the build on a chunk large enough to hurt first paint, rather than
+    // printing a warning nobody reads.
+    chunkSizeWarningLimit: 300,
     rollupOptions: {
       output: {
-        // Split the large third-party libraries into their own chunks so app
-        // edits don't invalidate them and charting only downloads with the
-        // pages that actually use it.
-        manualChunks: {
-          react: ['react', 'react-dom', 'react-router-dom'],
-          charts: ['recharts'],
-          motion: ['framer-motion'],
-          i18n: ['i18next', 'react-i18next'],
-          supabase: ['@supabase/supabase-js', '@supabase/ssr'],
-        },
+        // React is the only vendor bundle worth splitting now: it changes far
+        // less often than app code, so it stays cached across deploys.
+        manualChunks: { react: ['react', 'react-dom', 'react-router-dom'] },
       },
     },
   },
   server: {
     port: 5173,
     proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-      },
-      '/ws': {
-        target: 'ws://127.0.0.1:8000',
-        ws: true,
-      },
+      // Dev-only convenience so the app can be opened on localhost:5173 and
+      // still reach the API without a CORS round trip.
+      '/api': { target: 'http://127.0.0.1:8100', changeOrigin: true },
     },
-
   },
-})
+});

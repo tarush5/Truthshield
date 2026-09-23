@@ -2,8 +2,9 @@ import React, { Suspense, lazy, useEffect, useState } from 'react';
 import {
   BrowserRouter as Router, Link, Navigate, Route, Routes, useLocation,
 } from 'react-router-dom';
-import { Loader2, LogOut, Moon, ShieldCheck, Sun } from 'lucide-react';
+import { Command, Loader2, LogOut, Moon, ShieldCheck, Sun } from 'lucide-react';
 
+import CommandPalette from './components/CommandPalette';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Landing from './pages/Landing';
 
@@ -37,9 +38,8 @@ function useTheme() {
   return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))];
 }
 
-function NavBar() {
+function NavBar({ theme, toggleTheme, onOpenPalette }) {
   const { user, signOut } = useAuth();
-  const [theme, toggleTheme] = useTheme();
   const { pathname } = useLocation();
 
   const links = user
@@ -76,6 +76,17 @@ function NavBar() {
               {label}
             </Link>
           ))}
+
+          {user && (
+            <button
+              onClick={onOpenPalette}
+              className="mr-1 hidden items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-2xs text-ink-muted transition-colors hover:text-ink sm:inline-flex"
+              aria-label="Open command palette"
+            >
+              <Command className="h-3 w-3" />
+              <span className="font-mono">K</span>
+            </button>
+          )}
 
           <button
             onClick={toggleTheme}
@@ -119,7 +130,27 @@ function HomeRoute() {
 
 function Shell() {
   const { pathname } = useLocation();
+  const { isAuthenticated } = useAuth();
+  const [theme, toggleTheme] = useTheme();
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const isLanding = pathname === '/';
+
+  // ⌘K / Ctrl+K anywhere. Bound on the window rather than a element so it
+  // works regardless of what has focus.
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isAuthenticated]);
+
+  // Close on navigation, so a back gesture never leaves it stranded open.
+  useEffect(() => { setPaletteOpen(false); }, [pathname]);
 
   return (
     <div className="relative min-h-screen bg-page">
@@ -131,7 +162,7 @@ function Shell() {
       )}
 
       <div className="relative z-10 flex min-h-screen flex-col">
-        <NavBar />
+        <NavBar theme={theme} toggleTheme={toggleTheme} onOpenPalette={() => setPaletteOpen(true)} />
         <main className="flex-1 py-10 sm:py-14">
           <Suspense fallback={<Fallback />}>
             <Routes>
@@ -152,6 +183,13 @@ function Shell() {
           </div>
         </footer>
       </div>
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onToggleTheme={toggleTheme}
+        theme={theme}
+      />
     </div>
   );
 }

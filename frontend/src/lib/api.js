@@ -170,3 +170,81 @@ export async function pollReport(id, { onTick, signal, timeoutMs = 300000 } = {}
     delay = Math.min(delay * 1.5, 8000);
   }
 }
+
+/**
+ * Run an analysis over server-sent events.
+ *
+ * Uses fetch + a ReadableStream rather than EventSource, because EventSource
+ * cannot send a request body or an Authorization header — it only does bare
+ * GETs. The framing is parsed by hand, which is a dozen lines and avoids a
+ * dependency.
+ *
+ * Handlers are called as events arrive. The returned promise resolves with
+ * the finished report, or rejects — including on abort, so a cancelled run is
+ * distinguishable from a failed one.
+ */
+export async function analyzeStream({ text, url, language = 'en', signal, on = {} }) {
+  const token = tokenStore.get();
+  const response = await fetch(`${API_BASE}/analyze/stream`, {
+    method: 'POST',
+    signal,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ text, url, language }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) tokenStore.clear();
+    let body = null;
+    try { body = await response.json(); } catch { /* not JSON */ }
+    throw new ApiError(describe(response.status, body), response.status, body);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let settled = null;
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Frames are separated by a blank line. The last chunk may be partial,
+      // so whatever follows the final separator stays in the buffer.
+      const frames = buffer.split('\n\n');
+      buffer = frames.pop() ?? '';
+
+      for (const frame of frames) {
+        let event = 'message';
+        const dataLines = [];
+
+        for (const line of frame.split('\n')) {
+          if (line.startsWith(':')) continue;             // keepalive comment
+          if (line.startsWith('event:')) event = line.slice(6).trim();
+          else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+        }
+        if (!dataLines.length) continue;
+
+        let data;
+        try { data = JSON.parse(dataLines.join('\n')); } catch { continue; }
+
+        if (event === 'error') {
+          throw new ApiError(data.detail || 'Analysis failed.', 500, data);
+        }
+        if (event === 'complete') settled = data;
+        on[event]?.(data);
+      }
+    }
+  } finally {
+    // Free the connection even when the caller aborts mid-stream.
+    reader.cancel().catch(() => {});
+  }
+
+  if (!settled) throw new ApiError('The analysis ended without a result.', 500, null);
+  return settled;
+}

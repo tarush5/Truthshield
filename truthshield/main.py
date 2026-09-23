@@ -18,6 +18,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from truthshield.api.routes import analysis_router, auth_router, meta_router
+from truthshield.api.stream import stream_router
 from truthshield.settings import get_settings
 
 settings = get_settings()
@@ -133,6 +134,7 @@ async def unhandled(request: Request, exc: Exception):
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(analysis_router, prefix="/api/v1")
+app.include_router(stream_router, prefix="/api/v1")
 app.include_router(meta_router, prefix="/api/v1")
 
 

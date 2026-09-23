@@ -5,6 +5,7 @@ import {
   ExternalLink, Info, Loader2,
 } from 'lucide-react';
 
+import EvidenceSpectrum from '../components/EvidenceSpectrum';
 import TrustGauge from '../components/TrustGauge';
 import { api, ApiError } from '../lib/api';
 import {
@@ -330,6 +331,9 @@ function ClaimCard({ claim }) {
 
       {hasEvidence && (
         <>
+          <div className="border-t border-line">
+            <EvidenceSpectrum evidence={claim.evidence} />
+          </div>
           <button
             onClick={() => setOpen(!open)}
             className="flex w-full items-center justify-between border-t border-line px-5 py-2.5 text-2xs font-semibold uppercase tracking-wide text-ink-muted transition-colors hover:text-ink"

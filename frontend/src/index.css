@@ -1,136 +1,153 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════
-   Design tokens
+   TruthShield — visual identity
 
-   Colour values are unchanged from the validated set — the chart series
-   clear adjacent CVD ΔE 8.4 and normal-vision ΔE 19.8 against the card
-   surface, and every ink tier clears 4.5:1 on all three surfaces. What
-   changed here is everything above colour: type scale, spacing rhythm,
-   elevation, and motion.
+   A forensic instrument, not a dashboard. The product exists to be argued
+   with, so the surfaces stay quiet and the signal colours do all the
+   talking: neutral graphite, one violet accent, and a reserved status set
+   that means the same thing on every screen.
 
-   Contrast, measured (page / surface / raised):
-     ink            18.0 / 16.4 / 14.5
-     ink-secondary  10.7 /  9.7 /  8.6
-     ink-muted       6.4 /  5.8 /  5.2
+   Every value below was measured before it was written, not chosen and
+   hoped for. `.lab/contrast.py` reproduces the first table; the dataviz
+   validator reproduces the second.
+
+   Text contrast (page / surface / raised) — all pass 4.5:1 in both themes:
+     dark    ink 18.0/16.9/15.6 · secondary 9.6/9.0/8.3 · muted 5.8/5.4/5.0
+             brand 6.0/5.6/5.2 · good 10.5/9.9/9.1 · critical 7.1/6.7/6.2
+     light   ink 17.7/19.0/18.5 · secondary 9.1/9.7/9.5 · muted 5.2/5.6/5.5
+             brand 5.7/6.1/6.0 · good 4.9/5.3/5.2 · critical 5.3/5.6/5.5
+
+   Colour-blind separation on the verdict stack (the chart where two status
+   colours sit adjacent): the obvious green, #22B865, sits at ΔE 5.5 from
+   amber under protanopia — two segments a protanope cannot separate. A
+   sweep found that shifting it toward spring green reaches ΔE 9.7, past
+   the ≥8 target, while still reading as green rather than teal. That is
+   why `--c-good` is #12B886 and not the green you would first reach for.
    ═══════════════════════════════════════════════════════════ */
 
 :root,
 html.dark {
   color-scheme: dark;
 
-  --c-page: 8 11 18;
-  --c-surface: 17 23 37;
-  --c-surface-raised: 26 34 52;
-  --c-surface-sunken: 5 7 12;
+  /* Graphite, faintly cool. A true neutral goes flat under a violet accent
+     and a warm one turns muddy; this sits between. */
+  --c-page: 10 10 15;
+  --c-surface: 19 19 24;
+  --c-surface-raised: 27 27 34;
+  --c-surface-sunken: 6 6 10;
+  --c-surface-overlay: 32 32 40;
+  --c-surface-hover: 255 255 255;
+  --hover-alpha: 0.05;
 
-  --c-ink: 242 245 250;
-  --c-ink-secondary: 180 192 212;
-  --c-ink-muted: 135 148 171;
+  --c-ink: 244 244 246;
+  --c-ink-secondary: 180 180 192;
+  --c-ink-muted: 138 138 153;
 
   --c-border: 255 255 255;
   --border-alpha: 0.08;
   --border-alpha-strong: 0.16;
 
-  --c-brand: 59 147 255;
-  --c-brand-deep: 26 111 245;
+  /* The accent. Violet rather than blue: blue is what every dashboard
+     reaches for, and on a product about scrutiny it reads as generic
+     corporate trust rather than as a considered signal. */
+  --c-brand: 139 123 255;
+  --c-brand-deep: 109 88 245;
+  --c-brand-soft: 167 155 255;
 
-  /* Status — reserved for verdict and state, never a chart series. Marks use
-     the base step; text uses the lighter *-text step so small copy clears
-     4.5:1 on every surface. */
-  --c-good: 12 163 12;
-  --c-good-text: 52 199 89;
-  --c-warning: 250 178 25;
-  --c-warning-text: 245 185 61;
-  --c-serious: 236 131 90;
-  --c-critical: 208 59 59;
-  --c-critical-text: 240 112 107;
+  /* Status — reserved for verdict and state, never a chart series. Marks
+     use the base step; text uses the lighter *-text step so small copy
+     clears 4.5:1 on every surface. */
+  --c-good: 18 184 134;
+  --c-good-text: 61 214 140;
+  --c-warning: 224 161 22;
+  --c-warning-text: 245 184 65;
+  --c-serious: 232 115 74;
+  --c-critical: 225 68 68;
+  --c-critical-text: 255 107 107;
 
-  --c-series-1: 57 135 229;
-  --c-series-2: 217 89 38;
-  --c-series-3: 25 158 112;
-  --c-series-4: 201 133 0;
+  /* Categorical chart series. Validated as a set against the card surface:
+     adjacent CVD ΔE 10.3, normal-vision ΔE 20.6, all ≥3:1 contrast. */
+  --c-series-1: 124 107 255;
+  --c-series-2: 232 115 74;
+  --c-series-3: 31 174 140;
+  --c-series-4: 217 162 0;
 
   /* Elevation. Dark surfaces need a light top edge to read as raised —
      shadow alone disappears against a dark page. */
-  --edge: inset 0 1px 0 rgb(255 255 255 / 0.06);
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
-  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.55);
-  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 24px 56px -24px rgb(0 0 0 / 0.7);
-  --shadow-pop: 0 4px 8px rgb(0 0 0 / 0.32), 0 32px 64px -28px rgb(0 0 0 / 0.75);
-
-  /* Two more surfaces, so an overlay stacked on a card stacked on the page
-     stays legible. Without them a modal over a card was the same fill as
-     the card and the boundary vanished. */
-  --c-surface-overlay: 30 39 58;
-  --c-surface-hover: 255 255 255;
-  --hover-alpha: 0.05;
+  --edge: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.4), 0 24px 56px -24px rgb(0 0 0 / 0.75);
+  --shadow-pop: 0 4px 8px rgb(0 0 0 / 0.4), 0 32px 64px -28px rgb(0 0 0 / 0.8);
+  --glow: 0 0 0 1px rgb(var(--c-brand) / 0.22), 0 8px 32px -8px rgb(var(--c-brand) / 0.28);
 }
 
 html.light {
   color-scheme: light;
 
-  --c-page: 247 248 251;
+  --c-page: 247 247 249;
   --c-surface: 255 255 255;
-  --c-surface-raised: 252 253 255;
-  --c-surface-sunken: 241 243 248;
-
-  --c-ink: 12 18 30;
-  --c-ink-secondary: 62 76 97;
-  --c-ink-muted: 98 112 134;
-
-  --c-border: 15 23 42;
-  --border-alpha: 0.09;
-  --border-alpha-strong: 0.16;
-
-  --c-brand: 26 111 245;
-  --c-brand-deep: 20 89 225;
-
+  --c-surface-raised: 252 252 253;
+  --c-surface-sunken: 242 242 246;
   --c-surface-overlay: 255 255 255;
-  --c-surface-hover: 15 23 42;
+  --c-surface-hover: 16 16 20;
   --hover-alpha: 0.04;
 
-  --c-good: 12 131 12;
-  --c-good-text: 0 99 0;
-  --c-warning: 176 118 0;
-  --c-warning-text: 140 94 0;
-  --c-serious: 197 90 46;
-  --c-critical: 197 40 40;
-  --c-critical-text: 176 28 28;
+  --c-ink: 16 16 20;
+  --c-ink-secondary: 67 67 79;
+  --c-ink-muted: 102 102 122;
 
-  --c-series-1: 42 120 214;
-  --c-series-2: 235 104 52;
-  --c-series-3: 27 175 122;
-  --c-series-4: 237 161 0;
+  --c-border: 16 16 20;
+  --border-alpha: 0.09;
+  --border-alpha-strong: 0.17;
+
+  --c-brand: 91 61 245;
+  --c-brand-deep: 74 46 214;
+  --c-brand-soft: 120 96 250;
+
+  /* Darker steps: the dark theme's values are luminous on white and fail
+     body-text contrast outright. */
+  --c-good: 10 143 104;
+  --c-good-text: 10 124 66;
+  --c-warning: 168 118 26;
+  --c-warning-text: 138 90 0;
+  --c-serious: 208 86 44;
+  --c-critical: 196 43 43;
+  --c-critical-text: 196 43 43;
+
+  --c-series-1: 91 61 245;
+  --c-series-2: 208 86 44;
+  --c-series-3: 15 143 115;
+  --c-series-4: 168 118 26;
 
   --edge: none;
-  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
-  --shadow-md: 0 1px 3px rgb(15 23 42 / 0.07), 0 8px 24px -14px rgb(15 23 42 / 0.16);
-  --shadow-lg: 0 2px 6px rgb(15 23 42 / 0.08), 0 24px 56px -28px rgb(15 23 42 / 0.24);
-  --shadow-pop: 0 4px 10px rgb(15 23 42 / 0.10), 0 32px 64px -32px rgb(15 23 42 / 0.30);
+  --shadow-sm: 0 1px 2px rgb(16 16 20 / 0.06);
+  --shadow-md: 0 1px 3px rgb(16 16 20 / 0.07), 0 8px 24px -14px rgb(16 16 20 / 0.16);
+  --shadow-lg: 0 2px 6px rgb(16 16 20 / 0.08), 0 24px 56px -28px rgb(16 16 20 / 0.22);
+  --shadow-pop: 0 4px 10px rgb(16 16 20 / 0.10), 0 32px 64px -32px rgb(16 16 20 / 0.28);
+  --glow: 0 0 0 1px rgb(var(--c-brand) / 0.20), 0 8px 32px -10px rgb(var(--c-brand) / 0.22);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Shape and motion
+   Shape and motion — theme-independent.
 
-   Theme-independent, so they live outside the colour blocks. Naming the
-   durations is what keeps a dropdown, a toast and a modal feeling like
-   parts of one product rather than three people's timing instincts.
+   Naming the durations is what keeps a dropdown, a toast and a modal
+   feeling like parts of one product rather than three people's instincts.
+   The radii are tighter than the previous set: a 16px card corner reads
+   friendly, and this product is meant to read precise.
    ═══════════════════════════════════════════════════════════ */
 :root {
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 16px;
-  --r-xl: 20px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 18px;
   --r-full: 999px;
 
-  /* Three speeds, and one easing for almost everything. Decelerating: quick
-     to leave, gentle to arrive, which reads as responsive without the
-     overshoot of a spring. */
   --t-fast: 0.12s;
   --t-base: 0.18s;
   --t-slow: 0.32s;
@@ -160,50 +177,40 @@ html.light {
   }
 
   body {
-    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-family: 'Geist', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
     background: rgb(var(--c-page));
     color: rgb(var(--c-ink-secondary));
     min-height: 100vh;
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
-    /* Inter's optical sizing and contextual alternates; `cv11` gives the
-       single-storey 'a' that keeps long body copy from looking cramped. */
-    font-feature-settings: 'cv11', 'ss01';
     font-variant-ligatures: contextual;
   }
 
+  /* Headings take the display face and tighten as they grow. Optical
+     tracking: at 48px the default spacing reads loose, at 14px it reads
+     cramped, and one value cannot serve both. */
   h1, h2, h3, h4 {
+    font-family: 'Space Grotesk', 'Geist', system-ui, sans-serif;
     color: rgb(var(--c-ink));
-    font-weight: 700;
-    /* Tighter as size grows — display text at default tracking reads loose. */
-    letter-spacing: -0.021em;
+    letter-spacing: -0.02em;
     text-wrap: balance;
   }
 
-  h1 { letter-spacing: -0.032em; }
-
-  p { text-wrap: pretty; }
-
   ::selection {
-    background: rgb(var(--c-brand) / 0.25);
+    background: rgb(var(--c-brand) / 0.28);
     color: rgb(var(--c-ink));
   }
 
-  ::-webkit-scrollbar { width: 11px; height: 11px; }
+  /* A scrollbar that belongs to the theme rather than to the OS. */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
     background: rgb(var(--c-border) / 0.14);
-    border: 3px solid transparent;
-    border-radius: 99px;
+    border-radius: var(--r-full);
+    border: 2px solid transparent;
     background-clip: content-box;
   }
-  ::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--c-border) / 0.24); }
-
-  :focus-visible {
-    outline: 2px solid rgb(var(--c-brand));
-    outline-offset: 2px;
-    border-radius: 8px;
-  }
+  ::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-border) / 0.22); background-clip: content-box; }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -217,27 +224,28 @@ html.light {
 
 @layer components {
   /* ── Surfaces ──────────────────────────────────────────────
-     No backdrop-blur. It cost a compositing layer per card and, over a flat
-     page background, was invisible — a real frame rate cost for an effect
-     nobody could see. */
+     No backdrop-blur on cards. It cost a compositing layer each and, over
+     a flat page background, was invisible — a real frame-rate cost for an
+     effect nobody could see. It stays on the sticky headers, where the
+     content scrolling underneath makes it do something. */
   .card {
     background: rgb(var(--c-surface));
     border: 1px solid rgb(var(--c-border) / var(--border-alpha));
-    border-radius: 16px;
+    border-radius: var(--r-lg);
     box-shadow: var(--shadow-md), var(--edge);
   }
 
   .card-flat {
     background: rgb(var(--c-surface) / 0.6);
     border: 1px solid rgb(var(--c-border) / var(--border-alpha));
-    border-radius: 14px;
+    border-radius: var(--r-md);
   }
 
   .card-hover {
     @apply card;
-    transition: transform 0.18s cubic-bezier(0.2, 0, 0.2, 1),
-                box-shadow 0.18s cubic-bezier(0.2, 0, 0.2, 1),
-                border-color 0.18s;
+    transition: transform var(--t-base) var(--ease),
+                box-shadow var(--t-base) var(--ease),
+                border-color var(--t-base);
   }
   .card-hover:hover {
     transform: translateY(-2px);
@@ -245,33 +253,60 @@ html.light {
     box-shadow: var(--shadow-lg), var(--edge);
   }
 
-  /* ── Typography ────────────────────────────────────────────
-     A serif accent, used only on the single hero line. One contrasting face
-     on one element reads as considered; the same face on every heading reads
-     as a template. */
-  .display {
-    font-family: 'Instrument Serif', Georgia, serif;
-    font-weight: 400;
-    letter-spacing: -0.02em;
-    line-height: 1.05;
+  .surface-overlay {
+    background: rgb(var(--c-surface-overlay));
+    border: 1px solid rgb(var(--c-border) / var(--border-alpha-strong));
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-pop), var(--edge);
   }
 
+  .scrim {
+    position: fixed;
+    inset: 0;
+    background: rgb(4 4 8 / 0.6);
+    animation: fade var(--t-base) var(--ease) both;
+  }
+
+  /* ── Typography ────────────────────────────────────────────
+     The display face is the identity. Space Grotesk's flat terminals and
+     tight apertures read as instrumentation rather than as editorial —
+     which is the claim this product is making about itself. */
+  .display {
+    font-family: 'Space Grotesk', 'Geist', system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+    color: rgb(var(--c-ink));
+  }
+
+  /* The one emphasis in the product. A gradient confined to a single span
+     on a single line reads as deliberate; the same gradient on every
+     heading reads as a template. */
   .display em {
-    font-style: italic;
-    color: rgb(var(--c-brand));
+    font-style: normal;
+    background: linear-gradient(
+      100deg,
+      rgb(var(--c-brand-soft)) 0%,
+      rgb(var(--c-brand)) 45%,
+      rgb(var(--c-series-3)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 
   .section-title {
-    @apply text-base font-semibold;
+    font-family: 'Space Grotesk', 'Geist', system-ui, sans-serif;
+    @apply text-[0.9375rem] font-semibold;
     color: rgb(var(--c-ink));
-    letter-spacing: -0.014em;
+    letter-spacing: -0.015em;
   }
 
   .section-label {
     @apply font-semibold uppercase;
     font-size: 0.6875rem;
     line-height: 1rem;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
     color: rgb(var(--c-ink-muted));
   }
 
@@ -279,7 +314,7 @@ html.light {
     @apply inline-flex items-center gap-1.5 font-semibold uppercase;
     font-size: 0.6875rem;
     line-height: 1rem;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
     color: rgb(var(--c-brand));
   }
 
@@ -287,20 +322,24 @@ html.light {
      Scale on press rather than lift on hover: a 2px lift on a button the
      cursor is already over produces a hover-flicker loop at the boundary. */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold
+    @apply inline-flex items-center justify-center gap-2 font-semibold
            whitespace-nowrap select-none
            disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
-    transition: background-color 0.15s, box-shadow 0.15s, transform 0.1s,
-                border-color 0.15s, color 0.15s;
+    border-radius: var(--r-md);
+    transition: background-color var(--t-fast), box-shadow var(--t-fast),
+                transform var(--t-fast), border-color var(--t-fast), color var(--t-fast);
   }
   .btn:active:not(:disabled) { transform: scale(0.97); }
 
   .btn-primary {
     @apply btn px-5 py-2.5 text-sm text-white;
     background: rgb(var(--c-brand));
-    box-shadow: var(--shadow-sm), inset 0 1px 0 rgb(255 255 255 / 0.16);
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgb(255 255 255 / 0.18);
   }
-  .btn-primary:hover:not(:disabled) { background: rgb(var(--c-brand-deep)); }
+  .btn-primary:hover:not(:disabled) {
+    background: rgb(var(--c-brand-deep));
+    box-shadow: var(--glow), inset 0 1px 0 rgb(255 255 255 / 0.18);
+  }
 
   .btn-secondary {
     @apply btn px-5 py-2.5 text-sm;
@@ -319,16 +358,17 @@ html.light {
   }
   .btn-ghost:hover:not(:disabled) {
     color: rgb(var(--c-ink));
-    background: rgb(var(--c-border) / 0.06);
+    background: rgb(var(--c-surface-hover) / var(--hover-alpha));
   }
 
   /* ── Inputs ────────────────────────────────────────────────── */
   .input-field {
-    @apply w-full rounded-xl px-4 py-3 text-sm;
+    @apply w-full px-4 py-3 text-sm;
+    border-radius: var(--r-md);
     color: rgb(var(--c-ink));
     background: rgb(var(--c-surface-sunken));
     border: 1px solid rgb(var(--c-border) / var(--border-alpha));
-    transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+    transition: border-color var(--t-fast), box-shadow var(--t-fast), background-color var(--t-fast);
   }
   .input-field::placeholder { color: rgb(var(--c-ink-muted)); }
   .input-field:hover:not(:focus) {
@@ -337,16 +377,17 @@ html.light {
   .input-field:focus {
     outline: none;
     background: rgb(var(--c-surface));
-    border-color: rgb(var(--c-brand) / 0.55);
-    box-shadow: 0 0 0 3px rgb(var(--c-brand) / 0.14);
+    border-color: rgb(var(--c-brand) / 0.6);
+    box-shadow: 0 0 0 3px rgb(var(--c-brand) / 0.16);
   }
 
   /* ── Badges ────────────────────────────────────────────────── */
   .badge {
-    @apply inline-flex items-center gap-1.5 rounded-lg px-2 py-1 font-semibold uppercase;
+    @apply inline-flex items-center gap-1.5 px-2 py-1 font-semibold uppercase;
+    border-radius: var(--r-sm);
     font-size: 0.6875rem;
     line-height: 1;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
   }
 
   .badge-success {
@@ -370,53 +411,6 @@ html.light {
     box-shadow: inset 0 0 0 1px rgb(var(--c-border) / var(--border-alpha));
   }
 
-  /* ── Progress ──────────────────────────────────────────────── */
-  .progress-bar {
-    @apply h-1.5 overflow-hidden rounded-full;
-    background: rgb(var(--c-border) / 0.09);
-  }
-  .progress-fill {
-    @apply h-full rounded-full;
-    transition: width 0.7s cubic-bezier(0.2, 0, 0.1, 1);
-  }
-
-  /* ── Skeleton ──────────────────────────────────────────────── */
-  .skeleton {
-    background: linear-gradient(
-      90deg,
-      rgb(var(--c-border) / 0.05) 0%,
-      rgb(var(--c-border) / 0.1) 50%,
-      rgb(var(--c-border) / 0.05) 100%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.6s linear infinite;
-    border-radius: 8px;
-  }
-  @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
-
-  /* ── Overlay surfaces ──────────────────────────────────────
-     A modal sits on a card sits on the page, so it gets its own fill and a
-     heavier shadow. Sharing the card fill made the boundary disappear
-     exactly where the eye needed it most. */
-  .surface-overlay {
-    background: rgb(var(--c-surface-overlay));
-    border: 1px solid rgb(var(--c-border) / var(--border-alpha-strong));
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow-pop), var(--edge);
-  }
-
-  /* The scrim. Opaque enough to push the page back, transparent enough that
-     the reader keeps their place. */
-  .scrim {
-    position: fixed;
-    inset: 0;
-    background: rgb(2 4 10 / 0.55);
-    animation: fade var(--t-base) var(--ease) both;
-  }
-
   /* ── Tooltip ───────────────────────────────────────────────── */
   .tooltip {
     @apply pointer-events-none absolute whitespace-nowrap px-2 py-1 font-medium;
@@ -433,7 +427,8 @@ html.light {
 
   /* ── Menu ──────────────────────────────────────────────────── */
   .menu-item {
-    @apply flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm;
+    @apply flex w-full items-center gap-2.5 px-2.5 py-2 text-left text-sm;
+    border-radius: var(--r-sm);
     color: rgb(var(--c-ink-secondary));
     transition: background-color var(--t-fast), color var(--t-fast);
   }
@@ -451,7 +446,8 @@ html.light {
      pill: it survives a long label wrapping, and it points at the content
      rather than boxing the label. */
   .nav-item {
-    @apply relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium;
+    @apply relative flex items-center gap-3 px-3 py-2 text-sm font-medium;
+    border-radius: var(--r-md);
     color: rgb(var(--c-ink-muted));
     transition: color var(--t-fast), background-color var(--t-fast);
   }
@@ -477,25 +473,55 @@ html.light {
 
   /* ── Focus ─────────────────────────────────────────────────
      One visible ring for every interactive element. `:focus-visible` so a
-     mouse click does not leave a ring behind, and it is never removed --
+     mouse click does not leave a ring behind, and it is never removed —
      an invisible focus state makes the app unusable from a keyboard. */
   .focusable:focus-visible,
   .btn:focus-visible,
   .nav-item:focus-visible,
-  .menu-item:focus-visible {
+  .menu-item:focus-visible,
+  .segment:focus-visible {
     outline: 2px solid rgb(var(--c-brand));
     outline-offset: 2px;
+  }
+
+  /* ── Progress ──────────────────────────────────────────────── */
+  .progress-bar {
+    @apply h-1.5 overflow-hidden;
+    border-radius: var(--r-full);
+    background: rgb(var(--c-border) / 0.09);
+  }
+  .progress-fill {
+    @apply h-full;
+    border-radius: var(--r-full);
+    transition: width 0.7s var(--ease);
+  }
+
+  /* ── Skeleton ──────────────────────────────────────────────── */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--c-border) / 0.05) 0%,
+      rgb(var(--c-border) / 0.1) 50%,
+      rgb(var(--c-border) / 0.05) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+    border-radius: var(--r-sm);
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 
   /* ── Segmented control ─────────────────────────────────────── */
   .segment {
     @apply relative flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold;
     color: rgb(var(--c-ink-muted));
-    transition: color 0.15s, background-color 0.15s;
+    transition: color var(--t-fast), background-color var(--t-fast);
   }
   .segment:hover:not([aria-selected='true']):not(:disabled) {
     color: rgb(var(--c-ink));
-    background: rgb(var(--c-border) / 0.03);
+    background: rgb(var(--c-surface-hover) / var(--hover-alpha));
   }
   .segment[aria-selected='true'] { color: rgb(var(--c-brand)); }
   /* Underline rather than a filled pill: it marks the boundary between the
@@ -514,7 +540,6 @@ html.light {
   .text-balance { text-wrap: balance; }
   .text-pretty { text-wrap: pretty; }
 
-  /* Hairline that respects the theme without repeating the rgb() call. */
   .border-line { border-color: rgb(var(--c-border) / var(--border-alpha)); }
   .divide-line > * + * { border-color: rgb(var(--c-border) / var(--border-alpha)); }
 
@@ -522,37 +547,57 @@ html.light {
      flat field looking dead, not enough to compete with content. */
   .page-wash {
     background:
-      radial-gradient(60rem 30rem at 50% -8rem, rgb(var(--c-brand) / 0.10), transparent 70%),
-      radial-gradient(40rem 24rem at 92% 6rem, rgb(var(--c-series-3) / 0.05), transparent 70%);
+      radial-gradient(56rem 30rem at 50% -10rem, rgb(var(--c-brand) / 0.13), transparent 70%),
+      radial-gradient(40rem 24rem at 92% 4rem, rgb(var(--c-series-3) / 0.06), transparent 70%);
   }
 
   .grid-wash {
     background-image:
-      linear-gradient(rgb(var(--c-border) / 0.045) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(var(--c-border) / 0.045) 1px, transparent 1px);
+      linear-gradient(rgb(var(--c-border) / 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--c-border) / 0.05) 1px, transparent 1px);
     background-size: 56px 56px;
     mask-image: radial-gradient(ellipse 90% 55% at 50% 0%, #000 10%, transparent 72%);
     -webkit-mask-image: radial-gradient(ellipse 90% 55% at 50% 0%, #000 10%, transparent 72%);
   }
 
-  /* Entrance. Short, once, and disabled under reduced-motion by the base
-     layer above. */
-  .rise {
-    animation: rise 0.45s cubic-bezier(0.2, 0, 0.2, 1) both;
+  /* A hairline lit from the top — the edge a physical panel would catch.
+     One pseudo-element rather than a gradient border, which would need a
+     second background layer on every card that used it. */
+  .lit-edge {
+    position: relative;
   }
-  @keyframes rise {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: none; }
+  .lit-edge::before {
+    content: '';
+    position: absolute;
+    inset-inline: 12%;
+    top: -1px;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--c-brand) / 0.45),
+      transparent
+    );
   }
 
-  /* Shared keyframes for the overlay components above. */
+  /* ── Motion ─────────────────────────────────────────────────
+     All of it disabled under reduced-motion by the base layer above. */
   @keyframes fade {
     from { opacity: 0; }
     to { opacity: 1; }
   }
 
-  /* Overlays arrive from slightly below and scale a hair. Enough to read as
-     "this appeared", not enough to make a dropdown feel like a launch. */
+  .rise { animation: rise 0.45s var(--ease) both; }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+  .rise-1 { animation-delay: 0.04s; }
+  .rise-2 { animation-delay: 0.08s; }
+  .rise-3 { animation-delay: 0.12s; }
+
+  /* Overlays arrive from slightly below and scale a hair. Enough to read
+     as "this appeared", not enough to make a dropdown feel like a launch. */
   .pop {
     animation: pop var(--t-base) var(--ease) both;
     transform-origin: var(--pop-origin, top);
@@ -562,28 +607,21 @@ html.light {
     to { opacity: 1; transform: none; }
   }
 
-  /* A toast slides in from the edge it will leave by. */
-  .slide-in-right {
-    animation: slide-in-right var(--t-slow) var(--ease) both;
-  }
+  .slide-in-right { animation: slide-in-right var(--t-slow) var(--ease) both; }
   @keyframes slide-in-right {
     from { opacity: 0; transform: translateX(16px); }
     to { opacity: 1; transform: none; }
   }
 
-  .slide-up {
-    animation: slide-up var(--t-slow) var(--ease) both;
-  }
+  .slide-up { animation: slide-up var(--t-slow) var(--ease) both; }
   @keyframes slide-up {
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: none; }
   }
 
-  /* A live process, not a loading state: the analysis pipeline uses this to
-     say it is still working on a step that has no measurable progress. */
-  .pulse-dot {
-    position: relative;
-  }
+  /* A live process, not a loading state: the analysis pipeline uses this
+     to say it is still working on a step with no measurable progress. */
+  .pulse-dot { position: relative; }
   .pulse-dot::after {
     content: '';
     position: absolute;
@@ -597,11 +635,7 @@ html.light {
     70%, 100% { opacity: 0; transform: scale(2.4); }
   }
 
-  .rise-1 { animation-delay: 0.04s; }
-  .rise-2 { animation-delay: 0.08s; }
-  .rise-3 { animation-delay: 0.12s; }
-
-  /* Numerals that line up in a column. Deliberately not applied to the hero
-     figure, where equal-width digits make a large number look loose. */
+  /* Numerals that line up in a column. Deliberately not applied to the
+     hero figure, where equal-width digits make a large number look loose. */
   .tnum { font-variant-numeric: tabular-nums; }
 }

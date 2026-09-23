@@ -16,6 +16,7 @@ export default {
           DEFAULT: token('--c-surface'),
           raised: token('--c-surface-raised'),
           sunken: token('--c-surface-sunken'),
+          overlay: token('--c-surface-overlay'),
         },
         ink: {
           DEFAULT: token('--c-ink'),
@@ -25,6 +26,7 @@ export default {
         brand: {
           DEFAULT: token('--c-brand'),
           deep: token('--c-brand-deep'),
+          soft: token('--c-brand-soft'),
           // Steps kept for the few places that need a lighter or darker
           // brand tint than the two semantic tokens above.
           300: '#8eceff',
@@ -56,9 +58,14 @@ export default {
       },
 
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
-        display: ['Instrument Serif', 'Georgia', 'serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        // Geist for the interface: a grotesque with open apertures and real
+        // numerals, which matters on a product full of scores and counts.
+        sans: ['Geist', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        // Space Grotesk for display. Flat terminals and tight apertures read
+        // as instrumentation rather than as editorial, which is the claim
+        // this product makes about itself.
+        display: ['Space Grotesk', 'Geist', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
 
       fontSize: {
@@ -77,7 +84,17 @@ export default {
         sm: 'var(--shadow-sm)',
         DEFAULT: 'var(--shadow-md)',
         lg: 'var(--shadow-lg)',
+        pop: 'var(--shadow-pop)',
+        glow: 'var(--glow)',
         edge: 'var(--edge)',
+      },
+
+      borderRadius: {
+        sm: 'var(--r-sm)',
+        DEFAULT: 'var(--r-md)',
+        md: 'var(--r-md)',
+        lg: 'var(--r-lg)',
+        xl: 'var(--r-xl)',
       },
 
       transitionTimingFunction: {

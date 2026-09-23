@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  AlertTriangle, ArrowLeft, Check, ChevronDown, Clock, Copy,
+  AlertTriangle, ArrowLeft, Check, ChevronDown, Clock,
   ExternalLink, Info, Loader2,
 } from 'lucide-react';
 
@@ -30,7 +30,6 @@ export default function Report() {
   const { id } = useParams();
   const [report, setReport] = useState(null);
   const [error, setError] = useState(null);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -39,14 +38,6 @@ export default function Report() {
       .catch((err) => alive && setError(err));
     return () => { alive = false; };
   }, [id]);
-
-  const share = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch { /* clipboard blocked — the URL is in the address bar anyway */ }
-  };
 
   if (error) return <ReportError error={error} />;
   if (!report) return <ReportSkeleton />;
@@ -72,10 +63,11 @@ export default function Report() {
               <> · {report.processing_time_seconds.toFixed(1)}s</>
             )}
           </span>
-          <button onClick={share} className="btn-secondary !px-3 !py-1.5 text-2xs">
-            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-            {copied ? 'Copied' : 'Share'}
-          </button>
+          {/* No "share" control here. This copied the page URL, which is
+              private and 404s for anyone else -- a button that looks like
+              sharing and silently produces a dead link. Real sharing mints a
+              public token; it lives in ShareControl further down, next to
+              the revoke that has to sit beside it. */}
         </div>
       </header>
 

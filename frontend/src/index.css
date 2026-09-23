@@ -61,6 +61,14 @@ html.dark {
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
   --shadow-md: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.55);
   --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 24px 56px -24px rgb(0 0 0 / 0.7);
+  --shadow-pop: 0 4px 8px rgb(0 0 0 / 0.32), 0 32px 64px -28px rgb(0 0 0 / 0.75);
+
+  /* Two more surfaces, so an overlay stacked on a card stacked on the page
+     stays legible. Without them a modal over a card was the same fill as
+     the card and the boundary vanished. */
+  --c-surface-overlay: 30 39 58;
+  --c-surface-hover: 255 255 255;
+  --hover-alpha: 0.05;
 }
 
 html.light {
@@ -82,6 +90,10 @@ html.light {
   --c-brand: 26 111 245;
   --c-brand-deep: 20 89 225;
 
+  --c-surface-overlay: 255 255 255;
+  --c-surface-hover: 15 23 42;
+  --hover-alpha: 0.04;
+
   --c-good: 12 131 12;
   --c-good-text: 0 99 0;
   --c-warning: 176 118 0;
@@ -99,6 +111,39 @@ html.light {
   --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
   --shadow-md: 0 1px 3px rgb(15 23 42 / 0.07), 0 8px 24px -14px rgb(15 23 42 / 0.16);
   --shadow-lg: 0 2px 6px rgb(15 23 42 / 0.08), 0 24px 56px -28px rgb(15 23 42 / 0.24);
+  --shadow-pop: 0 4px 10px rgb(15 23 42 / 0.10), 0 32px 64px -32px rgb(15 23 42 / 0.30);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Shape and motion
+
+   Theme-independent, so they live outside the colour blocks. Naming the
+   durations is what keeps a dropdown, a toast and a modal feeling like
+   parts of one product rather than three people's timing instincts.
+   ═══════════════════════════════════════════════════════════ */
+:root {
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-full: 999px;
+
+  /* Three speeds, and one easing for almost everything. Decelerating: quick
+     to leave, gentle to arrive, which reads as responsive without the
+     overshoot of a spring. */
+  --t-fast: 0.12s;
+  --t-base: 0.18s;
+  --t-slow: 0.32s;
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Stacking. Written down because the alternative is discovering the
+     order by finding a dropdown behind a modal. */
+  --z-nav: 50;
+  --z-dropdown: 60;
+  --z-overlay: 70;
+  --z-modal: 80;
+  --z-toast: 90;
 }
 
 @layer base {
@@ -352,6 +397,96 @@ html.light {
     100% { background-position: -200% 0; }
   }
 
+  /* ── Overlay surfaces ──────────────────────────────────────
+     A modal sits on a card sits on the page, so it gets its own fill and a
+     heavier shadow. Sharing the card fill made the boundary disappear
+     exactly where the eye needed it most. */
+  .surface-overlay {
+    background: rgb(var(--c-surface-overlay));
+    border: 1px solid rgb(var(--c-border) / var(--border-alpha-strong));
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-pop), var(--edge);
+  }
+
+  /* The scrim. Opaque enough to push the page back, transparent enough that
+     the reader keeps their place. */
+  .scrim {
+    position: fixed;
+    inset: 0;
+    background: rgb(2 4 10 / 0.55);
+    animation: fade var(--t-base) var(--ease) both;
+  }
+
+  /* ── Tooltip ───────────────────────────────────────────────── */
+  .tooltip {
+    @apply pointer-events-none absolute whitespace-nowrap px-2 py-1 font-medium;
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    color: rgb(var(--c-ink));
+    background: rgb(var(--c-surface-overlay));
+    border: 1px solid rgb(var(--c-border) / var(--border-alpha-strong));
+    border-radius: var(--r-sm);
+    box-shadow: var(--shadow-md);
+    animation: fade var(--t-fast) var(--ease) both;
+    z-index: var(--z-dropdown);
+  }
+
+  /* ── Menu ──────────────────────────────────────────────────── */
+  .menu-item {
+    @apply flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm;
+    color: rgb(var(--c-ink-secondary));
+    transition: background-color var(--t-fast), color var(--t-fast);
+  }
+  .menu-item:hover:not(:disabled) {
+    color: rgb(var(--c-ink));
+    background: rgb(var(--c-surface-hover) / var(--hover-alpha));
+  }
+  .menu-item[aria-current='true'] {
+    color: rgb(var(--c-brand));
+    background: rgb(var(--c-brand) / 0.10);
+  }
+
+  /* ── Navigation rail ───────────────────────────────────────
+     The active marker is a bar on the leading edge rather than a filled
+     pill: it survives a long label wrapping, and it points at the content
+     rather than boxing the label. */
+  .nav-item {
+    @apply relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium;
+    color: rgb(var(--c-ink-muted));
+    transition: color var(--t-fast), background-color var(--t-fast);
+  }
+  .nav-item:hover:not([aria-current='page']) {
+    color: rgb(var(--c-ink));
+    background: rgb(var(--c-surface-hover) / var(--hover-alpha));
+  }
+  .nav-item[aria-current='page'] {
+    color: rgb(var(--c-ink));
+    background: rgb(var(--c-brand) / 0.10);
+  }
+  .nav-item[aria-current='page']::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    height: 1.125rem;
+    width: 2px;
+    transform: translateY(-50%);
+    border-radius: 0 2px 2px 0;
+    background: rgb(var(--c-brand));
+  }
+
+  /* ── Focus ─────────────────────────────────────────────────
+     One visible ring for every interactive element. `:focus-visible` so a
+     mouse click does not leave a ring behind, and it is never removed --
+     an invisible focus state makes the app unusable from a keyboard. */
+  .focusable:focus-visible,
+  .btn:focus-visible,
+  .nav-item:focus-visible,
+  .menu-item:focus-visible {
+    outline: 2px solid rgb(var(--c-brand));
+    outline-offset: 2px;
+  }
+
   /* ── Segmented control ─────────────────────────────────────── */
   .segment {
     @apply relative flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold;
@@ -408,6 +543,58 @@ html.light {
   @keyframes rise {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: none; }
+  }
+
+  /* Shared keyframes for the overlay components above. */
+  @keyframes fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Overlays arrive from slightly below and scale a hair. Enough to read as
+     "this appeared", not enough to make a dropdown feel like a launch. */
+  .pop {
+    animation: pop var(--t-base) var(--ease) both;
+    transform-origin: var(--pop-origin, top);
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* A toast slides in from the edge it will leave by. */
+  .slide-in-right {
+    animation: slide-in-right var(--t-slow) var(--ease) both;
+  }
+  @keyframes slide-in-right {
+    from { opacity: 0; transform: translateX(16px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .slide-up {
+    animation: slide-up var(--t-slow) var(--ease) both;
+  }
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* A live process, not a loading state: the analysis pipeline uses this to
+     say it is still working on a step that has no measurable progress. */
+  .pulse-dot {
+    position: relative;
+  }
+  .pulse-dot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: inherit;
+    animation: pulse-ring 1.8s var(--ease) infinite;
+  }
+  @keyframes pulse-ring {
+    0% { opacity: 0.6; transform: scale(1); }
+    70%, 100% { opacity: 0; transform: scale(2.4); }
   }
 
   .rise-1 { animation-delay: 0.04s; }

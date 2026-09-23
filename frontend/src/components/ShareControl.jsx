@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Copy, Link2, Loader2, Lock } from 'lucide-react';
 
+import { useToast } from './ui';
 import { api } from '../lib/api';
 
 /**
@@ -18,6 +19,7 @@ function shareUrl(token) {
 }
 
 export default function ShareControl({ reportId, className = '' }) {
+  const toast = useToast();
   const [token, setToken] = useState(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -36,7 +38,12 @@ export default function ShareControl({ reportId, className = '' }) {
         await navigator.clipboard.writeText(shareUrl(minted));
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-      } catch { /* clipboard blocked; the URL is on screen to select */ }
+        toast.success('Link copied — anyone with it can read this report');
+      } catch {
+        // Clipboard blocked. The URL is on screen to select, so say that
+        // rather than leaving the reader wondering whether it worked.
+        toast.info('Link created. Copying is blocked here — select it to copy.');
+      }
     } catch (err) {
       setError(err.message || 'Could not create a link.');
     } finally {
@@ -50,6 +57,7 @@ export default function ShareControl({ reportId, className = '' }) {
     try {
       await api.unshare(reportId);
       setToken(null);
+      toast.success('Link revoked — every copy of it has stopped working');
     } catch (err) {
       setError(err.message || 'Could not revoke the link.');
     } finally {
@@ -62,6 +70,7 @@ export default function ShareControl({ reportId, className = '' }) {
       await navigator.clipboard.writeText(shareUrl(token));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      toast.success('Link copied');
     } catch {
       setError('Copying is blocked here — select the link above instead.');
     }

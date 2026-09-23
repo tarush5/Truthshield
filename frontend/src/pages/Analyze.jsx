@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  AlertCircle, ArrowRight, Check, FileText, Link2, Loader2, Upload, X,
+  AlertCircle, ArrowRight, Check, FileText, History, Link2, Loader2, Upload, X,
 } from 'lucide-react';
 
+import { Tooltip } from '../components/ui';
 import { ApiError, analyzeStream, api, pollReport } from '../lib/api';
+import { getVerdict } from '../lib/verdict';
 
 /**
  * The submission surface, and the live console that runs underneath it.
@@ -138,11 +140,11 @@ export default function Analyze() {
   const latest = events[events.length - 1];
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-5 sm:px-8">
-      <header className="rise space-y-3 text-center">
-        <span className="eyebrow justify-center">Check a claim</span>
+    <div className="mx-auto max-w-3xl space-y-5 px-5 sm:px-8">
+      <header className="rise mb-7 text-center">
+        <span className="eyebrow justify-center mb-3">Check a claim</span>
         <h1 className="display text-4xl sm:text-5xl">Is this true?</h1>
-        <p className="mx-auto max-w-prose text-sm leading-relaxed text-ink-secondary">
+        <p className="mx-auto mt-3 max-w-prose text-sm leading-relaxed text-ink-secondary text-pretty">
           You'll get a verdict, every source behind it, and an explicit list of
           anything that couldn't be checked.
         </p>
@@ -169,16 +171,30 @@ export default function Analyze() {
           {mode === 'text' && (
             <div className="space-y-3">
               <label htmlFor="claim" className="sr-only">Claim to check</label>
-              <textarea
-                id="claim"
-                ref={textArea}
-                rows={5}
-                value={text}
-                disabled={busy}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Paste the claim, post, or article text…"
-                className="input-field resize-y"
-              />
+              <div className="relative">
+                <textarea
+                  id="claim"
+                  ref={textArea}
+                  rows={5}
+                  value={text}
+                  disabled={busy}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Paste the claim, post, or article text…"
+                  className="input-field resize-y !pb-7"
+                />
+                {/* Inside the field rather than beside it: the count is about
+                    the text, and a note floating alongside reads as an error
+                    the moment it turns amber. */}
+                <span
+                  className={`pointer-events-none absolute bottom-2.5 right-3 font-mono text-[0.625rem] tnum ${
+                    text.trim().length >= 15 ? 'text-ink-muted' : 'text-[rgb(var(--c-warning-text))]'
+                  }`}
+                >
+                  {text.trim().length < 15
+                    ? `${15 - text.trim().length} more characters`
+                    : `${text.length.toLocaleString()}`}
+                </span>
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-2xs text-ink-muted">Try:</span>
                 {SAMPLES.map((sample) => (
@@ -192,6 +208,7 @@ export default function Analyze() {
                   </button>
                 ))}
               </div>
+              <PriorMatches text={text} busy={busy} />
             </div>
           )}
 
@@ -283,6 +300,73 @@ export default function Analyze() {
 
       {busy && <Console events={events} claims={claims} />}
       {error && <ErrorPanel error={error} onRetry={() => { setError(null); submit(); }} />}
+    </div>
+  );
+}
+
+/**
+ * "We have looked at this before."
+ *
+ * Queried as the reader types, debounced, against the adjudicated-claim
+ * index. It answers a question people actually have before submitting --
+ * has this already been settled -- and it is cheap, because the second
+ * arrival of a claim is exactly the case the index exists for.
+ *
+ * Shown as history, never as an answer. Evidence moves, so a prior verdict
+ * is context for deciding whether to bother, not a substitute for checking
+ * again. Failures are swallowed: this is a nicety beside a text box, and it
+ * must never interrupt the submission it sits under.
+ */
+function PriorMatches({ text, busy }) {
+  const [matches, setMatches] = useState([]);
+  const claim = text.trim();
+
+  useEffect(() => {
+    if (busy || claim.length < 15) {
+      setMatches([]);
+      return undefined;
+    }
+
+    let alive = true;
+    // Long enough that typing a sentence fires one request, not thirty.
+    const timer = setTimeout(() => {
+      api.similarClaims(claim.slice(0, 500), 3)
+        .then((data) => alive && setMatches(data.matches || []))
+        .catch(() => alive && setMatches([]));
+    }, 600);
+
+    return () => { alive = false; clearTimeout(timer); };
+  }, [claim, busy]);
+
+  if (!matches.length) return null;
+
+  return (
+    <div className="rounded-xl border border-line bg-surface-sunken p-3">
+      <div className="mb-2 flex items-center gap-1.5">
+        <History className="h-3 w-3 text-ink-muted" aria-hidden="true" />
+        <span className="section-label">Checked before</span>
+      </div>
+      <ul className="space-y-1">
+        {matches.map((match) => {
+          const meta = getVerdict(match.verdict);
+          return (
+            <li key={match.report_id}>
+              <Link
+                to={`/report/${match.report_id}`}
+                className="focusable flex items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-[rgb(var(--c-surface-hover)/var(--hover-alpha))]"
+              >
+                <span className="truncate text-[0.6875rem] text-ink-secondary">{match.text}</span>
+                <span className="ml-auto shrink-0 text-[0.625rem] font-medium text-ink-muted">
+                  {meta.headline}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-2 text-[0.625rem] leading-relaxed text-ink-muted">
+        Evidence changes — checking again gives you today's answer.
+      </p>
     </div>
   );
 }

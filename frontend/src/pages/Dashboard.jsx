@@ -1,20 +1,22 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Activity, AlertTriangle, BarChart3, Gauge, Loader2, RefreshCw, Timer,
-} from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Activity, BarChart3, Gauge, RefreshCw, Timer } from 'lucide-react';
 
 import SourceBars from '../components/charts/SourceBars';
 import VolumeChart from '../components/charts/VolumeChart';
+import {
+  EmptyState, InlineError, PageHeader, Section, Skeleton, SkeletonCard,
+  StatCard, Tooltip,
+} from '../components/ui';
 import { api } from '../lib/api';
 
 /**
  * Operational view over what the system has actually done.
  *
- * Every figure here carries the sample it came from. That is the whole
- * design constraint: a young deployment has small numbers, and a dashboard
- * that renders "100% agreement" the same way at n=1 and n=400 invites a
- * decision the data cannot support. Rates below the API's sample floor are
- * shown as unavailable rather than shown small.
+ * Every figure carries the sample it came from. That is the design
+ * constraint the whole page is built around: a young deployment has small
+ * numbers, and a dashboard that renders "100% agreement" identically at
+ * n=1 and n=400 invites a decision the data cannot support. Rates below the
+ * API's sample floor read as unavailable rather than as small.
  */
 
 const WINDOWS = [
@@ -36,8 +38,8 @@ function seconds(value) {
  * How old the figures are.
  *
  * The aggregate is cached for a minute, so "just now" would be a small lie
- * on a reload. Saying when it was computed costs one line and means the
- * refresh control has a visible effect rather than appearing to do nothing.
+ * on a reload. Saying when it was computed costs one line and gives the
+ * refresh control a visible effect rather than appearing to do nothing.
  */
 function staleness(iso) {
   if (!iso) return null;
@@ -48,51 +50,38 @@ function staleness(iso) {
 }
 
 /**
- * A single headline figure.
+ * Change between the first and second half of the window.
  *
- * `note` is where the denominator goes. It is not optional decoration —
- * every rate on this page is required to state what it was computed from.
+ * Deliberately crude, and suppressed on thin data: a percentage swing
+ * computed from three analyses is noise wearing the costume of a trend.
  */
-function StatTile({ icon: Icon, label, value, note, tone = 'neutral' }) {
-  const toneClass = {
-    neutral: 'text-ink',
-    good: 'text-[rgb(var(--c-good-text))]',
-    warning: 'text-[rgb(var(--c-warning-text))]',
-    critical: 'text-[rgb(var(--c-critical-text))]',
-  }[tone];
+function halfOverHalf(series, key = 'total') {
+  if (!series || series.length < 6) return undefined;
+  const mid = Math.floor(series.length / 2);
+  const sum = (rows) => rows.reduce((t, r) => t + (r[key] || 0), 0);
 
-  return (
-    <div className="card p-4">
-      <div className="mb-2 flex items-center gap-2">
-        <Icon className="h-3.5 w-3.5 text-ink-muted" />
-        <span className="text-[0.6875rem] font-medium uppercase tracking-wide text-ink-muted">
-          {label}
-        </span>
-      </div>
-      <div className={`font-mono text-2xl font-semibold tabular-nums ${toneClass}`}>
-        {value}
-      </div>
-      {note && <div className="mt-1 text-[0.6875rem] text-ink-muted">{note}</div>}
-    </div>
-  );
+  const earlier = sum(series.slice(0, mid));
+  const later = sum(series.slice(mid));
+  if (earlier < 5) return undefined;
+  return ((later - earlier) / earlier) * 100;
 }
 
-function Panel({ title, description, children, action }) {
+function LoadingPanels() {
   return (
-    <section className="card p-5">
-      <header className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-sm font-semibold text-ink">{title}</h2>
-          {description && (
-            <p className="mt-0.5 max-w-prose text-[0.6875rem] leading-relaxed text-ink-muted">
-              {description}
-            </p>
-          )}
-        </div>
-        {action}
-      </header>
-      {children}
-    </section>
+    <div className="space-y-5" role="status" aria-busy="true" aria-live="polite">
+      <span className="sr-only">Loading insights</span>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+      </div>
+      <div className="card p-5">
+        <Skeleton className="mb-4 h-4 w-40" />
+        <Skeleton className="h-[240px] w-full" />
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
+        <div className="card p-5"><Skeleton className="h-[220px] w-full" /></div>
+        <div className="card p-5"><Skeleton className="h-[220px] w-full" /></div>
+      </div>
+    </div>
   );
 }
 
@@ -101,9 +90,10 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (window, { quiet = false, fresh = false } = {}) => {
-    if (!quiet) setLoading(true);
+    if (quiet) setRefreshing(true); else setLoading(true);
     try {
       setData(await api.insights(window, { fresh }));
       setError(null);
@@ -111,123 +101,120 @@ export default function Dashboard() {
       setError(err.message || 'Could not load insights.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!cancelled) await load(days);
-    })();
-    return () => { cancelled = true; };
-  }, [days, load]);
+  useEffect(() => { load(days); }, [days, load]);
 
   const volume = data?.volume;
   const latency = data?.latency;
   const confidence = data?.confidence;
   const calibration = data?.calibration;
 
-  // Taken from the same aggregate as the abstention counts below rather than
+  // Taken from the same aggregate as the abstention counts rather than
   // summed from the daily buckets. The two disagree at the window edge --
   // buckets are calendar days, the aggregate is a rolling timestamp cut --
   // and two totals differing by four on one screen reads as a broken number
-  // whichever of them is "right".
+  // whichever of them is right.
   const analysed = confidence?.total ?? 0;
+  const abstention = confidence?.abstention_rate;
 
-  // Abstention is the number to watch: it going up means retrieval is
-  // finding less usable evidence, which a verdict breakdown hides by
-  // treating "unverified" as just another outcome.
-  //
   // No green step. A low abstention rate is not a success -- the system
   // could be committing confidently and wrongly -- and colouring it good
   // would assert something this figure cannot show on its own.
-  const abstention = confidence?.abstention_rate;
   const abstentionTone =
     abstention === null || abstention === undefined ? 'neutral'
       : abstention > 0.45 ? 'critical'
         : abstention > 0.25 ? 'warning' : 'neutral';
 
-  return (
-    <div className="mx-auto max-w-5xl px-5 sm:px-8">
-      <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl tracking-tight text-ink">Insights</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            What this system has checked, which sources it leaned on, and where
-            readers disagreed with it.
-          </p>
-        </div>
+  const spark = useMemo(() => volume?.series?.map((row) => row.total) ?? [], [volume]);
+  const volumeTrend = useMemo(() => halfOverHalf(volume?.series), [volume]);
 
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-line p-0.5" role="group" aria-label="Time window">
-            {WINDOWS.map((w) => (
+  const hasAnything = analysed > 0;
+
+  return (
+    <div className="mx-auto w-full max-w-6xl px-5 sm:px-8">
+      <PageHeader
+        eyebrow="Operations"
+        title="Insights"
+        description="What this system has checked, which sources it leaned on, and where readers disagreed with it."
+        actions={
+          <>
+            <div className="flex rounded-xl border border-line p-0.5" role="group" aria-label="Time window">
+              {WINDOWS.map((w) => (
+                <button
+                  key={w.days}
+                  onClick={() => setDays(w.days)}
+                  aria-pressed={days === w.days}
+                  className={`focusable rounded-lg px-2.5 py-1 font-mono text-[0.6875rem] transition-colors duration-[var(--t-fast)] ${
+                    days === w.days ? 'bg-brand/12 text-brand' : 'text-ink-muted hover:text-ink'
+                  }`}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+            <Tooltip label="Recalculate now" side="bottom">
               <button
-                key={w.days}
-                onClick={() => setDays(w.days)}
-                aria-pressed={days === w.days}
-                className={`rounded-md px-2.5 py-1 font-mono text-[0.6875rem] transition-colors ${
-                  days === w.days
-                    ? 'bg-brand/12 text-brand'
-                    : 'text-ink-muted hover:text-ink'
-                }`}
+                onClick={() => load(days, { quiet: true, fresh: true })}
+                className="btn-ghost !p-2"
+                aria-label="Refresh"
+                disabled={refreshing}
               >
-                {w.label}
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
-            ))}
-          </div>
-          <button
-            onClick={() => load(days, { quiet: true, fresh: true })}
-            className="btn-ghost !p-2"
-            aria-label="Refresh"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </header>
+            </Tooltip>
+          </>
+        }
+      />
 
       {error && (
-        <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-[rgb(var(--c-critical))]/30 bg-[rgb(var(--c-critical))]/[0.07] p-3.5">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--c-critical-text))]" />
-          <p className="text-sm text-ink-secondary">{error}</p>
+        <div className="mb-5">
+          <InlineError onRetry={() => load(days, { fresh: true })}>{error}</InlineError>
         </div>
       )}
 
       {loading && !data ? (
-        <div className="flex min-h-[40vh] items-center justify-center">
-          <Loader2 className="h-5 w-5 animate-spin text-brand" />
+        <LoadingPanels />
+      ) : !hasAnything && !error ? (
+        <div className="card">
+          <EmptyState
+            icon={BarChart3}
+            title="Nothing to report yet"
+            description="These panels fill in as claims are checked. Run one and the volume, sources and latency figures start here."
+            action={<a href="/analyze" className="btn-primary !px-4 !py-2 text-sm">Check a claim</a>}
+          />
         </div>
       ) : (
         <div className="space-y-5">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatTile
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
               icon={BarChart3}
               label="Analysed"
               value={analysed.toLocaleString()}
-              note={`completed in ${days} days`}
+              note={`in ${days} days`}
+              trend={volumeTrend}
+              goodDirection="up"
+              spark={spark}
             />
-            <StatTile
+            <StatCard
               icon={Gauge}
               label="Abstained"
               value={percent(abstention)}
-              note={
-                confidence?.total
-                  ? `${confidence.abstentions} of ${confidence.total}`
-                  : 'no analyses yet'
-              }
+              note={confidence?.total ? `${confidence.abstentions} of ${confidence.total}` : 'no analyses'}
               tone={abstentionTone}
             />
-            <StatTile
+            <StatCard
               icon={Timer}
               label="Median time"
               value={seconds(latency?.p50)}
               note={latency?.count ? `p95 ${seconds(latency.p95)}` : 'no samples'}
             />
-            <StatTile
+            <StatCard
               icon={Activity}
               label="Reader agreement"
-              value={
-                calibration?.reliable_sample ? percent(calibration.agreement_rate) : '—'
-              }
+              value={calibration?.reliable_sample ? percent(calibration.agreement_rate) : '—'}
               note={
                 calibration?.feedback_count
                   ? `${calibration.feedback_count} response${calibration.feedback_count === 1 ? '' : 's'}`
@@ -236,65 +223,63 @@ export default function Dashboard() {
             />
           </div>
 
-          <Panel
+          <Section
             title="Volume by verdict"
-            description="Daily counts. Quiet days are drawn as zero rather than skipped, so the line never interpolates across a gap."
+            description="Daily counts. Quiet days are drawn as zero rather than skipped, so the chart never interpolates across a gap."
           >
             <VolumeChart data={volume} />
-          </Panel>
+          </Section>
 
-          <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-            <Panel
+          <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
+            <Section
               title="Sources relied on"
               description="Bar length is citations; the split within it is how that domain's evidence fell. Credibility is a mean, shown only where there are enough citations to mean something."
             >
               <SourceBars sources={data?.sources?.sources ?? []} />
-            </Panel>
+            </Section>
 
-            <Panel
+            <Section
               title="Where readers disagreed"
               description="Self-selected feedback — people who disagree are likelier to leave it. Read it as a prompt to investigate, not as an accuracy score."
             >
               {calibration?.by_verdict?.length ? (
-                <div className="space-y-2.5">
+                <ul className="space-y-1">
                   {calibration.by_verdict.map((row) => (
-                    <div key={row.verdict} className="flex items-center justify-between gap-3">
+                    <li
+                      key={row.verdict}
+                      className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition-colors duration-[var(--t-fast)] hover:bg-[rgb(var(--c-surface-hover)/var(--hover-alpha))]"
+                    >
                       <div className="min-w-0">
-                        <div className="truncate text-[0.8125rem] text-ink-secondary">
-                          {row.verdict}
-                        </div>
+                        <div className="truncate text-[0.8125rem] text-ink-secondary">{row.verdict}</div>
                         <div className="text-[0.6875rem] text-ink-muted">
                           {row.agreed} agreed · {row.disagreed} disagreed
                         </div>
                       </div>
                       <span
-                        className="shrink-0 font-mono text-sm tabular-nums text-ink"
-                        title={
-                          row.reliable_sample
-                            ? undefined
-                            : 'Too few responses to compute a meaningful rate'
-                        }
+                        className="shrink-0 font-mono text-sm tnum text-ink"
+                        title={row.reliable_sample ? undefined : 'Too few responses to compute a meaningful rate'}
                       >
                         {row.reliable_sample ? percent(row.agreement_rate) : '—'}
                       </span>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               ) : (
-                <p className="py-8 text-center text-sm text-ink-muted">
-                  No reader feedback in this window.
-                </p>
+                <EmptyState
+                  icon={Activity}
+                  title="No feedback yet"
+                  description="Reader agreement appears once people start rating verdicts."
+                  className="!py-8"
+                />
               )}
-            </Panel>
+            </Section>
           </div>
 
           <p className="pb-2 text-[0.6875rem] leading-relaxed text-ink-muted">
-            Figures cover the trailing {days} days and exclude analyses that
-            failed. Rates are shown as unavailable rather than rounded where
-            the sample is too small to support one.
-            {data?.computed_at && (
-              <> Computed {staleness(data.computed_at)}; refresh recalculates.</>
-            )}
+            Figures cover the trailing {days} days and exclude analyses that failed.
+            Rates are shown as unavailable rather than rounded where the sample is
+            too small to support one.
+            {data?.computed_at && <> Computed {staleness(data.computed_at)}; refresh recalculates.</>}
           </p>
         </div>
       )}

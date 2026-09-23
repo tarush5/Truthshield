@@ -2,9 +2,11 @@ import React, { Suspense, lazy, useEffect, useState } from 'react';
 import {
   BrowserRouter as Router, Link, Navigate, Route, Routes, useLocation,
 } from 'react-router-dom';
-import { Command, Loader2, LogOut, Moon, ShieldCheck, Sun } from 'lucide-react';
+import { Moon, ShieldCheck, Sun } from 'lucide-react';
 
 import CommandPalette from './components/CommandPalette';
+import AppShell from './components/shell/AppShell';
+import { SkeletonCard, ToastProvider } from './components/ui';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Landing from './pages/Landing';
 
@@ -12,15 +14,28 @@ import Landing from './pages/Landing';
 // download the report and history code to read the landing page.
 const Analyze = lazy(() => import('./pages/Analyze'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-const SharedReport = lazy(() => import('./pages/SharedReport'));
-const Report = lazy(() => import('./pages/Report'));
 const History = lazy(() => import('./pages/History'));
 const Login = lazy(() => import('./pages/Login'));
+const Report = lazy(() => import('./pages/Report'));
+const SharedReport = lazy(() => import('./pages/SharedReport'));
 
-function Fallback() {
+/**
+ * A route that is still arriving.
+ *
+ * Skeletons in the shape of the page rather than a spinner: the layout is
+ * already known, so reserving it stops the content jumping into place when
+ * the chunk lands.
+ */
+function RouteFallback() {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center">
-      <Loader2 className="h-5 w-5 animate-spin text-brand" />
+    <div className="mx-auto max-w-5xl px-5 sm:px-8">
+      <div className="mb-7 space-y-3">
+        <div className="skeleton h-8 w-48" />
+        <div className="skeleton h-4 w-72" />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)}
+      </div>
     </div>
   );
 }
@@ -40,80 +55,62 @@ function useTheme() {
   return [theme, () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))];
 }
 
-function NavBar({ theme, toggleTheme, onOpenPalette }) {
-  const { user, signOut } = useAuth();
-  const { pathname } = useLocation();
-
-  const links = user
-    ? [
-        { to: '/analyze', label: 'Check' },
-        { to: '/history', label: 'History' },
-        { to: '/insights', label: 'Insights' },
-      ]
-    : [];
+/**
+ * The header for pages nobody is signed in to.
+ *
+ * Separate from the application shell on purpose: a navigation rail listing
+ * destinations a visitor cannot open is worse than no rail, and a shared
+ * report needs to read as a document rather than as somebody's dashboard.
+ */
+function PublicHeader({ theme, onToggleTheme }) {
+  const { isAuthenticated } = useAuth();
 
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-page/85 backdrop-blur-md">
-      <nav className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-5 sm:px-8">
-        <Link
-          to={user ? '/analyze' : '/'}
-          className="flex shrink-0 items-center gap-2.5 rounded-lg"
-        >
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand">
-            <ShieldCheck className="h-4 w-4 text-white" />
+    <header
+      className="sticky top-0 border-b border-line bg-page/85 backdrop-blur-md"
+      style={{ zIndex: 'var(--z-nav)' }}
+    >
+      <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
+        <Link to="/" className="focusable flex shrink-0 items-center gap-2.5 rounded-lg">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand shadow-sm">
+            <ShieldCheck className="h-4 w-4 text-white" aria-hidden="true" />
           </span>
-          <span className="text-[0.9375rem] font-bold tracking-tight text-ink">
-            TruthShield
-          </span>
+          <span className="text-[0.9375rem] font-bold tracking-tight text-ink">TruthShield</span>
         </Link>
 
-        <div className="flex items-center gap-1">
-          {links.map(({ to, label }) => (
-            <Link
-              key={to}
-              to={to}
-              aria-current={pathname === to ? 'page' : undefined}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                pathname === to
-                  ? 'bg-brand/12 text-brand'
-                  : 'text-ink-muted hover:bg-line/[0.06] hover:text-ink'
-              }`}
-            >
-              {label}
-            </Link>
-          ))}
-
-          {user && (
-            <button
-              onClick={onOpenPalette}
-              className="mr-1 hidden items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-2xs text-ink-muted transition-colors hover:text-ink sm:inline-flex"
-              aria-label="Open command palette"
-            >
-              <Command className="h-3 w-3" />
-              <span className="font-mono">K</span>
-            </button>
-          )}
-
+        <div className="flex items-center gap-1.5">
           <button
-            onClick={toggleTheme}
+            onClick={onToggleTheme}
             className="btn-ghost !p-2"
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
           >
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
-
-          {user ? (
-            <button onClick={signOut} className="btn-ghost !p-2" aria-label="Sign out">
-              <LogOut className="h-4 w-4" />
-            </button>
-          ) : (
-            <Link to="/login" className="btn-primary !px-4 !py-1.5 text-sm">
-              Sign in
-            </Link>
-          )}
+          <Link to={isAuthenticated ? '/analyze' : '/login'} className="btn-primary !px-4 !py-1.5 text-sm">
+            {isAuthenticated ? 'Open app' : 'Sign in'}
+          </Link>
         </div>
       </nav>
     </header>
+  );
+}
+
+function PublicLayout({ theme, onToggleTheme, wash = false, children }) {
+  return (
+    <div className="relative min-h-screen bg-page">
+      <div className="page-wash pointer-events-none fixed inset-0" aria-hidden="true" />
+      {wash && <div className="grid-wash pointer-events-none fixed inset-0" aria-hidden="true" />}
+
+      <div className="relative flex min-h-screen flex-col" style={{ zIndex: 1 }}>
+        <PublicHeader theme={theme} onToggleTheme={onToggleTheme} />
+        <main className="flex-1">{children}</main>
+        <footer className="border-t border-line py-6">
+          <div className="mx-auto max-w-6xl px-5 text-[0.6875rem] text-ink-muted sm:px-8">
+            Verdicts are automated and can be wrong. Check the sources before relying on one.
+          </div>
+        </footer>
+      </div>
+    </div>
   );
 }
 
@@ -123,15 +120,20 @@ function Protected({ children }) {
 
   // Wait for the session check before redirecting; otherwise a reload on a
   // protected page bounces to sign-in for a frame and back again.
-  if (checking) return <Fallback />;
+  if (checking) return <RouteFallback />;
   if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location }} />;
   return children;
 }
 
-function HomeRoute() {
+function HomeRoute({ theme, onToggleTheme }) {
   const { isAuthenticated, checking } = useAuth();
-  if (checking) return <Fallback />;
-  return isAuthenticated ? <Navigate to="/analyze" replace /> : <Landing />;
+  if (checking) return null;
+  if (isAuthenticated) return <Navigate to="/analyze" replace />;
+  return (
+    <PublicLayout theme={theme} onToggleTheme={onToggleTheme} wash>
+      <Landing />
+    </PublicLayout>
+  );
 }
 
 function Shell() {
@@ -139,9 +141,8 @@ function Shell() {
   const { isAuthenticated } = useAuth();
   const [theme, toggleTheme] = useTheme();
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const isLanding = pathname === '/';
 
-  // ⌘K / Ctrl+K anywhere. Bound on the window rather than a element so it
+  // ⌘K / Ctrl+K anywhere. Bound on the window rather than an element so it
   // works regardless of what has focus.
   useEffect(() => {
     if (!isAuthenticated) return undefined;
@@ -158,41 +159,40 @@ function Shell() {
   // Close on navigation, so a back gesture never leaves it stranded open.
   useEffect(() => { setPaletteOpen(false); }, [pathname]);
 
+  // A route change should start at the top. Without this, opening a report
+  // from halfway down the history list lands mid-page.
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+
+  const publicShell = (element, wash = false) => (
+    <PublicLayout theme={theme} onToggleTheme={toggleTheme} wash={wash}>
+      {element}
+    </PublicLayout>
+  );
+
+  const appShell = (element) => (
+    <AppShell theme={theme} onToggleTheme={toggleTheme} onOpenPalette={() => setPaletteOpen(true)}>
+      <Protected>{element}</Protected>
+    </AppShell>
+  );
+
   return (
-    <div className="relative min-h-screen bg-page">
-      {/* Ambient wash. Fixed and non-interactive; the grid only joins it on
-          the landing page, where there is enough empty space to carry it. */}
-      <div className="page-wash pointer-events-none fixed inset-0" aria-hidden="true" />
-      {isLanding && (
-        <div className="grid-wash pointer-events-none fixed inset-0" aria-hidden="true" />
-      )}
+    <>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/" element={<HomeRoute theme={theme} onToggleTheme={toggleTheme} />} />
+          <Route path="/login" element={publicShell(<Login />)} />
+          {/* Public by design: the whole point of a share link is that the
+              recipient does not have an account. */}
+          <Route path="/shared/:token" element={publicShell(<SharedReport />)} />
 
-      <div className="relative z-10 flex min-h-screen flex-col">
-        <NavBar theme={theme} toggleTheme={toggleTheme} onOpenPalette={() => setPaletteOpen(true)} />
-        <main className="flex-1 py-10 sm:py-14">
-          <Suspense fallback={<Fallback />}>
-            <Routes>
-              <Route path="/" element={<HomeRoute />} />
-              <Route path="/login" element={<Login />} />
-              {/* Public by design: the whole point of a share link is
-                  that the recipient does not have an account. */}
-              <Route path="/shared/:token" element={<SharedReport />} />
-              <Route path="/analyze" element={<Protected><Analyze /></Protected>} />
-              <Route path="/report/:id" element={<Protected><Report /></Protected>} />
-              <Route path="/history" element={<Protected><History /></Protected>} />
-              <Route path="/insights" element={<Protected><Dashboard /></Protected>} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </main>
+          <Route path="/analyze" element={appShell(<Analyze />)} />
+          <Route path="/report/:id" element={appShell(<Report />)} />
+          <Route path="/history" element={appShell(<History />)} />
+          <Route path="/insights" element={appShell(<Dashboard />)} />
 
-        <footer className="border-t border-line py-6">
-          <div className="mx-auto max-w-5xl px-5 text-2xs text-ink-muted sm:px-8">
-            Verdicts are automated and can be wrong. Check the sources before
-            relying on one.
-          </div>
-        </footer>
-      </div>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
 
       <CommandPalette
         open={paletteOpen}
@@ -200,7 +200,7 @@ function Shell() {
         onToggleTheme={toggleTheme}
         theme={theme}
       />
-    </div>
+    </>
   );
 }
 
@@ -208,7 +208,9 @@ export default function App() {
   return (
     <Router>
       <AuthProvider>
-        <Shell />
+        <ToastProvider>
+          <Shell />
+        </ToastProvider>
       </AuthProvider>
     </Router>
   );

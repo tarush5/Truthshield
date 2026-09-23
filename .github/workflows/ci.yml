@@ -65,7 +65,12 @@ jobs:
           alembic upgrade head
 
       - name: Tests
-        run: pytest tests_v2/ -q --maxfail=1
+        # The path matters: `pytest <missing-dir>/` exits 4 as a usage error,
+        # not 0, but it collects nothing -- a green-looking job that has
+        # never run a test. This pointed at `tests_v2/`, which does not
+        # exist. `--strict-markers` keeps a typo'd marker from doing the
+        # same thing more quietly.
+        run: pytest tests/ -q --maxfail=1 --strict-markers
 
   frontend:
     runs-on: ubuntu-latest

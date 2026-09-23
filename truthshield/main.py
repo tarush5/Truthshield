@@ -18,6 +18,11 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from truthshield.api.routes import analysis_router, auth_router, meta_router
+from truthshield.api.insights import claims_router, insights_router
+from truthshield.api.middleware import (
+    RequestContextMiddleware, SecurityHeadersMiddleware, current_request_id,
+)
+from truthshield.api.sharing import sharing_router
 from truthshield.api.stream import stream_router
 from truthshield.settings import get_settings
 
@@ -80,6 +85,14 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down")
 
 
+# Interactive docs are a development tool. In production they publish the
+# full request shape of every route, including the auth ones, to anyone who
+# asks -- a reconnaissance shortcut with no corresponding benefit once the
+# people who need the schema have it.
+_DOCS_URL = None if settings.APP_ENV.is_production else "/docs"
+_REDOC_URL = None if settings.APP_ENV.is_production else "/redoc"
+_OPENAPI_URL = None if settings.APP_ENV.is_production else "/openapi.json"
+
 app = FastAPI(
     title="TruthShield API",
     description=(
@@ -89,10 +102,20 @@ app = FastAPI(
     ),
     version="2.0.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=_DOCS_URL,
+    redoc_url=_REDOC_URL,
+    openapi_url=_OPENAPI_URL,
 )
 
+# Middleware runs bottom-up on the way in, so the request id is established
+# first and is therefore available to everything above it, including the
+# exception handler that has to report it.
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    https_only=settings.APP_ENV.is_production,
+    docs_paths=tuple(p for p in (_DOCS_URL, _REDOC_URL, _OPENAPI_URL) if p),
+)
+app.add_middleware(RequestContextMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 app.add_middleware(
     CORSMiddleware,
@@ -128,13 +151,27 @@ async def unhandled(request: Request, exc: Exception):
     The previous API returned exception text in `detail`, which described the
     token verification setup to anyone who sent a malformed token.
     """
-    logger.error("Unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
-    return JSONResponse(status_code=500, content={"detail": "Internal server error."})
+    request_id = current_request_id()
+    logger.error(
+        "Unhandled error on %s %s [%s]",
+        request.method, request.url.path, request_id, exc_info=exc,
+    )
+    # The id, and only the id. It is meaningless to an attacker and is the
+    # one thing that lets an operator find this exact failure in the logs
+    # when a user reports it.
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error.", "request_id": request_id},
+        headers={"X-Request-ID": request_id},
+    )
 
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(analysis_router, prefix="/api/v1")
 app.include_router(stream_router, prefix="/api/v1")
+app.include_router(insights_router, prefix="/api/v1")
+app.include_router(claims_router, prefix="/api/v1")
+app.include_router(sharing_router, prefix="/api/v1")
 app.include_router(meta_router, prefix="/api/v1")
 
 

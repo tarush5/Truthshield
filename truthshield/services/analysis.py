@@ -54,8 +54,48 @@ class AnalysisService:
             language=Language(language),
             progress=progress,
         )
+        self._augment(report)
         self._persist(report, user_id, org_id)
         return report
+
+    def _augment(self, report: AnalysisReport) -> None:
+        """
+        Attach prior adjudications and a grounded explanation.
+
+        Runs after the verdict is settled and cannot change it. Both halves
+        are best-effort and wrapped: the analysis is finished and persisted
+        whether or not a language model answered, and an exception here must
+        not lose a result the user already waited for.
+        """
+        claim_text = (report.original_text or "").strip()
+
+        if len(claim_text) >= 12:
+            try:
+                from truthshield.domain.rag import get_claim_memory
+
+                memory = get_claim_memory()
+                memory.refresh(self._session)
+                report.prior_claims = [
+                    prior.as_dict()
+                    for prior in memory.search(claim_text, top_k=4)
+                    # The report currently being written is in the index on a
+                    # re-analysis of the same text; showing a claim its own
+                    # prior self as corroboration would be circular.
+                    if prior.report_id != report.id
+                ]
+            except Exception:
+                logger.debug("Prior-claim lookup failed", exc_info=True)
+
+        try:
+            evidence = [ev for claim in report.claims for ev in claim.evidence]
+            if evidence and claim_text:
+                from truthshield.domain.rag import explain
+
+                grounded = explain(claim_text, evidence)
+                if grounded is not None:
+                    report.explanation = grounded.as_dict()
+        except Exception:
+            logger.debug("Grounded explanation failed", exc_info=True)
 
     def enqueue(
         self,

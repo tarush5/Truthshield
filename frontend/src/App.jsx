@@ -11,6 +11,8 @@ import Landing from './pages/Landing';
 // Everything behind auth is split out, so a signed-out visitor does not
 // download the report and history code to read the landing page.
 const Analyze = lazy(() => import('./pages/Analyze'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const SharedReport = lazy(() => import('./pages/SharedReport'));
 const Report = lazy(() => import('./pages/Report'));
 const History = lazy(() => import('./pages/History'));
 const Login = lazy(() => import('./pages/Login'));
@@ -43,7 +45,11 @@ function NavBar({ theme, toggleTheme, onOpenPalette }) {
   const { pathname } = useLocation();
 
   const links = user
-    ? [{ to: '/analyze', label: 'Check' }, { to: '/history', label: 'History' }]
+    ? [
+        { to: '/analyze', label: 'Check' },
+        { to: '/history', label: 'History' },
+        { to: '/insights', label: 'Insights' },
+      ]
     : [];
 
   return (
@@ -168,9 +174,13 @@ function Shell() {
             <Routes>
               <Route path="/" element={<HomeRoute />} />
               <Route path="/login" element={<Login />} />
+              {/* Public by design: the whole point of a share link is
+                  that the recipient does not have an account. */}
+              <Route path="/shared/:token" element={<SharedReport />} />
               <Route path="/analyze" element={<Protected><Analyze /></Protected>} />
               <Route path="/report/:id" element={<Protected><Report /></Protected>} />
               <Route path="/history" element={<Protected><History /></Protected>} />
+              <Route path="/insights" element={<Protected><Dashboard /></Protected>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>

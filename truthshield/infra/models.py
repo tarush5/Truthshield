@@ -128,6 +128,16 @@ class Report(Base, TimestampMixin):
     processing_time_seconds = Column(Float, nullable=False, default=0.0)
     error = Column(Text, nullable=True)
 
+    # Public sharing, opt-in per report and revocable.
+    #
+    # A report is private to its owner by default. Sharing mints an
+    # unguessable token; revoking clears it, and the link stops working for
+    # everyone immediately because the lookup is by this column. Nullable and
+    # unique together mean any number of unshared reports coexist -- SQL
+    # treats NULLs as distinct in a unique index.
+    share_token = Column(String(64), nullable=True, unique=True, index=True)
+    shared_at = Column(DateTime(timezone=True), nullable=True)
+
     user = relationship("User", back_populates="reports")
     evidence = relationship("Evidence", back_populates="report", cascade="all, delete-orphan")
     feedback = relationship("Feedback", back_populates="report", cascade="all, delete-orphan")

@@ -110,6 +110,46 @@ class TestConfigurationFailsClosed:
                      DATABASE_URL="postgresql://u:p@localhost/db")
         assert "CORS_ORIGINS" in str(exc.value)
 
+    def test_production_gets_exactly_the_configured_origins(self):
+        """
+        The development convenience below must not follow the app into
+        production. Nothing may be allowed that was not configured.
+        """
+        from truthshield.settings import Settings
+        settings = Settings(
+            APP_ENV="production", JWT_SECRET_KEY="x" * 48,
+            CORS_ORIGINS="https://app.example.com",
+            DATABASE_URL="postgresql://u:p@localhost/db",
+        )
+        assert settings.cors_origins == ["https://app.example.com"]
+
+    def test_development_allows_the_ports_vite_actually_uses(self):
+        """
+        Vite takes the next free port when 5173 is busy, so a second
+        `npm run dev` served a frontend whose every request failed CORS
+        preflight -- surfacing to the user as "login failed" and naming
+        nothing. Development allows the fallback ports on both hostnames;
+        `localhost` and `127.0.0.1` are distinct origins to a browser.
+        """
+        from truthshield.settings import Settings
+        origins = Settings(
+            APP_ENV="development", JWT_SECRET_KEY="x" * 48,
+            DATABASE_URL="sqlite:///./dev.db",
+        ).cors_origins
+
+        for port in (5173, 5174, 5175):
+            assert f"http://localhost:{port}" in origins
+            assert f"http://127.0.0.1:{port}" in origins
+
+    def test_the_configured_origin_is_never_dropped_in_development(self):
+        from truthshield.settings import Settings
+        origins = Settings(
+            APP_ENV="development", JWT_SECRET_KEY="x" * 48,
+            CORS_ORIGINS="https://staging.example.com",
+            DATABASE_URL="sqlite:///./dev.db",
+        ).cors_origins
+        assert origins[0] == "https://staging.example.com"
+
 
 class TestTokenVerification:
     def test_asymmetric_algorithms_are_rejected_not_trusted(self):

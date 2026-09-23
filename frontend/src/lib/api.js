@@ -143,6 +143,27 @@ export const api = {
 
   stats: () => request('/stats'),
   health: () => request('/health'),
+
+  // Analytics. The dashboard takes `overview` rather than the four panel
+  // endpoints, so its panels cannot end up computed against different
+  // windows when a request straddles midnight.
+  insights: (days = 30, { fresh = false } = {}) =>
+    request(`/insights/overview?days=${days}${fresh ? '&fresh=true' : ''}`),
+  sources: (days = 30, limit = 15) =>
+    request(`/insights/sources?days=${days}&limit=${limit}`),
+
+  // Prior adjudications resembling a claim. Context shown beside a fresh
+  // verdict, never in place of one.
+  similarClaims: (q, limit = 5) =>
+    request(`/claims/similar?q=${encodeURIComponent(q)}&limit=${limit}`),
+
+  // Sharing. Minting is idempotent; revoking kills every copy of the link
+  // at once, and re-sharing afterwards returns a different token.
+  share: (reportId) => request(`/reports/${reportId}/share`, { method: 'POST' }),
+  unshare: (reportId) => request(`/reports/${reportId}/share`, { method: 'DELETE' }),
+
+  // Public: no Authorization header is sent, and none is needed.
+  sharedReport: (token) => request(`/shared/${encodeURIComponent(token)}`),
 };
 
 /**

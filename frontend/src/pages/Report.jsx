@@ -6,6 +6,9 @@ import {
 } from 'lucide-react';
 
 import EvidenceSpectrum from '../components/EvidenceSpectrum';
+import GroundedExplanation from '../components/GroundedExplanation';
+import PriorClaims from '../components/PriorClaims';
+import ShareControl from '../components/ShareControl';
 import TrustGauge from '../components/TrustGauge';
 import { api, ApiError } from '../lib/api';
 import {
@@ -114,8 +117,23 @@ export default function Report() {
         </div>
       </section>
 
+      {/* ── What the sources say ────────────────────────────
+          Below the verdict and after the limitations, because it explains
+          a ruling rather than making one. Absent unless a model is
+          configured and its citations resolved. */}
+      <GroundedExplanation
+        explanation={report.explanation}
+        evidence={report.claims?.flatMap((c) => c.evidence ?? []) ?? []}
+      />
+
       {/* ── Limitations ─────────────────────────────────────── */}
       {report.limitations?.length > 0 && <Limitations items={report.limitations} />}
+
+      {/* ── Previously checked ──────────────────────────────── */}
+      <PriorClaims claims={report.prior_claims ?? []} />
+
+      {/* ── Sharing ─────────────────────────────────────────── */}
+      <ShareControl reportId={report.id} />
 
       {/* ── Score components ────────────────────────────────── */}
       <Breakdown breakdown={report.breakdown} />

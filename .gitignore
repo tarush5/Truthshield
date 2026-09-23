@@ -125,3 +125,8 @@ venv/
 *.db
 truthshield_*.db
 .pytest_cache/
+
+# Scratch space for measurement scripts, seeded corpora and throwaway
+# databases. Everything here is reproducible and none of it belongs in the
+# repository.
+.lab/

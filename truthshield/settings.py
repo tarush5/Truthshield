@@ -39,6 +39,12 @@ PLACEHOLDER_SECRETS = {
     "your_jwt_secret",
 }
 
+# Vite's default port and the ones it falls back to when that is taken. Only
+# ever added outside production -- see `Settings.cors_origins`. Without this,
+# running a second dev server silently produces a frontend whose every
+# request fails preflight, reported to the user as "login failed".
+DEV_SERVER_PORTS = (5173, 5174, 5175, 5176, 3000, 4173)
+
 
 class Environment(str, Enum):
     DEVELOPMENT = "development"
@@ -77,6 +83,12 @@ class Settings(BaseSettings):
     # Comma-separated exact origins. No wildcard: the API is called with
     # Authorization headers and credentials, which browsers refuse to combine
     # with "*" anyway.
+    #
+    # Outside production this list is widened to the local dev-server port
+    # range -- see `cors_origins`. Vite takes the next free port when 5173 is
+    # busy, and a second `npm run dev` therefore serves a frontend that every
+    # request fails from, with a CORS preflight rejection that surfaces as
+    # "login failed" and names nothing.
     CORS_ORIGINS: str = "http://localhost:5173"
 
     RATE_LIMIT: str = "60/minute"
@@ -131,7 +143,27 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> List[str]:
-        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        """
+        Exact allowed origins.
+
+        In development the configured list is extended with the ports Vite
+        actually uses, on both hostnames: it falls back from 5173 when that
+        port is taken, and `localhost` and `127.0.0.1` are different origins
+        to a browser even though they are the same host to everything else.
+
+        Production gets exactly what was configured and nothing more.
+        """
+        origins = [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        if self.APP_ENV.is_production:
+            return origins
+
+        extra = [
+            f"http://{host}:{port}"
+            for port in DEV_SERVER_PORTS
+            for host in ("localhost", "127.0.0.1")
+        ]
+        seen = set(origins)
+        return origins + [o for o in extra if o not in seen]
 
     @property
     def max_upload_bytes(self) -> int:

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -199,6 +199,21 @@ class AnalysisReport(BaseModel):
     summary: str = ""
     reasons: List[str] = Field(default_factory=list)
     limitations: List[str] = Field(default_factory=list)
+
+    # Retrieval-augmented additions. Both default to empty and every consumer
+    # treats them that way, because both are off unless configured: the
+    # explanation needs an API key and the prior claims need a corpus.
+    #
+    # `prior_claims` sits beside the verdict rather than replacing it. A claim
+    # we ruled on last week is context for the reader, not an answer to serve
+    # in place of today's -- see `domain.rag.store`.
+    prior_claims: List[Dict[str, Any]] = Field(default_factory=list)
+
+    # A short explanation written from the retrieved sources, with its
+    # citations already verified against them. None means no key, no usable
+    # sources, or an answer that could not be grounded -- all normal, and all
+    # handled by falling back to `reasons`.
+    explanation: Optional[Dict[str, Any]] = None
 
     processing_time_seconds: float = 0.0
     created_at: datetime = Field(default_factory=_utcnow)

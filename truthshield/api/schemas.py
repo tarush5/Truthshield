@@ -160,6 +160,12 @@ class ReportOut(BaseModel):
     claims: List[ClaimOut]
     detectors: List[DetectorOut]
 
+    # Retrieval-augmented, and both empty unless configured. Always present
+    # in the response rather than conditionally included, so a client renders
+    # an absence instead of branching on a missing key.
+    prior_claims: List[Dict[str, Any]] = []
+    explanation: Optional[Dict[str, Any]] = None
+
     processing_time_seconds: float
     created_at: datetime
 
@@ -189,8 +195,72 @@ class ReportOut(BaseModel):
                 )
                 for d in report.detectors
             ],
+            prior_claims=report.prior_claims,
+            explanation=report.explanation,
             processing_time_seconds=report.processing_time_seconds,
             created_at=report.created_at,
+        )
+
+
+class SharedReportOut(BaseModel):
+    """
+    A report as a stranger holding the link sees it.
+
+    Deliberately narrower than `ReportOut`. It carries the finding and the
+    evidence behind it, and drops everything that identifies the account
+    that ran it -- including the report id, which would otherwise let a
+    holder of a public link go probing the authenticated routes with it.
+    """
+
+    content_type: ContentType
+    language: Language
+    original_text: Optional[str]
+    source_url: Optional[str]
+
+    verdict: Verdict
+    trust_score: int
+    fake_probability: int
+    confidence_band: ConfidenceBand
+    breakdown: Dict[str, float]
+
+    summary: str
+    reasons: List[str]
+    limitations: List[str]
+
+    claims: List[ClaimOut]
+    detectors: List[DetectorOut]
+    explanation: Optional[Dict[str, Any]] = None
+
+    created_at: datetime
+    shared_at: Optional[datetime] = None
+
+    @classmethod
+    def of(cls, report: AnalysisReport, *, shared_at=None) -> "SharedReportOut":
+        return cls(
+            content_type=report.content_type,
+            language=report.language,
+            original_text=report.original_text,
+            source_url=report.source_url,
+            verdict=report.verdict,
+            trust_score=report.trust_score,
+            fake_probability=report.fake_probability,
+            confidence_band=report.confidence_band,
+            breakdown=report.breakdown.model_dump(),
+            summary=report.summary,
+            reasons=report.reasons,
+            limitations=report.limitations,
+            claims=[ClaimOut.of(c) for c in report.claims],
+            detectors=[
+                DetectorOut(
+                    name=d.name, status=d.status.value, score=d.score,
+                    method=d.method, detail=d.detail,
+                    counted_toward_score=d.counts_toward_scoring,
+                )
+                for d in report.detectors
+            ],
+            explanation=report.explanation,
+            created_at=report.created_at,
+            shared_at=shared_at,
         )
 
 

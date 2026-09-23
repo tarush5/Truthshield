@@ -20,7 +20,7 @@ export default defineConfig({
     proxy: {
       // Dev-only convenience so the app can be opened on localhost:5173 and
       // still reach the API without a CORS round trip.
-      '/api': { target: 'http://127.0.0.1:8100', changeOrigin: true },
+      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
     },
   },
 });

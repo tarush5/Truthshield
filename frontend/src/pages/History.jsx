@@ -29,7 +29,7 @@ export default function History() {
   if (!reports) {
     return (
       <Centered>
-        <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
+        <Loader2 className="h-6 w-6 animate-spin text-brand" />
       </Centered>
     );
   }

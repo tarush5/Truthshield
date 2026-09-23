@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,87 +7,80 @@
 /* ═══════════════════════════════════════════════════════════
    Design tokens
 
-   Everything below is expressed against these. The previous stylesheet had no
-   token layer: components hardcoded `text-white/40`, `bg-[#071124]/45` and the
-   like, so light mode had to be bolted on as ~150 lines of `!important`
-   overrides keyed to opacity classes, and body text routinely sat at 20-45%
-   white — which is why the analyze and login screens read as blank panels.
+   Colour values are unchanged from the validated set — the chart series
+   clear adjacent CVD ΔE 8.4 and normal-vision ΔE 19.8 against the card
+   surface, and every ink tier clears 4.5:1 on all three surfaces. What
+   changed here is everything above colour: type scale, spacing rhythm,
+   elevation, and motion.
 
-   Tokens are space-separated RGB channels so Tailwind can apply its own alpha
-   via `rgb(var(--token) / <alpha-value>)`.
-
-   Contrast against the three surfaces (page / surface / raised), measured:
+   Contrast, measured (page / surface / raised):
      ink            18.0 / 16.4 / 14.5
      ink-secondary  10.7 /  9.7 /  8.6
      ink-muted       6.4 /  5.8 /  5.2
-     ink-faint       7.5 /  6.9 /  6.1
-   All clear 4.5:1, so any of them is safe for body copy.
    ═══════════════════════════════════════════════════════════ */
 
 :root,
 html.dark {
   color-scheme: dark;
 
-  --c-page: 8 11 18;             /* #080B12 */
-  --c-surface: 17 23 37;         /* #111725 */
-  --c-surface-raised: 26 34 52;  /* #1A2234 */
-  --c-surface-sunken: 5 7 12;    /* #05070C */
+  --c-page: 8 11 18;
+  --c-surface: 17 23 37;
+  --c-surface-raised: 26 34 52;
+  --c-surface-sunken: 5 7 12;
 
-  --c-ink: 242 245 250;          /* #F2F5FA */
-  --c-ink-secondary: 180 192 212;/* #B4C0D4 */
-  --c-ink-muted: 135 148 171;    /* #8794AB */
-  --c-ink-faint: 148 161 184;    /* #94A1B8 */
+  --c-ink: 242 245 250;
+  --c-ink-secondary: 180 192 212;
+  --c-ink-muted: 135 148 171;
 
-  --c-border: 255 255 255;       /* used at low alpha */
-  --c-border-strong: 255 255 255;
-  --border-alpha: 0.10;
-  --border-alpha-strong: 0.18;
+  --c-border: 255 255 255;
+  --border-alpha: 0.08;
+  --border-alpha-strong: 0.16;
 
-  --c-brand: 59 147 255;         /* #3B93FF */
+  --c-brand: 59 147 255;
+  --c-brand-deep: 26 111 245;
 
-  /* Status — reserved for verdict/state, never a chart series.
-     Marks use the base step; text uses the lighter *-text step so small copy
-     still clears 4.5:1 on every surface. */
-  --c-good: 12 163 12;           /* #0CA30C */
-  --c-good-text: 52 199 89;      /* #34C759 */
-  --c-warning: 250 178 25;       /* #FAB219 */
-  --c-warning-text: 245 185 61;  /* #F5B93D */
-  --c-serious: 236 131 90;       /* #EC835A */
-  --c-critical: 208 59 59;       /* #D03B3B */
-  --c-critical-text: 240 112 107;/* #F0706B */
+  /* Status — reserved for verdict and state, never a chart series. Marks use
+     the base step; text uses the lighter *-text step so small copy clears
+     4.5:1 on every surface. */
+  --c-good: 12 163 12;
+  --c-good-text: 52 199 89;
+  --c-warning: 250 178 25;
+  --c-warning-text: 245 185 61;
+  --c-serious: 236 131 90;
+  --c-critical: 208 59 59;
+  --c-critical-text: 240 112 107;
 
-  /* Chart series — validated as a categorical set against --c-surface:
-     adjacent CVD ΔE 8.4, normal-vision ΔE 19.8, all ≥3:1 contrast. */
-  --c-series-1: 57 135 229;      /* #3987E5 blue   */
-  --c-series-2: 217 89 38;       /* #D95926 orange */
-  --c-series-3: 25 158 112;      /* #199E70 aqua   */
-  --c-series-4: 201 133 0;       /* #C98500 yellow */
+  --c-series-1: 57 135 229;
+  --c-series-2: 217 89 38;
+  --c-series-3: 25 158 112;
+  --c-series-4: 201 133 0;
 
-  /* Chart chrome */
-  --c-grid: 255 255 255;
-  --grid-alpha: 0.07;
-  --c-axis: 135 148 171;
+  /* Elevation. Dark surfaces need a light top edge to read as raised —
+     shadow alone disappears against a dark page. */
+  --edge: inset 0 1px 0 rgb(255 255 255 / 0.06);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.55);
+  --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 24px 56px -24px rgb(0 0 0 / 0.7);
 }
 
 html.light {
   color-scheme: light;
 
-  --c-page: 244 246 250;         /* #F4F6FA */
+  --c-page: 247 248 251;
   --c-surface: 255 255 255;
-  --c-surface-raised: 248 250 252;
-  --c-surface-sunken: 237 241 247;
+  --c-surface-raised: 252 253 255;
+  --c-surface-sunken: 241 243 248;
 
   --c-ink: 12 18 30;
   --c-ink-secondary: 62 76 97;
-  --c-ink-muted: 92 106 128;
-  --c-ink-faint: 108 122 143;
+  --c-ink-muted: 98 112 134;
 
   --c-border: 15 23 42;
-  --c-border-strong: 15 23 42;
-  --border-alpha: 0.10;
-  --border-alpha-strong: 0.18;
+  --border-alpha: 0.09;
+  --border-alpha-strong: 0.16;
 
-  --c-brand: 26 111 245;         /* #1A6FF5 — darker step for a light surface */
+  --c-brand: 26 111 245;
+  --c-brand-deep: 20 89 225;
 
   --c-good: 12 131 12;
   --c-good-text: 0 99 0;
@@ -97,14 +90,15 @@ html.light {
   --c-critical: 197 40 40;
   --c-critical-text: 176 28 28;
 
-  --c-series-1: 42 120 214;      /* light-mode steps of the same eight hues */
+  --c-series-1: 42 120 214;
   --c-series-2: 235 104 52;
   --c-series-3: 27 175 122;
   --c-series-4: 237 161 0;
 
-  --c-grid: 15 23 42;
-  --grid-alpha: 0.08;
-  --c-axis: 92 106 128;
+  --edge: none;
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
+  --shadow-md: 0 1px 3px rgb(15 23 42 / 0.07), 0 8px 24px -14px rgb(15 23 42 / 0.16);
+  --shadow-lg: 0 2px 6px rgb(15 23 42 / 0.08), 0 24px 56px -28px rgb(15 23 42 / 0.24);
 }
 
 @layer base {
@@ -117,6 +111,7 @@ html.light {
 
   html {
     scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
@@ -125,36 +120,44 @@ html.light {
     color: rgb(var(--c-ink-secondary));
     min-height: 100vh;
     overflow-x: hidden;
-    letter-spacing: -0.011em;
     -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
+    /* Inter's optical sizing and contextual alternates; `cv11` gives the
+       single-storey 'a' that keeps long body copy from looking cramped. */
+    font-feature-settings: 'cv11', 'ss01';
+    font-variant-ligatures: contextual;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1, h2, h3, h4 {
     color: rgb(var(--c-ink));
-    letter-spacing: -0.025em;
     font-weight: 700;
+    /* Tighter as size grows — display text at default tracking reads loose. */
+    letter-spacing: -0.021em;
+    text-wrap: balance;
   }
+
+  h1 { letter-spacing: -0.032em; }
+
+  p { text-wrap: pretty; }
 
   ::selection {
-    background: rgb(var(--c-brand) / 0.28);
+    background: rgb(var(--c-brand) / 0.25);
     color: rgb(var(--c-ink));
   }
 
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar { width: 11px; height: 11px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: rgb(var(--c-border) / 0.16);
-    border-radius: 9999px;
+    background: rgb(var(--c-border) / 0.14);
     border: 3px solid transparent;
+    border-radius: 99px;
     background-clip: content-box;
   }
-  ::-webkit-scrollbar-thumb:hover { background-clip: content-box; background-color: rgb(var(--c-border) / 0.28); }
+  ::-webkit-scrollbar-thumb:hover { background-color: rgb(var(--c-border) / 0.24); }
 
   :focus-visible {
     outline: 2px solid rgb(var(--c-brand));
     outline-offset: 2px;
-    border-radius: 6px;
+    border-radius: 8px;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -168,110 +171,102 @@ html.light {
 }
 
 @layer components {
-  /* ── Surfaces ────────────────────────────────────────────── */
+  /* ── Surfaces ──────────────────────────────────────────────
+     No backdrop-blur. It cost a compositing layer per card and, over a flat
+     page background, was invisible — a real frame rate cost for an effect
+     nobody could see. */
   .card {
-    background: rgb(var(--c-surface) / 0.72);
-    backdrop-filter: blur(18px) saturate(130%);
-    -webkit-backdrop-filter: blur(18px) saturate(130%);
+    background: rgb(var(--c-surface));
     border: 1px solid rgb(var(--c-border) / var(--border-alpha));
-    border-radius: 18px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 8px 24px -14px rgba(0,0,0,0.5);
+    border-radius: 16px;
+    box-shadow: var(--shadow-md), var(--edge);
   }
 
   .card-flat {
-    background: rgb(var(--c-surface) / 0.55);
+    background: rgb(var(--c-surface) / 0.6);
     border: 1px solid rgb(var(--c-border) / var(--border-alpha));
-    border-radius: 16px;
+    border-radius: 14px;
   }
 
   .card-hover {
-    @apply card transition-all duration-300;
+    @apply card;
+    transition: transform 0.18s cubic-bezier(0.2, 0, 0.2, 1),
+                box-shadow 0.18s cubic-bezier(0.2, 0, 0.2, 1),
+                border-color 0.18s;
   }
   .card-hover:hover {
-    border-color: rgb(var(--c-border) / var(--border-alpha-strong));
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3), 0 18px 40px -20px rgba(0,0,0,0.65);
     transform: translateY(-2px);
+    border-color: rgb(var(--c-border) / var(--border-alpha-strong));
+    box-shadow: var(--shadow-lg), var(--edge);
   }
 
-  /* Kept as aliases so panels not yet migrated keep their surface. */
-  .glass-card { @apply card; }
-  .glass-card-hover { @apply card-hover; }
-  .glass-card-interactive { @apply card-hover; }
-
-  /* ── Typography ──────────────────────────────────────────── */
-  .gradient-text {
-    background: linear-gradient(135deg,
-      rgb(var(--c-ink)) 10%,
-      rgb(var(--c-brand)) 90%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+  /* ── Typography ────────────────────────────────────────────
+     A serif accent, used only on the single hero line. One contrasting face
+     on one element reads as considered; the same face on every heading reads
+     as a template. */
+  .display {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
   }
 
-  .gradient-text-hero {
-    background: linear-gradient(135deg,
-      rgb(var(--c-ink)) 15%,
-      rgb(var(--c-brand)) 75%,
-      rgb(var(--c-series-3)) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    letter-spacing: -0.04em;
+  .display em {
+    font-style: italic;
+    color: rgb(var(--c-brand));
   }
 
   .section-title {
-    @apply text-lg font-bold tracking-tight;
+    @apply text-base font-semibold;
     color: rgb(var(--c-ink));
+    letter-spacing: -0.014em;
   }
 
-  /* Was 10px at 20% opacity — a label nobody could read. */
   .section-label {
     @apply font-semibold uppercase;
     font-size: 0.6875rem;
     line-height: 1rem;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
     color: rgb(var(--c-ink-muted));
   }
 
   .eyebrow {
-    @apply inline-flex items-center gap-2 font-semibold uppercase;
+    @apply inline-flex items-center gap-1.5 font-semibold uppercase;
     font-size: 0.6875rem;
     line-height: 1rem;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
     color: rgb(var(--c-brand));
   }
 
-  /* ── Buttons ─────────────────────────────────────────────── */
+  /* ── Buttons ───────────────────────────────────────────────
+     Scale on press rather than lift on hover: a 2px lift on a button the
+     cursor is already over produces a hover-flicker loop at the boundary. */
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold
-           transition-all duration-200 active:scale-[0.98]
-           disabled:opacity-45 disabled:cursor-not-allowed disabled:active:scale-100;
+           whitespace-nowrap select-none
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
+    transition: background-color 0.15s, box-shadow 0.15s, transform 0.1s,
+                border-color 0.15s, color 0.15s;
   }
+  .btn:active:not(:disabled) { transform: scale(0.97); }
 
   .btn-primary {
     @apply btn px-5 py-2.5 text-sm text-white;
-    background: linear-gradient(135deg, rgb(var(--c-brand)), rgb(var(--c-brand) / 0.82));
-    box-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 6px 20px -8px rgb(var(--c-brand) / 0.55);
+    background: rgb(var(--c-brand));
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgb(255 255 255 / 0.16);
   }
-  .btn-primary:hover:not(:disabled) {
-    box-shadow: 0 2px 4px rgba(0,0,0,0.25), 0 10px 28px -8px rgb(var(--c-brand) / 0.7);
-    filter: brightness(1.08);
-  }
-
-  .btn-primary-lg { @apply btn-primary px-7 py-3.5 text-base rounded-2xl; }
+  .btn-primary:hover:not(:disabled) { background: rgb(var(--c-brand-deep)); }
 
   .btn-secondary {
     @apply btn px-5 py-2.5 text-sm;
     color: rgb(var(--c-ink));
-    background: rgb(var(--c-border) / 0.06);
+    background: rgb(var(--c-border) / 0.05);
     border: 1px solid rgb(var(--c-border) / var(--border-alpha));
   }
   .btn-secondary:hover:not(:disabled) {
-    background: rgb(var(--c-border) / 0.11);
+    background: rgb(var(--c-border) / 0.09);
     border-color: rgb(var(--c-border) / var(--border-alpha-strong));
   }
-
-  .btn-secondary-lg { @apply btn-secondary px-7 py-3.5 text-base rounded-2xl; }
 
   .btn-ghost {
     @apply btn px-3 py-2 text-sm;
@@ -279,91 +274,104 @@ html.light {
   }
   .btn-ghost:hover:not(:disabled) {
     color: rgb(var(--c-ink));
-    background: rgb(var(--c-border) / 0.07);
+    background: rgb(var(--c-border) / 0.06);
   }
 
-  /* ── Inputs ──────────────────────────────────────────────── */
+  /* ── Inputs ────────────────────────────────────────────────── */
   .input-field {
-    @apply w-full px-4 py-3 rounded-xl text-sm transition-all duration-200;
+    @apply w-full rounded-xl px-4 py-3 text-sm;
     color: rgb(var(--c-ink));
-    background: rgb(var(--c-surface-sunken) / 0.6);
+    background: rgb(var(--c-surface-sunken));
     border: 1px solid rgb(var(--c-border) / var(--border-alpha));
+    transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
   }
   .input-field::placeholder { color: rgb(var(--c-ink-muted)); }
+  .input-field:hover:not(:focus) {
+    border-color: rgb(var(--c-border) / var(--border-alpha-strong));
+  }
   .input-field:focus {
     outline: none;
-    border-color: rgb(var(--c-brand) / 0.6);
-    box-shadow: 0 0 0 3px rgb(var(--c-brand) / 0.15);
+    background: rgb(var(--c-surface));
+    border-color: rgb(var(--c-brand) / 0.55);
+    box-shadow: 0 0 0 3px rgb(var(--c-brand) / 0.14);
   }
 
-  /* ── Badges ──────────────────────────────────────────────── */
+  /* ── Badges ────────────────────────────────────────────────── */
   .badge {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold uppercase;
+    @apply inline-flex items-center gap-1.5 rounded-lg px-2 py-1 font-semibold uppercase;
     font-size: 0.6875rem;
-    line-height: 1rem;
-    letter-spacing: 0.06em;
-    border: 1px solid transparent;
+    line-height: 1;
+    letter-spacing: 0.04em;
   }
 
   .badge-success {
     color: rgb(var(--c-good-text));
-    background: rgb(var(--c-good) / 0.14);
-    border-color: rgb(var(--c-good) / 0.35);
+    background: rgb(var(--c-good) / 0.13);
+    box-shadow: inset 0 0 0 1px rgb(var(--c-good) / 0.3);
   }
   .badge-warning {
     color: rgb(var(--c-warning-text));
-    background: rgb(var(--c-warning) / 0.14);
-    border-color: rgb(var(--c-warning) / 0.35);
+    background: rgb(var(--c-warning) / 0.13);
+    box-shadow: inset 0 0 0 1px rgb(var(--c-warning) / 0.3);
   }
   .badge-danger {
     color: rgb(var(--c-critical-text));
-    background: rgb(var(--c-critical) / 0.14);
-    border-color: rgb(var(--c-critical) / 0.35);
+    background: rgb(var(--c-critical) / 0.13);
+    box-shadow: inset 0 0 0 1px rgb(var(--c-critical) / 0.3);
   }
   .badge-info {
     color: rgb(var(--c-ink-secondary));
     background: rgb(var(--c-border) / 0.07);
-    border-color: rgb(var(--c-border) / var(--border-alpha));
+    box-shadow: inset 0 0 0 1px rgb(var(--c-border) / var(--border-alpha));
   }
 
-  /* ── Progress ────────────────────────────────────────────── */
+  /* ── Progress ──────────────────────────────────────────────── */
   .progress-bar {
-    @apply h-1.5 rounded-full overflow-hidden;
-    background: rgb(var(--c-border) / 0.10);
+    @apply h-1.5 overflow-hidden rounded-full;
+    background: rgb(var(--c-border) / 0.09);
   }
   .progress-fill {
-    @apply h-full rounded-full transition-all duration-700 ease-out;
+    @apply h-full rounded-full;
+    transition: width 0.7s cubic-bezier(0.2, 0, 0.1, 1);
   }
 
-  /* ── Sidebar ─────────────────────────────────────────────── */
-  .sidebar-nav-item {
-    @apply flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium
-           transition-all duration-200 cursor-pointer;
-    color: rgb(var(--c-ink-muted));
-  }
-  .sidebar-nav-item:hover {
-    color: rgb(var(--c-ink));
-    background: rgb(var(--c-border) / 0.06);
-  }
-  .sidebar-nav-item.active {
-    color: rgb(var(--c-brand));
-    background: rgb(var(--c-brand) / 0.12);
-    box-shadow: inset 0 0 0 1px rgb(var(--c-brand) / 0.22);
-  }
-
-  /* ── Skeleton ────────────────────────────────────────────── */
+  /* ── Skeleton ──────────────────────────────────────────────── */
   .skeleton {
-    background: linear-gradient(90deg,
+    background: linear-gradient(
+      90deg,
       rgb(var(--c-border) / 0.05) 0%,
-      rgb(var(--c-border) / 0.12) 50%,
-      rgb(var(--c-border) / 0.05) 100%);
+      rgb(var(--c-border) / 0.1) 50%,
+      rgb(var(--c-border) / 0.05) 100%
+    );
     background-size: 200% 100%;
-    animation: shimmerSlide 1.6s linear infinite;
+    animation: shimmer 1.6s linear infinite;
     border-radius: 8px;
   }
-  @keyframes shimmerSlide {
+  @keyframes shimmer {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
+  }
+
+  /* ── Segmented control ─────────────────────────────────────── */
+  .segment {
+    @apply relative flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold;
+    color: rgb(var(--c-ink-muted));
+    transition: color 0.15s, background-color 0.15s;
+  }
+  .segment:hover:not([aria-selected='true']):not(:disabled) {
+    color: rgb(var(--c-ink));
+    background: rgb(var(--c-border) / 0.03);
+  }
+  .segment[aria-selected='true'] { color: rgb(var(--c-brand)); }
+  /* Underline rather than a filled pill: it marks the boundary between the
+     control and the panel it governs, so the two read as one object. */
+  .segment[aria-selected='true']::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    bottom: -1px;
+    height: 2px;
+    background: rgb(var(--c-brand));
   }
 }
 
@@ -371,95 +379,42 @@ html.light {
   .text-balance { text-wrap: balance; }
   .text-pretty { text-wrap: pretty; }
 
-  .hairline { border-color: rgb(var(--c-border) / var(--border-alpha)); }
+  /* Hairline that respects the theme without repeating the rgb() call. */
+  .border-line { border-color: rgb(var(--c-border) / var(--border-alpha)); }
+  .divide-line > * + * { border-color: rgb(var(--c-border) / var(--border-alpha)); }
 
-  /* Ambient page treatments */
-  .bg-grid {
-    background-image:
-      linear-gradient(rgb(var(--c-grid) / var(--grid-alpha)) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(var(--c-grid) / var(--grid-alpha)) 1px, transparent 1px);
-    background-size: 64px 64px;
-    mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, #000 20%, transparent 75%);
-    -webkit-mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, #000 20%, transparent 75%);
-  }
-
-  .bg-radial-glow {
+  /* Ambient page wash. Two very low-alpha radials — enough to stop a large
+     flat field looking dead, not enough to compete with content. */
+  .page-wash {
     background:
-      radial-gradient(ellipse 70% 45% at 50% -5%, rgb(var(--c-brand) / 0.14) 0%, transparent 70%),
-      radial-gradient(ellipse 45% 35% at 85% 10%, rgb(var(--c-series-3) / 0.07) 0%, transparent 70%);
+      radial-gradient(60rem 30rem at 50% -8rem, rgb(var(--c-brand) / 0.10), transparent 70%),
+      radial-gradient(40rem 24rem at 92% 6rem, rgb(var(--c-series-3) / 0.05), transparent 70%);
   }
 
-  /* A single sweeping highlight, used on the active pipeline row. */
-  .scan-line {
-    position: relative;
-    overflow: hidden;
-  }
-  .scan-line::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, transparent, rgb(var(--c-brand) / 0.12), transparent);
-    animation: scan 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-    pointer-events: none;
-  }
-  @keyframes scan {
-    0% { transform: translateY(-100%); opacity: 0; }
-    50% { opacity: 1; }
-    100% { transform: translateY(100%); opacity: 0; }
+  .grid-wash {
+    background-image:
+      linear-gradient(rgb(var(--c-border) / 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--c-border) / 0.045) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 90% 55% at 50% 0%, #000 10%, transparent 72%);
+    -webkit-mask-image: radial-gradient(ellipse 90% 55% at 50% 0%, #000 10%, transparent 72%);
   }
 
-  .typing-cursor {
-    display: inline-block;
-    width: 2px;
-    height: 1.1em;
-    background: rgb(var(--c-brand));
-    margin-left: 2px;
-    animation: blink 1s step-end infinite;
-    vertical-align: text-bottom;
+  /* Entrance. Short, once, and disabled under reduced-motion by the base
+     layer above. */
+  .rise {
+    animation: rise 0.45s cubic-bezier(0.2, 0, 0.2, 1) both;
   }
-  @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
   }
+
+  .rise-1 { animation-delay: 0.04s; }
+  .rise-2 { animation-delay: 0.08s; }
+  .rise-3 { animation-delay: 0.12s; }
+
+  /* Numerals that line up in a column. Deliberately not applied to the hero
+     figure, where equal-width digits make a large number look loose. */
+  .tnum { font-variant-numeric: tabular-nums; }
 }
-
-/* ═══════════════════════════════════════════════════════════
-   Legacy compatibility shim
-
-   Panels not yet migrated to tokens still write `text-white/40`,
-   `border-white/5` and similar. Those are invisible on a light surface, so
-   remap them by tier. New markup should use the ink/line tokens directly and
-   never needs anything here.
-   ═══════════════════════════════════════════════════════════ */
-html.light [class*="text-white/1"],
-html.light [class*="text-white/2"],
-html.light [class*="text-white/3"] { color: rgb(var(--c-ink-muted)) !important; }
-
-html.light [class*="text-white/4"],
-html.light [class*="text-white/5"],
-html.light [class*="text-white/6"] { color: rgb(var(--c-ink-secondary)) !important; }
-
-html.light [class*="text-white/7"],
-html.light [class*="text-white/8"],
-html.light [class*="text-white/9"] { color: rgb(var(--c-ink)) !important; }
-
-html.light .text-white:not(.keep-white):not([class*="btn-primary"] *) { color: rgb(var(--c-ink)) !important; }
-
-html.light [class*="border-white/"] { border-color: rgb(var(--c-border) / var(--border-alpha)) !important; }
-html.light [class*="bg-white/"] { background-color: rgb(var(--c-border) / 0.05) !important; }
-
-/* Hardcoded hex surfaces from the pre-token components. */
-html.light [class*="bg-[#030712]"],
-html.light [class*="bg-[#071124]"],
-html.light [class*="bg-[#0b1220]"] { background-color: rgb(var(--c-surface) / 0.85) !important; }
-
-/* Dark mode: the old palette wrote body copy at 20-45% white. Floor the
-   faintest tiers so nothing lands below the readable range again. */
-html.dark [class*="text-white/1"],
-html.dark [class*="text-white/2"],
-html.dark [class*="text-white/3"],
-html.dark [class*="text-white/4"] { color: rgb(var(--c-ink-muted)); }
-html.dark [class*="text-white/5"],
-html.dark [class*="text-white/6"] { color: rgb(var(--c-ink-faint)); }
-html.dark [class*="text-white/7"],
-html.dark [class*="text-white/8"] { color: rgb(var(--c-ink-secondary)); }

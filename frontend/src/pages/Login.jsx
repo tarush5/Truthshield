@@ -63,8 +63,8 @@ export default function Login() {
     <div className="mx-auto flex min-h-[70vh] max-w-md items-center px-4">
       <div className="w-full space-y-6">
         <header className="space-y-2 text-center">
-          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-500/15">
-            <Shield className="h-5 w-5 text-brand-400" />
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-brand/15">
+            <Shield className="h-5 w-5 text-brand" />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-ink">
             {isNew ? 'Create your account' : 'Welcome back'}
@@ -89,7 +89,7 @@ export default function Login() {
                 onClick={() => { setTab(id); setError(''); }}
                 className={`flex-1 px-4 py-3 text-sm font-semibold transition-colors ${
                   tab === id
-                    ? 'bg-brand-500/10 text-brand-400'
+                    ? 'bg-brand/10 text-brand'
                     : 'text-ink-muted hover:text-ink'
                 }`}
               >
@@ -148,7 +148,7 @@ export default function Login() {
             {isNew ? 'Already have an account?' : 'New here?'}{' '}
             <button
               onClick={() => { setIsNew(!isNew); setError(''); }}
-              className="font-semibold text-brand-400 hover:underline"
+              className="font-semibold text-brand hover:underline"
             >
               {isNew ? 'Sign in' : 'Create an account'}
             </button>

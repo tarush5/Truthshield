@@ -185,3 +185,57 @@ class TestAPIKeys:
         assert record.key_hash != raw
         assert len(record.key_hash) == 64            # sha256 hex
         assert raw not in record.key_hash
+
+
+# ═══════════════════════════════════════════════
+# Configuration that must agree across the stack
+# ═══════════════════════════════════════════════
+
+class TestFrontendBackendAgreement:
+    """
+    The frontend is a separate build with its own copy of the API location.
+    Nothing in either language catches the two drifting apart, and when they
+    did — the backend on 8000, the frontend calling 8100 — every request
+    failed with a connection error that presented as a broken login.
+    """
+
+    def _repo_root(self):
+        from pathlib import Path
+        return Path(__file__).resolve().parent.parent
+
+    def test_frontend_default_api_port_matches_the_backend(self):
+        import re
+        from truthshield.settings import Settings
+
+        source = (self._repo_root() / "frontend" / "src" / "lib" / "api.js").read_text(encoding="utf-8")
+        match = re.search(r"const DEFAULT_BASE = 'http://127\.0\.0\.1:(\d+)/api/v1';", source)
+        assert match, "Could not find DEFAULT_BASE in frontend/src/lib/api.js"
+
+        assert int(match.group(1)) == Settings.model_fields["APP_PORT"].default
+
+    def test_vite_dev_proxy_targets_the_same_port(self):
+        import re
+        from truthshield.settings import Settings
+
+        source = (self._repo_root() / "frontend" / "vite.config.js").read_text(encoding="utf-8")
+        match = re.search(r"target: 'http://127\.0\.0\.1:(\d+)'", source)
+        assert match, "Could not find the dev proxy target in frontend/vite.config.js"
+
+        assert int(match.group(1)) == Settings.model_fields["APP_PORT"].default
+
+    def test_env_example_starts_a_fresh_checkout(self):
+        """
+        `cp .env.example .env` has to be enough to run locally. It previously
+        pointed DATABASE_URL at Postgres, so a first-time reader following the
+        README hit a connection error before reaching the app.
+        """
+        text = (self._repo_root() / ".env.example").read_text(encoding="utf-8")
+        active = [
+            line.strip() for line in text.splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        ]
+        settings_lines = dict(
+            line.split("=", 1) for line in active if "=" in line
+        )
+        assert settings_lines.get("APP_ENV") == "development"
+        assert settings_lines.get("DATABASE_URL", "").startswith("sqlite")

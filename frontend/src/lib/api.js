@@ -7,7 +7,11 @@
  * stale token in localStorage while the UI pretended to be signed in.
  */
 
-const DEFAULT_BASE = 'http://127.0.0.1:8100/api/v1';
+// Must match the backend's APP_PORT default, docker-compose and the README.
+// These drifted apart once — the frontend pointed at 8100 while everything
+// else ran on 8000 — and every API call, sign-in included, failed with a
+// connection error that looked like a login bug.
+const DEFAULT_BASE = 'http://127.0.0.1:8000/api/v1';
 
 function resolveBase() {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;

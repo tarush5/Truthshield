@@ -129,7 +129,7 @@ export default function Analyze() {
               onClick={() => { setMode(id); setError(null); }}
               className={`flex flex-1 items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition-colors disabled:opacity-50 ${
                 mode === id
-                  ? 'bg-brand-500/10 text-brand-400'
+                  ? 'bg-brand/10 text-brand'
                   : 'text-ink-muted hover:bg-white/[0.03] hover:text-ink'
               }`}
             >
@@ -194,8 +194,8 @@ export default function Analyze() {
               onClick={() => !busy && fileInput.current?.click()}
               className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-colors ${
                 dragging
-                  ? 'border-brand-400 bg-brand-500/10'
-                  : 'border-line hover:border-line-strong hover:bg-white/[0.02]'
+                  ? 'border-brand bg-brand/10'
+                  : 'border-line hover:border-line hover:bg-white/[0.02]'
               } ${busy ? 'pointer-events-none opacity-50' : ''}`}
             >
               <input
@@ -208,7 +208,7 @@ export default function Analyze() {
               />
               {file ? (
                 <div className="flex items-center justify-center gap-3">
-                  <FileText className="h-5 w-5 text-brand-400" />
+                  <FileText className="h-5 w-5 text-brand" />
                   <div className="min-w-0 text-left">
                     <p className="truncate text-sm font-medium text-ink">{file.name}</p>
                     <p className="text-2xs text-ink-muted">
@@ -244,7 +244,7 @@ export default function Analyze() {
           </p>
           {busy ? (
             <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-brand-400" />
+              <Loader2 className="h-4 w-4 animate-spin text-brand" />
               <button onClick={cancel} className="btn-secondary !px-4 !py-2 text-2xs">
                 Cancel
               </button>

@@ -108,7 +108,7 @@ export default function Report() {
               </ul>
             )}
 
-            <FakeProbability value={report.fake_probability} tone={meta.tone} />
+            <FakeProbability value={report.fake_probability} />
           </div>
         </div>
       </section>
@@ -143,7 +143,7 @@ export default function Report() {
               href={report.source_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-brand-400 hover:underline"
+              className="inline-flex items-center gap-1.5 text-sm text-brand hover:underline"
             >
               {hostOf(report.source_url)}
               <ExternalLink className="h-3 w-3" />
@@ -160,13 +160,31 @@ export default function Report() {
 
 /* ─────────────────────────────────────────────────────────── */
 
-function FakeProbability({ value, tone }) {
+/**
+ * Misinformation likelihood.
+ *
+ * The colour comes from the value, not from the verdict. Taking the verdict's
+ * tone painted this bar green on a "likely true" report — a green bar filling
+ * to 40% under the words "chance this is misinformation", where higher is
+ * worse. On this scale low is good and high is bad, so it gets its own ramp.
+ *
+ * 50% is the neutral point the backend shrinks an uncertain result toward, so
+ * the bands sit either side of it rather than at the midpoint of 0–100.
+ */
+function riskTone(value) {
+  if (value >= 60) return 'critical';
+  if (value >= 45) return 'warning';
+  return 'good';
+}
+
+function FakeProbability({ value }) {
+  const tone = riskTone(value);
   return (
     <div className="space-y-1.5">
       <div className="flex items-baseline justify-between gap-3">
         <span className="section-label">Chance this is misinformation</span>
         <span
-          className="text-lg font-bold"
+          className="text-lg font-bold tnum"
           style={{ color: `rgb(var(${TONE_TEXT_VAR[tone]}))` }}
         >
           {value}%
@@ -185,6 +203,13 @@ function FakeProbability({ value, tone }) {
           style={{ width: `${value}%`, background: `rgb(var(${TONE_VAR[tone]}))` }}
         />
       </div>
+      {/* 50 is "we could not establish much", not "half likely fake". Saying
+          so stops an uncertain result reading as a hedged accusation. */}
+      {value >= 45 && value <= 55 && (
+        <p className="text-2xs text-ink-muted">
+          Near 50% means the evidence did not settle this either way.
+        </p>
+      )}
     </div>
   );
 }
@@ -338,7 +363,7 @@ function EvidenceRow({ item }) {
           href={item.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="min-w-0 flex-1 text-sm font-medium text-ink hover:text-brand-400"
+          className="min-w-0 flex-1 text-sm font-medium text-ink hover:text-brand"
         >
           {item.title}
         </a>

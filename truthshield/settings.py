@@ -172,8 +172,15 @@ class Settings(BaseSettings):
                     "JWT_SECRET_KEY is unset or still a placeholder while "
                     f"APP_ENV={self.APP_ENV.value}. This key signs every session "
                     "token and the placeholder is public in this repository, so "
-                    "anyone could mint a token for any account. Generate one:\n"
-                    '  python -c "import secrets; print(secrets.token_hex(32))"'
+                    "anyone could mint a token for any account.\n"
+                    "\n"
+                    "  First run here?  cp .env.example .env\n"
+                    "                   That sets APP_ENV=development, which is "
+                    "enough to start locally.\n"
+                    "\n"
+                    "  Deploying?       Generate a real key:\n"
+                    '                   python -c "import secrets; '
+                    'print(secrets.token_hex(32))"'
                 )
             logger.warning(
                 "JWT_SECRET_KEY is a placeholder. Tolerated only because "

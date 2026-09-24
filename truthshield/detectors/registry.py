@@ -16,6 +16,7 @@ from typing import List
 from truthshield.detectors.base import (
     Detector, OptionalDependency, cv2, librosa, pytesseract, torch, transformers,
 )
+from truthshield.detectors.fraud import FraudSignalDetector
 from truthshield.domain.types import (
     ContentPacket, ContentType, DetectorResult, DetectorStatus,
 )
@@ -269,6 +270,10 @@ class VoiceCloneDetector(Detector):
 
 _DETECTORS: List[Detector] = [
     AITextDetector(),
+    # Asks whether the writing uses the techniques of a scam, which is a
+    # different question from whether the claim is true, and is reported as
+    # its own score for exactly that reason.
+    FraudSignalDetector(),
     DeepfakeDetector(),
     VoiceCloneDetector(),
 ]

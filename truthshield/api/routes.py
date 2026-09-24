@@ -326,15 +326,23 @@ def health():
     from truthshield.infra.cache import get_cache
     from truthshield.infra.celery_app import broker_reachable
     from truthshield.infra.database import check_connection
+    from truthshield.infra.evidence.providers import llm_providers, search_providers
 
     db_ok = check_connection()
+    search = search_providers()
+
     return schemas.HealthResponse(
-        status="ok" if db_ok else "degraded",
+        # Degraded when the database is down *or* when no keyed search
+        # provider is configured. The second case still serves requests, but
+        # on a fraction of the intended evidence, and calling that "ok"
+        # is how a badly configured deployment stays badly configured.
+        status="ok" if (db_ok and not search["degraded"]) else "degraded",
         version="2.0.0",
         database=db_ok,
         cache=get_cache().health(),
         broker=broker_reachable(),
         capabilities=availability(),
+        evidence={"search": search, "llm": llm_providers()},
     )
 
 

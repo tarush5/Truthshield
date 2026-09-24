@@ -301,5 +301,11 @@ class HealthResponse(BaseModel):
     broker: bool
     capabilities: Dict[str, Any]
 
+    # Which evidence sources this deployment can actually reach. Reported
+    # because the retriever skips unconfigured providers silently, which
+    # made a deployment running on keyless fallbacks look identical to a
+    # fully configured one while producing much weaker evidence.
+    evidence: Dict[str, Any] = {}
+
 
 TokenResponse.model_rebuild()

@@ -1384,12 +1384,29 @@ class EvidenceRetriever:
 
     @staticmethod
     def _extract_search_terms(text: str) -> str:
-        """Pull out likely entity names or significant words for Wikipedia."""
-        entities = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", text)
-        if entities:
-            return " ".join(entities[:4])
-        words = text.split()[:10]
-        return " ".join(w for w in words if len(w) > 3)[:100]
+        """
+        The reference-work query: what the claim is about.
+
+        This used to take capitalised words as entities, which matches the
+        sentence-initial capital because that is grammar rather than a name.
+        Measured across the benchmark fixture it sent "Drinking" for a claim
+        about bleach and COVID, "Humans" for one about brain usage (which
+        returns the Warcraft: Orcs & Humans page and an IMDb listing), and
+        "Vaccines" for one about autism (which returns the indie band). All
+        three appeared verbatim in the retrieved evidence, and they are the
+        direct cause of the fixture's abstentions.
+
+        `entity_query` keeps acronyms, real proper nouns and the distinctive
+        content words together instead of taking the first four capitals. On
+        the fixture it preserves 28 of 29 subject terms against 14 of 29;
+        `.lab/query_fix.py` reproduces that.
+        """
+        from truthshield.domain.verdict.focus import entity_query
+
+        query = entity_query(text)
+        # Never return nothing: an empty query would silently skip the
+        # reference-work sources rather than searching them badly.
+        return query or " ".join(w for w in text.split()[:10] if len(w) > 3)[:100]
 
     @staticmethod
     def _score_source(url: str) -> float:

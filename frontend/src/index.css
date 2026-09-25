@@ -36,17 +36,17 @@ html.dark {
 
   /* Graphite, faintly cool. A true neutral goes flat under a violet accent
      and a warm one turns muddy; this sits between. */
-  --c-page: 10 10 15;
-  --c-surface: 19 19 24;
-  --c-surface-raised: 27 27 34;
-  --c-surface-sunken: 6 6 10;
-  --c-surface-overlay: 32 32 40;
+  --c-page: 8 8 12;
+  --c-surface: 18 18 24;
+  --c-surface-raised: 28 28 36;
+  --c-surface-sunken: 5 5 8;
+  --c-surface-overlay: 34 34 44;
   --c-surface-hover: 255 255 255;
   --hover-alpha: 0.05;
 
-  --c-ink: 244 244 246;
-  --c-ink-secondary: 180 180 192;
-  --c-ink-muted: 138 138 153;
+  --c-ink: 247 247 250;
+  --c-ink-secondary: 184 184 198;
+  --c-ink-muted: 139 139 157;
 
   --c-border: 255 255 255;
   --border-alpha: 0.08;
@@ -55,9 +55,15 @@ html.dark {
   /* The accent. Violet rather than blue: blue is what every dashboard
      reaches for, and on a product about scrutiny it reads as generic
      corporate trust rather than as a considered signal. */
-  --c-brand: 139 123 255;
-  --c-brand-deep: 109 88 245;
-  --c-brand-soft: 167 155 255;
+  --c-brand: 155 125 255;
+  --c-brand-deep: 124 92 245;
+  --c-brand-soft: 181 162 255;
+
+  /* Two further accents, for the mesh and for gradient type. Reserved for
+     ambience and emphasis -- never a chart series, which has its own
+     validated set, and never status, which is reserved. */
+  --c-accent-cyan: 61 217 232;
+  --c-accent-pink: 255 107 181;
 
   /* Status — reserved for verdict and state, never a chart series. Marks
      use the base step; text uses the lighter *-text step so small copy
@@ -84,7 +90,8 @@ html.dark {
   --shadow-md: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
   --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.4), 0 24px 56px -24px rgb(0 0 0 / 0.75);
   --shadow-pop: 0 4px 8px rgb(0 0 0 / 0.4), 0 32px 64px -28px rgb(0 0 0 / 0.8);
-  --glow: 0 0 0 1px rgb(var(--c-brand) / 0.22), 0 8px 32px -8px rgb(var(--c-brand) / 0.28);
+  --glow: 0 0 0 1px rgb(var(--c-brand) / 0.24), 0 8px 32px -8px rgb(var(--c-brand) / 0.34);
+  --glow-lg: 0 0 0 1px rgb(var(--c-brand) / 0.28), 0 16px 56px -12px rgb(var(--c-brand) / 0.42);
 }
 
 html.light {
@@ -106,9 +113,12 @@ html.light {
   --border-alpha: 0.09;
   --border-alpha-strong: 0.17;
 
-  --c-brand: 91 61 245;
-  --c-brand-deep: 74 46 214;
-  --c-brand-soft: 120 96 250;
+  --c-brand: 97 53 240;
+  --c-brand-deep: 78 40 200;
+  --c-brand-soft: 126 92 248;
+
+  --c-accent-cyan: 14 124 140;
+  --c-accent-pink: 194 24 91;
 
   /* Darker steps: the dark theme's values are luminous on white and fail
      body-text contrast outright. */
@@ -131,6 +141,7 @@ html.light {
   --shadow-lg: 0 2px 6px rgb(16 16 20 / 0.08), 0 24px 56px -28px rgb(16 16 20 / 0.22);
   --shadow-pop: 0 4px 10px rgb(16 16 20 / 0.10), 0 32px 64px -32px rgb(16 16 20 / 0.28);
   --glow: 0 0 0 1px rgb(var(--c-brand) / 0.20), 0 8px 32px -10px rgb(var(--c-brand) / 0.22);
+  --glow-lg: 0 0 0 1px rgb(var(--c-brand) / 0.24), 0 16px 56px -14px rgb(var(--c-brand) / 0.30);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -543,12 +554,100 @@ html.light {
   .border-line { border-color: rgb(var(--c-border) / var(--border-alpha)); }
   .divide-line > * + * { border-color: rgb(var(--c-border) / var(--border-alpha)); }
 
-  /* Ambient page wash. Two very low-alpha radials — enough to stop a large
-     flat field looking dead, not enough to compete with content. */
+  /* ── Ambient mesh ───────────────────────────────────────────
+     Four radial fields that drift slowly against each other. The movement
+     is what stops a large dark page reading as a flat void, and it is done
+     with `transform` on a separate layer rather than by animating the
+     gradient stops -- animating the background would repaint the whole
+     field every frame, while a transform is composited on the GPU and
+     costs nothing measurable.
+
+     Alphas are deliberately low. The mesh sits behind text, and anything
+     stronger starts competing with the content for attention -- which is
+     the failure mode of every "bold" dark theme. */
   .page-wash {
     background:
-      radial-gradient(56rem 30rem at 50% -10rem, rgb(var(--c-brand) / 0.13), transparent 70%),
-      radial-gradient(40rem 24rem at 92% 4rem, rgb(var(--c-series-3) / 0.06), transparent 70%);
+      radial-gradient(48rem 28rem at 12% -6rem, rgb(var(--c-brand) / 0.20), transparent 64%),
+      radial-gradient(40rem 26rem at 88% 2rem, rgb(var(--c-accent-cyan) / 0.11), transparent 62%),
+      radial-gradient(36rem 24rem at 62% 42rem, rgb(var(--c-accent-pink) / 0.09), transparent 62%),
+      radial-gradient(52rem 32rem at 26% 60rem, rgb(var(--c-brand) / 0.09), transparent 68%);
+    animation: drift 26s var(--ease) infinite alternate;
+    will-change: transform;
+  }
+
+  @keyframes drift {
+    from { transform: translate3d(-1.5%, -1%, 0) scale(1.04); }
+    to   { transform: translate3d(1.5%, 1.5%, 0) scale(1.1); }
+  }
+
+  /* A second, faster layer. Two rates read as depth; one reads as a
+     screensaver. */
+  .page-wash-2 {
+    background:
+      radial-gradient(30rem 20rem at 78% 20rem, rgb(var(--c-accent-cyan) / 0.09), transparent 60%),
+      radial-gradient(26rem 18rem at 20% 34rem, rgb(var(--c-brand) / 0.10), transparent 60%);
+    animation: drift-2 18s var(--ease) infinite alternate;
+    will-change: transform;
+  }
+
+  @keyframes drift-2 {
+    from { transform: translate3d(2%, 1%, 0); }
+    to   { transform: translate3d(-2%, -1.5%, 0); }
+  }
+
+  /* ── Glass ──────────────────────────────────────────────────
+     Only where something is actually behind it. A blurred panel over a
+     flat fill is a compositing layer bought for an effect nobody can see,
+     which is why `.card` does not use this and the hero and overlays do.
+     The saturate() is what keeps the mesh's colour alive through the blur
+     instead of going grey. */
+  .glass {
+    background: rgb(var(--c-surface) / 0.62);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border: 1px solid rgb(var(--c-border) / var(--border-alpha-strong));
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg), var(--edge);
+  }
+
+  /* A gradient hairline along the top edge, as if lit from above. Drawn
+     with a mask rather than a second element so it works on any radius. */
+  .edge-lit {
+    position: relative;
+    isolation: isolate;
+  }
+  .edge-lit::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      160deg,
+      rgb(var(--c-brand) / 0.55),
+      transparent 38%,
+      transparent 68%,
+      rgb(var(--c-accent-cyan) / 0.28)
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Lift and light on hover. Paired: the glow alone reads as a focus ring,
+     the lift alone reads as a generic card. */
+  .lift {
+    transition: transform var(--t-base) var(--ease),
+                box-shadow var(--t-base) var(--ease),
+                border-color var(--t-base);
+  }
+  .lift:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--glow), var(--shadow-lg);
+    border-color: rgb(var(--c-brand) / 0.35);
   }
 
   .grid-wash {

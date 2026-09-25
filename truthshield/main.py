@@ -18,6 +18,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from truthshield.api.routes import analysis_router, auth_router, meta_router
+from truthshield.api.fraud import fraud_router
 from truthshield.api.insights import claims_router, insights_router
 from truthshield.api.middleware import (
     RequestContextMiddleware, SecurityHeadersMiddleware, current_request_id,
@@ -172,6 +173,7 @@ app.include_router(stream_router, prefix="/api/v1")
 app.include_router(insights_router, prefix="/api/v1")
 app.include_router(claims_router, prefix="/api/v1")
 app.include_router(sharing_router, prefix="/api/v1")
+app.include_router(fraud_router, prefix="/api/v1")
 app.include_router(meta_router, prefix="/api/v1")
 
 

@@ -859,6 +859,34 @@ Analyze this claim and provide your verdict as JSON."""
             "contradicted", "refuted", "denied", "no proof", "inaccurate",
             "lacks evidence", "unsupported", "wrong", "untrue", "fictitious",
             "does not cure", "cannot prevent", "no scientific evidence",
+            "no link", "no association", "no connection", "no correlation",
+            "not associated", "not linked", "does not cause", "do not cause",
+        ]
+
+        # The "no <something> link" family, which a literal list cannot cover.
+        #
+        # The slot between the negator and the noun is open -- "no causal
+        # link", "no credible association", "no proven connection" -- and a
+        # literal match fails on every adjective nobody thought to add.
+        # Measured on a set of real CDC, WHO and Reuters debunk phrasings,
+        # the literal list alone caught 5 of 8; "no link" matched while "no
+        # causal link" did not, and both are the same finding written two
+        # ways. These are the constructions science writing actually uses to
+        # state a negative result, so they matter more here than the
+        # tabloid-register words above.
+        false_patterns = [
+            re.compile(
+                r"\bno\s+(?:\w+\s+){0,2}"
+                r"(?:link|links|association|connection|correlation|relationship|"
+                r"evidence|proof|basis|indication)\b"
+            ),
+            re.compile(
+                r"\bnot\s+(?:\w+\s+){0,2}"
+                r"(?:linked|associated|connected|correlated|supported|proven)\b"
+            ),
+            re.compile(r"\b(?:does|do|did)\s+not\s+(?:cause|prove|show|support|confirm|cure)\b"),
+            re.compile(r"\b(?:has|have)\s+been\s+(?:debunked|disproven|discredited|refuted)\b"),
+            re.compile(r"\bfound\s+no\s+\w+"),
         ]
         true_keywords = [
             "true", "correct", "verified", "confirmed", "accurate",
@@ -1127,6 +1155,20 @@ Analyze this claim and provide your verdict as JSON."""
                             has_true = True
                         else:
                             has_false = True
+
+                # Same negation-of-negation guard as the literals above: a
+                # debunk of a debunk ("it is not true that there is no link")
+                # is a confirmation, and reading it as refutation would invert
+                # the verdict.
+                for pattern in false_patterns:
+                    match = pattern.search(claim_context)
+                    if not match:
+                        continue
+                    preceding = claim_context[max(0, match.start() - 20):match.start()].split()
+                    if preceding and preceding[-1] in negation_words:
+                        has_true = True
+                    else:
+                        has_false = True
 
                 for kw in true_keywords:
                     if kw in claim_context:

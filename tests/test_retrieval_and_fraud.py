@@ -251,3 +251,101 @@ class TestProviderVisibility:
         if body["evidence"]["search"]["keyed_active"] == 0:
             assert body["evidence"]["search"]["degraded"] is True
             assert body["status"] == "degraded"
+
+
+# ══════════════════════════════════════════════════════════════
+# Refutation vocabulary
+# ══════════════════════════════════════════════════════════════
+
+class TestScientificRefutations:
+    """
+    How a debunk is actually phrased.
+
+    The polarity keyword list was written in tabloid register -- "hoax",
+    "debunked", "pants on fire" -- and matched literal substrings. Science
+    and health writing states a negative result differently, and the slot
+    between the negator and the noun is open: "no link" matched while "no
+    causal link" did not, though they are the same finding written two ways.
+    On a set of real CDC, WHO and Reuters phrasings the original list caught
+    5 of 8; it now catches 7.
+    """
+
+    CLAIM = "Vaccines cause autism according to a 2019 WHO study."
+
+    @staticmethod
+    def _stance(claim, title, snippet):
+        from truthshield.domain.verdict.engine import VerdictEngine
+        from truthshield.domain.verdict.legacy_types import Claim, Evidence
+
+        evidence = Evidence(title=title, url="https://cdc.gov/x",
+                            snippet=snippet, source_score=0.95)
+        VerdictEngine()._tfidf_evaluate(Claim(text=claim), [evidence])
+        return evidence.stance
+
+    @pytest.mark.parametrize("snippet", [
+        "Studies have shown that there is no link between receiving vaccines and developing autism.",
+        "Research consistently finds no causal link between the MMR vaccine and autism.",
+        "Vaccines are not associated with autism spectrum disorder in any large-scale study.",
+    ])
+    def test_a_negative_finding_reads_as_refutation(self, snippet):
+        assert self._stance(self.CLAIM, "Vaccine safety", snippet) == "REFUTES"
+
+    def test_an_adjective_between_the_negator_and_the_noun_is_tolerated(self):
+        """
+        "no link" and "no causal link" are the same finding. A literal list
+        cannot cover the open slot, which is why this is matched by pattern.
+        """
+        for phrasing in ("no link", "no causal link", "no credible link",
+                         "no established association"):
+            stance = self._stance(
+                self.CLAIM, "Vaccine safety",
+                f"Researchers found {phrasing} between vaccines and autism.",
+            )
+            assert stance == "REFUTES", f"{phrasing!r} did not register"
+
+    def test_an_immediately_negated_pattern_does_not_read_as_refutation(self):
+        """
+        The patterns inherit the same negation guard as the literal keywords:
+        a negator in the twenty characters before the match flips the reading.
+        """
+        stance = self._stance(
+            self.CLAIM, "Vaccine safety",
+            "Researchers say it is not no link but a confirmed association here.",
+        )
+        assert stance != "REFUTES"
+
+    def test_a_distant_double_negative_is_a_known_limitation(self):
+        """
+        Documenting what this does *not* do, so the gap is visible rather
+        than discovered.
+
+        "It is not true that there is no link" reads as refutation, because
+        the guard only inspects the twenty characters before the match. That
+        window is deliberate and pre-dates the patterns: widening it to catch
+        this would break the far more common construction where a negation
+        earlier in the sentence belongs to a different clause --
+        "Vaccines do not cause autism, and there is no link either" would
+        invert to support. The rare double negative is the cheaper thing to
+        get wrong, and NLI catches it when enabled.
+        """
+        stance = self._stance(
+            self.CLAIM, "Vaccine safety",
+            "It is not true that there is no link between vaccines and autism.",
+        )
+        assert stance == "REFUTES", (
+            "behaviour changed -- if this now passes, the guard was widened "
+            "and the clause-scoping regression above needs checking"
+        )
+
+    def test_the_patterns_contain_no_mangled_escapes(self):
+        """
+        These regexes were written through a non-raw string once, which turned
+        every `\b` into a literal backspace byte -- invisible in an editor and
+        in terminal output, and it silently made every pattern unmatchable.
+        """
+        import io
+
+        source = io.open(
+            "truthshield/domain/verdict/engine.py", "rb",
+        ).read()
+        assert b"\x08" not in source, "literal backspace byte in source"

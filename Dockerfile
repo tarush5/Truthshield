@@ -32,4 +32,16 @@ RUN useradd --create-home --uid 10001 app \
 USER app
 
 EXPOSE 8000
-CMD ["uvicorn", "truthshield.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Bind whatever port the platform assigns, defaulting to 8000 locally.
+#
+# Render, Railway, Fly and Cloud Run all inject $PORT and route to it; a
+# container that hardcodes a port fails their health check. On Render the
+# consequence is quiet and expensive to diagnose: the failed deploy is
+# rolled back and the *previous* image keeps serving, so the service looks
+# healthy while running whatever code last deployed successfully.
+#
+# Shell form is required here -- exec form does not expand environment
+# variables -- and `exec` keeps uvicorn as PID 1 so SIGTERM still reaches it
+# and shutdown stays graceful.
+CMD ["sh", "-c", "exec uvicorn truthshield.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

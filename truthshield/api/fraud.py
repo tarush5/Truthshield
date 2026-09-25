@@ -51,6 +51,29 @@ def list_detectors():
     return {"detectors": catalogue()}
 
 
+@fraud_router.get("/safety")
+def safety_centre(category: Optional[str] = Query(None, description="One category, or all.")):
+    """
+    What a reader should actually do next.
+
+    Public: safety advice is useful to someone who has not signed up, and
+    there is nothing here worth protecting. Served rather than hard-coded in
+    the client so the advice shown always matches the categories the backend
+    can actually produce.
+    """
+    from truthshield.fraud.contract import FraudCategory
+    from truthshield.fraud.guidance import catalogue, for_category
+
+    if category:
+        try:
+            chosen = FraudCategory(category.upper())
+        except ValueError:
+            raise HTTPException(status_code=404, detail="Unknown category.")
+        return {"category": chosen.value, **for_category(chosen).as_dict()}
+
+    return {"categories": catalogue()}
+
+
 @fraud_router.post("/analyze")
 def analyze_for_fraud(
     payload: FraudAnalyzeRequest = Body(...),

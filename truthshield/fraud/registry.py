@@ -159,6 +159,18 @@ def analyze(text: str, *, hint: str = "", only: Optional[Sequence[str]] = None) 
 
     score, confidence, category = _combine(ran)
 
+    from truthshield.fraud.guidance import for_category
+    from truthshield.fraud.privacy import redact, summarise
+
+    # Detectors saw the original; nothing downstream does.
+    #
+    # People reporting a scam paste the scam and everything around it --
+    # their own card number, the code they nearly sent, the account the bank
+    # quoted back. The submission is often a richer source of their personal
+    # data than anything they would knowingly upload, so the copy that
+    # travels onward into reports, logs and storage is the masked one.
+    safe_text, redactions = redact(text)
+
     return {
         "risk_score": round(score, 1),
         "risk_level": RiskLevel.for_score(score).value,
@@ -166,6 +178,19 @@ def analyze(text: str, *, hint: str = "", only: Optional[Sequence[str]] = None) 
         "category": category.value,
         "classification": classification.as_dict(),
         "findings": [f.as_dict() for f in ran],
+        # What to actually do, which is the part that helps. Differs sharply
+        # by category: ignoring a prize scam is right, ignoring a bank
+        # warning is not.
+        "guidance": for_category(category).as_dict(),
+        "privacy": {
+            "redacted_content": safe_text,
+            "redactions": summarise(redactions),
+            "note": (
+                "Personal data found in your submission has been masked in the "
+                "stored and shared copy. Masking is pattern-based and may miss "
+                "some values — names and addresses are not detected at all."
+            ),
+        },
         # How much of the system actually looked. A low score from one
         # detector is a different statement from a low score from six.
         "coverage": {

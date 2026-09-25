@@ -7,6 +7,6 @@ and the API are untouched, which is the property the plugin layer exists to
 provide.
 """
 
-from truthshield.fraud.detectors import message, url  # noqa: F401
+from truthshield.fraud.detectors import email, message, url  # noqa: F401
 
-__all__ = ["message", "url"]
+__all__ = ["email", "message", "url"]

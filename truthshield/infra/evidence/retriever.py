@@ -286,9 +286,25 @@ class EvidenceRetriever:
         tasks.append(asyncio.create_task(
             asyncio.to_thread(self._search_wikipedia, wiki_query)
         ))
-        tasks.append(asyncio.create_task(
-            asyncio.to_thread(self._search_wikidata, wiki_query)
-        ))
+
+        # Wikidata is deliberately not in the fan-out.
+        #
+        # It returns entity *definitions*, not evidence about a claim, which
+        # is a different thing from what this pipeline needs. Measured over
+        # five claims it cost a median 414ms and returned items that scored
+        # OFF_TOPIC every time: "percent (Q11229)" for a claim about brain
+        # usage, "Earth (Q2)" for a flat-Earth claim, "The Vaccines" -- the
+        # band -- for one about autism.
+        #
+        # The proof it costs nothing to drop is stronger than usual: the
+        # benchmark fixture contains zero Wikidata items, because it was
+        # captured after the query change below stopped matching Wikidata's
+        # exact-title API. The engine's current 21/2/13 was therefore already
+        # measured without it.
+        #
+        # `_search_wikidata` is kept: it works when handed a single entity
+        # name, and an entity-resolution feature would want it. It is only
+        # the blanket fan-out that was paying 414ms for nothing.
 
         if settings.GOOGLE_CSE_API_KEY:
             tasks.append(asyncio.create_task(

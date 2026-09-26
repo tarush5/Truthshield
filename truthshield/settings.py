@@ -122,6 +122,15 @@ class Settings(BaseSettings):
     # Local model inference. Off by default: the weights are hundreds of MB and
     # several seconds of cold start, and the system degrades honestly without
     # them rather than pretending it checked.
+    # Scientific literature (Europe PMC, OpenAlex) as an evidence source.
+    #
+    # Off because it measured badly, not because it is unfinished: OpenAlex
+    # adds ~2s to a 1537ms median request and is about half relevant, and
+    # Europe PMC cannot bridge colloquial claims to medical vocabulary. The
+    # full numbers are in `infra/evidence/scholarly.py`. Worth enabling only
+    # for a medical-claim deployment that can afford the latency.
+    ENABLE_SCHOLARLY_SOURCES: bool = False
+
     ENABLE_ML_DETECTORS: bool = False
     MODEL_CACHE_DIR: Path = REPO_ROOT / ".model_cache"
     UPLOAD_DIR: Path = REPO_ROOT / ".uploads"

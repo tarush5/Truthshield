@@ -306,6 +306,20 @@ class EvidenceRetriever:
         # name, and an entity-resolution feature would want it. It is only
         # the blanket fan-out that was paying 414ms for nothing.
 
+        # Scientific literature, off unless explicitly enabled. It measured
+        # badly -- ~2s added to a 1537ms median, about half relevant -- and
+        # `infra/evidence/scholarly.py` carries the numbers. Available for a
+        # medical-claim deployment that can afford the latency.
+        if getattr(settings, "ENABLE_SCHOLARLY_SOURCES", False):
+            from truthshield.infra.evidence import scholarly
+
+            for provider in (scholarly.search_europepmc, scholarly.search_openalex):
+                tasks.append(asyncio.create_task(
+                    asyncio.to_thread(
+                        provider, search_query, self._get_session(), Evidence,
+                    )
+                ))
+
         if settings.GOOGLE_CSE_API_KEY:
             tasks.append(asyncio.create_task(
                 asyncio.to_thread(self._google_knowledge_graph, wiki_query)

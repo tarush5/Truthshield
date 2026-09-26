@@ -16,6 +16,7 @@ Two rules shape this module, both learned from the previous version:
 
 from __future__ import annotations
 
+import sys
 import logging
 from enum import Enum
 from functools import lru_cache
@@ -119,9 +120,6 @@ class Settings(BaseSettings):
     EVIDENCE_TIMEOUT_SECONDS: float = 8.0
     MAX_CLAIMS_PER_SUBMISSION: int = 3
 
-    # Local model inference. Off by default: the weights are hundreds of MB and
-    # several seconds of cold start, and the system degrades honestly without
-    # them rather than pretending it checked.
     # Scientific literature (Europe PMC, OpenAlex) as an evidence source.
     #
     # Off because it measured badly, not because it is unfinished: OpenAlex
@@ -131,6 +129,9 @@ class Settings(BaseSettings):
     # for a medical-claim deployment that can afford the latency.
     ENABLE_SCHOLARLY_SOURCES: bool = False
 
+    # Local model inference. Off by default: the weights are hundreds of MB and
+    # several seconds of cold start, and the system degrades honestly without
+    # them rather than pretending it checked.
     ENABLE_ML_DETECTORS: bool = False
     MODEL_CACHE_DIR: Path = REPO_ROOT / ".model_cache"
     UPLOAD_DIR: Path = REPO_ROOT / ".uploads"
@@ -258,7 +259,69 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    """
+    The validated configuration, or a legible failure.
+
+    The validators below fail closed on purpose: a missing signing key or a
+    SQLite URL in production stops the process rather than starting a
+    service that is quietly unsafe. That is right, but the raw Pydantic
+    output buries the one useful sentence under fifteen lines of traceback,
+    and on a hosting dashboard nobody scrolls to the bottom of a stack
+    trace.
+
+    The cost of that was real: a deployment served pre-rewrite code for
+    weeks because every new container exited during startup, the platform
+    rolled back to the last image that booted, and the health endpoint went
+    on answering. The failure looked like nothing at all.
+
+    So a configuration error is reported as an operator message first, with
+    the traceback after it for anyone who wants the detail.
+    """
+    try:
+        return Settings()
+    except Exception as exc:
+        problems = []
+        for line in str(exc).splitlines():
+            line = line.strip()
+            # Pydantic prefixes the human-readable cause this way; the rest
+            # of its output is type machinery and a docs URL.
+            if line.startswith("Value error,"):
+                problem = line[len("Value error,"):].strip()
+                # Drop the trailing "[type=value_error, input_value={...}]",
+                # which repeats the configuration back at the reader and
+                # pushes the actual instruction off the line.
+                problem = problem.split(" [type=")[0].strip()
+                problems.append(problem)
+
+        banner = [
+            "",
+            "=" * 72,
+            "  TruthShield could not start: the configuration is not valid.",
+            "=" * 72,
+        ]
+        if problems:
+            for problem in problems:
+                banner.append(f"  - {problem}")
+        else:
+            banner.append(f"  {str(exc).splitlines()[0][:200]}")
+
+        banner += [
+            "",
+            "  In production the service requires, at minimum:",
+            "    APP_ENV=production",
+            "    JWT_SECRET_KEY   32+ random characters; changing it signs everyone out",
+            "    DATABASE_URL     a postgresql:// URL (SQLite is refused here)",
+            "    CORS_ORIGINS     the frontend's exact origin, no trailing slash",
+            "",
+            "  Nothing starts until these are set. That is deliberate -- a service",
+            "  running without a real signing key is worse than one that is down.",
+            "=" * 72,
+            "",
+        ]
+        # stderr, unbuffered, before the traceback: hosting platforms
+        # capture both, and this has to be the part that is read.
+        print("\n".join(banner), file=sys.stderr, flush=True)
+        raise
 
 
 def reset_settings_cache() -> None:

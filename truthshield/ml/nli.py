@@ -62,10 +62,27 @@ logger = logging.getLogger(__name__)
 # difference between a fifth of a second and five seconds.
 DEFAULT_MODEL = "cross-encoder/nli-deberta-v3-xsmall"
 
-# Below this the answer is discarded. Set from the sweep in the module
-# docstring, not from intuition: at 0.90 and 0.95 the fixture lost four
-# verdicts, at 0.98 it lost none.
-CONFIDENCE_FLOOR = 0.98
+# Below this the answer is discarded.
+#
+# Was 0.98, set from a sweep where 0.90 lost four verdicts. That sweep is no
+# longer valid, and the reason has nothing to do with the model: the fixture
+# it used held evidence retrieved by the broken query extractor, so the
+# model was being asked to judge stacks of off-topic results -- the Warcraft
+# page against a claim about brain usage. Garbage premises, garbage
+# entailment.
+#
+# Re-measured on the 36-claim fixture captured after retrieval was fixed:
+#
+#   lexical only            21 correct  1 wrong  14 abstaining
+#   refute only, >= 0.90    22 correct  1 wrong  13 abstaining
+#   refute only, >= 0.95    21 correct  1 wrong  14 abstaining
+#   refute only, >= 0.98    21 correct  1 wrong  14 abstaining
+#
+# One recovered verdict and no new errors, so the floor comes down. The gain
+# is a single claim out of 36 and should not be oversold -- what the sweep
+# actually establishes is that 0.90 is *safe* here, not that it is much
+# better. `.lab/nli_on_v2.py` reproduces it.
+CONFIDENCE_FLOOR = 0.90
 
 # Reading a long article body as a premise costs time and rarely changes the
 # label — the lead sentences carry the position.

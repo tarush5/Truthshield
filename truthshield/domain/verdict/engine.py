@@ -861,6 +861,16 @@ Analyze this claim and provide your verdict as JSON."""
             "does not cure", "cannot prevent", "no scientific evidence",
             "no link", "no association", "no connection", "no correlation",
             "not associated", "not linked", "does not cause", "do not cause",
+            # Inflections, because matching is by substring and these are
+            # different strings. "debunked" was present while "debunking"
+            # and "debunks" were not, so Britannica's "Are Bats Blind?
+            # Debunking the Phrase 'Blind as a Bat'" -- an article whose
+            # title states it is a debunk -- was scored as SUPPORTING the
+            # claim that bats are blind.
+            "debunk", "debunking", "debunks", "myth buster", "mythbusting",
+            "misconception", "misconceptions", "not actually", "actually false",
+            "contrary to popular belief", "popular myth", "common myth",
+            "old wives", "not supported by",
         ]
 
         # The "no <something> link" family, which a literal list cannot cover.
@@ -889,7 +899,16 @@ Analyze this claim and provide your verdict as JSON."""
             re.compile(r"\bfound\s+no\s+\w+"),
         ]
         true_keywords = [
-            "true", "correct", "verified", "confirmed", "accurate",
+            # "true" is deliberately absent as a bare word. It matched
+            # Wikipedia's "bats ... capable of true and sustained flight",
+            # which set raw_polarity to "true" and scored an article that
+            # never mentions vision as SUPPORTING "bats are blind". The same
+            # trap catches "true north", "came true" and "true story". The
+            # qualified forms below carry the assertion; the bare adjective
+            # carries only itself.
+            "is true", "are true", "was true", "were true", "holds true",
+            "claim is true", "turned out to be true",
+            "correct", "verified", "confirmed", "accurate",
             "supported by", "successfully", "achieved", "accomplished",
             "became the first", "announced that", "according to official",
             "landed", "launched", "completed", "established",
@@ -1256,7 +1275,17 @@ Analyze this claim and provide your verdict as JSON."""
                 # located in China" without recovering any of the claims it was
                 # aimed at, 9/12 correct down to 8/12. The gate stays on the
                 # weaker implicit-support path only.
-                elif raw_polarity == "true" or (sim >= 0.15 and ev.source_score >= 0.50):
+                elif raw_polarity == "true" or (
+                    sim >= 0.15 and ev.source_score >= 0.50
+                    # A short claim is fully specified by its few content
+                    # words, so matching one of them is topic, not support.
+                    # "Bats are blind" has two; Wikipedia's article on bats
+                    # matches "bat", says nothing about vision, and was
+                    # scored SUPPORTS on that alone. Longer claims keep the
+                    # looser test -- they carry qualifiers that real
+                    # evidence legitimately omits.
+                    and (len(claim_content_stems) > 3 or overlap_ratio >= 0.85)
+                ):
                     ev.stance = "SUPPORTS"
                     support += impact * 1.5
                     signals.append(f"Supported by '{source_label}'")

@@ -1,0 +1,15 @@
+# Lint gate for CI. Deliberately narrow: pyflakes errors (undefined names,
+# unused imports, unused variables) and syntax errors -- the class of finding
+# that is a bug or dead code, never a style opinion.
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = ["F", "E9"]
+
+[lint.per-file-ignores]
+# Dead locals in the 1.x fact-check modules, which are wrapped rather than
+# edited until they are split in Phase 2 (docs/MIGRATION.md, debt item 3).
+"truthshield/domain/verdict/claim_extractor.py" = ["F841"]
+"truthshield/domain/verdict/engine.py" = ["F841"]
+"truthshield/infra/evidence/retriever.py" = ["F841"]

@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Tokens ────────────────────────────────────────────────────
+   Forced dark theme. Bare HSL triplets: Tailwind wraps them in hsl()
+   with an alpha channel. */
+:root {
+  --bg: 0 0% 4%;
+  --surface: 0 0% 8%;
+  --text: 0 0% 96%;
+  --muted: 0 0% 53%;
+  --stroke: 0 0% 12%;
+  --accent: 0 0% 96%;
+
+  --risk-low: 150 24% 60%;
+  --risk-medium: 42 62% 60%;
+  --risk-high: 22 64% 58%;
+  --risk-critical: 355 44% 50%;
+
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-display: 'Instrument Serif', Georgia, serif;
+
+  --accent-from: #89aacc;
+  --accent-to: #4e85bf;
+
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    background: hsl(var(--bg));
+  }
+
+  body {
+    @apply bg-bg font-body text-text-primary antialiased;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: rgba(137, 170, 204, 0.35);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent-from);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+@layer utilities {
+  .accent-gradient {
+    background: linear-gradient(90deg, var(--accent-from) 0%, var(--accent-to) 100%);
+  }
+
+  .accent-gradient-reverse {
+    background: linear-gradient(270deg, var(--accent-from) 0%, var(--accent-to) 100%);
+  }
+
+  .accent-gradient-animated {
+    background: linear-gradient(90deg, var(--accent-from), var(--accent-to), var(--accent-from));
+    background-size: 200% 200%;
+    animation: gradient-shift 6s ease infinite;
+  }
+
+  .accent-text {
+    background: linear-gradient(90deg, var(--accent-from), var(--accent-to));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .halftone {
+    background-image: radial-gradient(circle, #000 1px, transparent 1px);
+    background-size: 4px 4px;
+  }
+
+  .glass {
+    @apply border border-white/10 bg-surface/70 backdrop-blur-md;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ── Keyframes ─────────────────────────────────────────────── */
+@keyframes scroll-down {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(200%); }
+}
+
+@keyframes role-fade-in {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* GSAP entrance targets start hidden so there is no flash before the
+   timeline runs; reduced motion shows them immediately. */
+.name-reveal,
+.blur-in {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .name-reveal,
+  .blur-in {
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+  }
+}

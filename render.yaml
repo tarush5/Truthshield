@@ -1,0 +1,141 @@
+# Render blueprint.
+#
+# Committed so the deployment stops being something configured by hand in a
+# dashboard and starts being something reviewable. The symptom that prompted
+# it: the live API was serving pre-rewrite code for weeks while `main` was
+# current, because a dashboard-configured service had drifted from the repo
+# and nothing in version control said what it was supposed to be doing.
+#
+# Applying this is opt-in. Render only reads it when you create a Blueprint
+# from the repo (Dashboard -> New -> Blueprint); an existing service carries
+# on with its dashboard settings until you either adopt the blueprint or
+# match these values by hand.
+
+services:
+  # ── API ─────────────────────────────────────────────────────
+  - type: web
+    name: truthshield-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    branch: main
+    # Without this, a push to a feature branch redeploys production.
+    autoDeployTrigger: commit
+
+    # Render calls this to decide whether a deploy succeeded. Pointing it at
+    # a real endpoint rather than `/` means a container that boots but cannot
+    # reach its database is caught as a failed deploy instead of going live.
+    healthCheckPath: /api/v1/health
+
+    envVars:
+      - key: APP_ENV
+        value: production
+
+      # Generated once by Render and kept. Every session token is signed with
+      # it, so changing it signs everyone out.
+      - key: JWT_SECRET_KEY
+        generateValue: true
+
+      - key: DATABASE_URL
+        fromDatabase:
+          name: truthshield-db
+          property: connectionString
+
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: truthshield-redis
+          property: connectionString
+
+      # The deployed frontend's origin. Production CORS is strict by design --
+      # it does not add localhost or any dev port -- so a wrong value here
+      # fails every request at preflight, which surfaces to the user as
+      # "login is broken" and names nothing.
+      - key: CORS_ORIGINS
+        sync: false
+
+      # Optional. Left unset, /api/v1/health reports status "degraded" and
+      # names each missing provider, because retrieval on the keyless
+      # fallbacks alone is materially worse and should not look healthy.
+      - key: GOOGLE_CSE_API_KEY
+        sync: false
+      - key: GOOGLE_CSE_ID
+        sync: false
+      - key: GOOGLE_FACTCHECK_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # Local inference needs requirements-ml.txt (~2GB) and more memory than
+      # the free plan has. Off here; the report says so rather than quietly
+      # skipping the checks.
+      - key: ENABLE_ML_DETECTORS
+        value: "false"
+
+  # ── Background worker ───────────────────────────────────────
+  # Same image as the API on purpose: a worker running different code from
+  # the API is a failure mode that only appears in production.
+  - type: worker
+    name: truthshield-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    branch: main
+    dockerCommand: celery -A truthshield.infra.celery_app worker --loglevel=info --concurrency=2
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: JWT_SECRET_KEY
+        fromService:
+          type: web
+          name: truthshield-api
+          envVarKey: JWT_SECRET_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: truthshield-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: truthshield-redis
+          property: connectionString
+      - key: ENABLE_ML_DETECTORS
+        value: "false"
+
+  # ── Frontend ────────────────────────────────────────────────
+  # Included so the whole stack is described in one place, even if the
+  # frontend currently lives on Vercel. Delete this block if it stays there.
+  - type: web
+    name: truthshield-web
+    runtime: static
+    branch: main
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      # Build-time. Without it the bundle falls back to a same-origin
+      # `/api/v1`, which only resolves if a rewrite proxies to the API --
+      # and on a plain static host it returns index.html for every API call.
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      # SPA fallback. Assets are excluded so a missing bundle 404s honestly
+      # instead of returning HTML that the browser then fails to parse as JS.
+      - type: rewrite
+        source: /assets/*
+        destination: /assets/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: redis
+    name: truthshield-redis
+    plan: free
+    # Cache and Celery broker only; nothing here is the source of truth.
+    ipAllowList: []
+
+databases:
+  - name: truthshield-db
+    plan: free
+    databaseName: truthshield
+    user: truthshield

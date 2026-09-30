@@ -1,0 +1,207 @@
+"""
+Application entry point.
+
+Startup is deliberately noisy about what is and is not available. The previous
+version logged "Rate limiting enabled" while the limiter was attached to no
+route, and reported a healthy service while silently running on a fallback
+SQLite file. Anything degraded here says so, on startup and on /health.
+"""
+
+from __future__ import annotations
+
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
+
+from truthshield.api.routes import analysis_router, auth_router, meta_router
+from truthshield.api.errors import register as register_error_handlers
+from truthshield.api.fraud import fraud_router
+from truthshield.api.investigations import (
+    admin_router, analyze_v2_router, investigations_router, platform_router,
+)
+from truthshield.api.insights import claims_router, insights_router
+from truthshield.api.middleware import (
+    RequestContextMiddleware, SecurityHeadersMiddleware, current_request_id,
+)
+from truthshield.api.sharing import sharing_router
+from truthshield.api.stream import stream_router
+from truthshield.settings import get_settings
+
+settings = get_settings()
+
+logging.basicConfig(
+    level=settings.LOG_LEVEL,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger("truthshield")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    import asyncio
+
+    from truthshield.detectors.registry import availability
+    from truthshield.infra.cache import get_cache
+    from truthshield.infra.celery_app import broker_reachable
+    from truthshield.infra.database import check_connection
+
+    logger.info("TruthShield %s — %s", app.version, settings.APP_ENV.value)
+
+    db_ok = check_connection()
+    logger.info("Database: %s", "connected" if db_ok else "UNREACHABLE")
+    if not db_ok and settings.APP_ENV.is_production:
+        # Fail loudly rather than serve requests that cannot be persisted.
+        raise RuntimeError("Database is unreachable; refusing to start in production.")
+
+    cache = get_cache()
+    logger.info("Cache: %s%s", cache.backend, " (degraded)" if cache.degraded else "")
+    logger.info("Celery broker: %s", "reachable" if broker_reachable() else "UNREACHABLE")
+
+    caps = availability()
+    missing = [k for k, v in caps.items() if v is False]
+    logger.info("Detector capabilities: %s", caps)
+    if missing:
+        logger.warning(
+            "Unavailable capabilities: %s. Analyses will report these as "
+            "unchecked rather than passing.", ", ".join(missing),
+        )
+
+    async def warm():
+        """Load the NLP pipeline and warm caches off the request path."""
+        def _load():
+            try:
+                from truthshield.domain.verdict.claim_extractor import ClaimExtractor
+                ClaimExtractor().extract("Warmup sentence for model loading.", "en")
+                from truthshield.infra.evidence.retriever import EvidenceRetriever
+                EvidenceRetriever._get_session()
+                EvidenceRetriever._rss_entries()
+                logger.info("Warmup complete")
+            except Exception as exc:
+                logger.warning("Warmup failed (non-fatal): %s", exc)
+        await asyncio.to_thread(_load)
+
+    asyncio.create_task(warm())
+    yield
+    logger.info("Shutting down")
+
+
+# Interactive docs are a development tool. In production they publish the
+# full request shape of every route, including the auth ones, to anyone who
+# asks -- a reconnaissance shortcut with no corresponding benefit once the
+# people who need the schema have it.
+_DOCS_URL = None if settings.APP_ENV.is_production else "/docs"
+_REDOC_URL = None if settings.APP_ENV.is_production else "/redoc"
+_OPENAPI_URL = None if settings.APP_ENV.is_production else "/openapi.json"
+
+app = FastAPI(
+    title="TruthShield API",
+    description=(
+        "Misinformation analysis: claim extraction, evidence retrieval, "
+        "stance detection and manipulation checks. Reports state what was "
+        "checked and what could not be."
+    ),
+    version="2.0.0",
+    lifespan=lifespan,
+    docs_url=_DOCS_URL,
+    redoc_url=_REDOC_URL,
+    openapi_url=_OPENAPI_URL,
+)
+
+# Middleware runs bottom-up on the way in, so the request id is established
+# first and is therefore available to everything above it, including the
+# exception handler that has to report it.
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    https_only=settings.APP_ENV.is_production,
+    docs_paths=tuple(p for p in (_DOCS_URL, _REDOC_URL, _OPENAPI_URL) if p),
+)
+app.add_middleware(RequestContextMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,   # validated: never "*"
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
+)
+
+# ── Rate limiting ─────────────────────────────────────────────
+from truthshield.api.limits import limiter  # noqa: E402
+
+if limiter is not None:
+    from slowapi.errors import RateLimitExceeded
+    from slowapi.middleware import SlowAPIMiddleware
+
+    from truthshield.api.errors import rate_limited
+
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, rate_limited)
+    # The middleware is what actually applies default_limits. Without it the
+    # limiter exists and enforces nothing.
+    app.add_middleware(SlowAPIMiddleware)
+    logger.info(
+        "Rate limiting: %s on every route, %s on auth, %s on inline analysis",
+        settings.RATE_LIMIT, settings.RATE_LIMIT_AUTH, settings.RATE_LIMIT_ANALYSIS,
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled(request: Request, exc: Exception):
+    """
+    Never leak internals.
+
+    The previous API returned exception text in `detail`, which described the
+    token verification setup to anyone who sent a malformed token.
+    """
+    request_id = current_request_id()
+    logger.error(
+        "Unhandled error on %s %s [%s]",
+        request.method, request.url.path, request_id, exc_info=exc,
+    )
+    # The id, and only the id. It is meaningless to an attacker and is the
+    # one thing that lets an operator find this exact failure in the logs
+    # when a user reports it.
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "INTERNAL_ERROR",
+                "message": "Internal server error.",
+                "request_id": request_id,
+            },
+            "detail": "Internal server error.",
+            "request_id": request_id,
+        },
+        headers={"X-Request-ID": request_id},
+    )
+
+
+register_error_handlers(app)
+
+app.include_router(auth_router, prefix="/api/v1")
+app.include_router(analysis_router, prefix="/api/v1")
+app.include_router(stream_router, prefix="/api/v1")
+app.include_router(insights_router, prefix="/api/v1")
+app.include_router(claims_router, prefix="/api/v1")
+app.include_router(sharing_router, prefix="/api/v1")
+app.include_router(fraud_router, prefix="/api/v1")
+app.include_router(meta_router, prefix="/api/v1")
+app.include_router(investigations_router, prefix="/api/v1")
+app.include_router(analyze_v2_router, prefix="/api/v1")
+app.include_router(platform_router, prefix="/api/v1")
+app.include_router(admin_router, prefix="/api/v1")
+
+
+@app.get("/", tags=["meta"])
+def root():
+    return {
+        "service": "TruthShield",
+        "version": app.version,
+        "docs": "/docs",
+        "health": "/api/v1/health",
+    }

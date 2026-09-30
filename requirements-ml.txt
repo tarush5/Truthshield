@@ -1,0 +1,15 @@
+# Optional local inference. Adds roughly 2 GB.
+#
+# Without these the detectors report UNAVAILABLE and the analysis says so,
+# rather than returning a clean score for a check that never ran. Install
+# alongside requirements.txt and set ENABLE_ML_DETECTORS=true.
+
+-r requirements.txt
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.6
+torchvision>=0.21
+transformers>=4.44
+opencv-python-headless>=4.10
+librosa>=0.10
+soundfile>=0.12

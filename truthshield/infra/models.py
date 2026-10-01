@@ -26,7 +26,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import JSON
 
-from truthshield.infra.database import GUID, Base
+from truthshield.infra.database import GUID, Base, Embedding
 
 # JSONB on Postgres (indexable, binary); plain JSON elsewhere.
 JSONType = JSON().with_variant(JSONB(), "postgresql")
@@ -286,6 +286,9 @@ class InvestigationInput(Base, TimestampMixin):
     size_bytes = Column(Integer, nullable=False, default=0)
     mime_type = Column(String(100), nullable=True)
     filename = Column(String(255), nullable=True)
+    # Where an uploaded file lives in object storage (content-addressed by
+    # SHA-256). Null for text inputs.
+    storage_key = Column(String(255), nullable=True)
     meta = Column(JSONType, nullable=True)
 
     investigation = relationship("Investigation", back_populates="inputs")
@@ -364,3 +367,99 @@ class InvestigationCounter(Base):
 
     year = Column(Integer, primary_key=True, autoincrement=False)
     value = Column(Integer, nullable=False, default=0)
+
+
+# ══════════════════════════════════════════════════════════════
+# Evidence store (2.0 Phase 2)
+# ══════════════════════════════════════════════════════════════
+
+class Source(Base, TimestampMixin):
+    """
+    A publisher, as a registry entry.
+
+    `category` and `credibility` start from heuristics (domain suffix, the
+    1.x credibility database) and are signals, never truth. An administrator
+    can curate them; a curated entry is not overwritten by later heuristics.
+    """
+
+    __tablename__ = "sources"
+
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    domain = Column(String(255), unique=True, nullable=False, index=True)
+    name = Column(String(255), nullable=True)
+    category = Column(String(16), nullable=False, default="UNKNOWN", index=True)
+    credibility = Column(Float, nullable=False, default=0.5)
+    curated = Column(Boolean, nullable=False, default=False, server_default=false())
+    notes = Column(Text, nullable=True)
+    first_seen_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    last_seen_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
+
+    documents = relationship("EvidenceDocument", back_populates="source")
+
+
+class EvidenceDocument(Base, TimestampMixin):
+    """
+    A retrieved or ingested document.
+
+    The store is a cache of the web plus curated uploads: when the same URL is
+    fetched again with different content its chunks are replaced. What an
+    investigation *used* is snapshotted into that investigation's result, so
+    past investigations are unaffected.
+    """
+
+    __tablename__ = "evidence_documents"
+
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    source_id = Column(GUID, ForeignKey("sources.id", ondelete="SET NULL"), nullable=True, index=True)
+    url = Column(Text, nullable=False)
+    url_sha256 = Column(String(64), unique=True, nullable=False, index=True)
+    title = Column(Text, nullable=True)
+    author = Column(String(255), nullable=True)
+    published_at = Column(DateTime(timezone=True), nullable=True)
+    retrieved_at = Column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    content_scope = Column(String(16), nullable=False, default="snippet")   # snippet | full_text | uploaded
+    content_sha256 = Column(String(64), nullable=False)
+    provider = Column(String(48), nullable=True)
+    language = Column(String(8), nullable=True)
+    meta = Column(JSONType, nullable=True)
+    ingested_by = Column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    source = relationship("Source", back_populates="documents")
+    chunks = relationship("EvidenceChunk", back_populates="document",
+                          cascade="all, delete-orphan", passive_deletes=True,
+                          order_by="EvidenceChunk.chunk_index")
+
+
+class EvidenceChunk(Base, TimestampMixin):
+    __tablename__ = "evidence_chunks"
+    __table_args__ = (
+        Index("ix_evidence_chunks_model", "embedding_model"),
+    )
+
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    document_id = Column(GUID, ForeignKey("evidence_documents.id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+    chunk_index = Column(Integer, nullable=False)
+    text = Column(Text, nullable=False)
+    char_start = Column(Integer, nullable=False, default=0)
+    char_end = Column(Integer, nullable=False, default=0)
+    embedding = Column(Embedding, nullable=True)
+    # Vectors from different models are never compared; search filters on this.
+    embedding_model = Column(String(80), nullable=False)
+
+    document = relationship("EvidenceDocument", back_populates="chunks")
+
+
+class ClaimRecord(Base, TimestampMixin):
+    """A claim extracted in an investigation, normalised out of the result for search."""
+
+    __tablename__ = "claims"
+
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    investigation_id = Column(GUID, ForeignKey("investigations.id", ondelete="CASCADE"),
+                              nullable=False, index=True)
+    claim_key = Column(String(8), nullable=False)          # C1, C2, ...
+    text = Column(Text, nullable=False)
+    assessment = Column(String(24), nullable=False, index=True)
+    confidence = Column(Float, nullable=True)
+    source_count = Column(Integer, nullable=False, default=0)

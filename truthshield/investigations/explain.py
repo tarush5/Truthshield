@@ -10,7 +10,7 @@ could not be traced back to anything.
 
 from __future__ import annotations
 
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 from truthshield.fraud.contract import FraudCategory
 from truthshield.fraud.guidance import for_category
@@ -65,6 +65,10 @@ def classify(assessment: RiskAssessment, engines: Sequence[EngineResult]) -> tup
         return "potential_phishing", FraudCategory(lead)
     if categories:
         return "potential_scam", FraudCategory(categories[0])
+    media_points = assessment.families["document_media"].points if "document_media" in assessment.families else 0
+    if media_points >= assessment.score * 0.5:
+        # Indicators, not a finding of forgery -- the label says "potential".
+        return "potential_document_manipulation", FraudCategory.UNKNOWN
     if evidence_points > 0:
         return "potential_misinformation", FraudCategory.NONE
     if any(c.startswith("manipulation_") for c in codes):
@@ -87,15 +91,37 @@ def summarise(assessment: RiskAssessment, classification: str) -> str:
     )
 
 
+DOCUMENT_ACTIONS = {
+    "headline": "Confirm this document with its issuer before acting on it.",
+    "do_now": [
+        "Contact the issuer using details you already hold (a past invoice, their website, a known phone number) "
+        "and confirm the amount, the reference number and the bank details.",
+        "Ask for the original file directly from the issuer if this copy came through a third party.",
+    ],
+    "do_not": [
+        "Do not pay to bank details that differ from those on earlier, verified documents.",
+        "Do not rely on contact details printed on this document to verify it.",
+    ],
+    "if_already_acted": [
+        "If you paid, contact your bank immediately and ask about recalling the transfer.",
+        "Keep the document and all related emails or messages; they are evidence.",
+    ],
+    "verify_how": "Check totals and dates against your own records and the issuer's confirmation.",
+}
+
+
 def recommended_actions(classification: str, category: FraudCategory) -> dict:
     if classification == "potential_misinformation":
         return MISINFORMATION_ACTIONS
+    if classification == "potential_document_manipulation":
+        return DOCUMENT_ACTIONS
     if classification in ("no_significant_signals",):
         return GENERAL_ACTIONS
     return for_category(category).as_dict()
 
 
-def explanation(assessment: RiskAssessment, classification: str) -> dict:
+def explanation(assessment: RiskAssessment, classification: str, llm: Optional[dict] = None) -> dict:
+    llm = llm or {"status": "not_configured", "text": None, "note": "No language model is configured."}
     return {
         "summary": summarise(assessment, classification),
         "top_signals": [
@@ -103,12 +129,16 @@ def explanation(assessment: RiskAssessment, classification: str) -> dict:
             for c in assessment.contributions[:5] if c.points > 0
         ],
         "method": "Deterministic summary of the risk contributions; every statement maps to a listed signal.",
-        "llm": None,
-        "llm_status": "not_used",
-        "llm_note": (
-            "No language model was used to write or decide anything in this investigation. "
-            "LLM-written interpretation arrives in a later phase and will be labelled as such."
+        # The interpretation, when one exists, sits beside the deterministic
+        # summary. It never decided anything above it.
+        "llm": llm.get("text"),
+        "llm_status": llm.get("status"),
+        "llm_note": llm.get("note") or (
+            "No language model decided anything in this investigation; scores and claim "
+            "assessments come from the engines."
         ),
+        "llm_meta": {k: llm.get(k) for k in ("model", "provider", "input_tokens", "output_tokens", "citations")
+                     if llm.get(k) is not None},
     }
 
 

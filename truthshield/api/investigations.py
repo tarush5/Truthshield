@@ -13,7 +13,9 @@ import io
 import uuid
 from typing import Literal, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Query, Request, Response, UploadFile
+from fastapi.responses import FileResponse
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -95,8 +97,12 @@ def create(
         )
     except InvestigationError as exc:
         _raise(exc)
+    return _dispatch_or_fail(session, inv, background)
+
+
+def _dispatch_or_fail(session, inv, background, mode=None) -> "CreatedResponse":
     try:
-        executor = service.dispatch(inv, background=background)
+        executor = service.dispatch(inv, background=background, mode=mode)
     except InvestigationError as exc:
         # Never leave a QUEUED record that nothing will ever pick up.
         inv.status = "FAILED"
@@ -109,6 +115,36 @@ def create(
         links={"self": f"/api/v1/investigations/{inv.id}",
                "events": f"/api/v1/investigations/{inv.id}/events"},
     )
+
+
+async def _receive_file(file: UploadFile, session, principal):
+    from truthshield.investigations.files import FileRejected, receive
+    from truthshield.settings import get_settings
+
+    try:
+        stored = await receive(file, max_bytes=get_settings().max_upload_bytes)
+    except FileRejected as exc:
+        raise ApiError(exc.status, exc.code, exc.message)
+    return await run_in_threadpool(service.create_file_investigation, session, principal, stored)
+
+
+@investigations_router.post("/upload", status_code=202, response_model=CreatedResponse)
+@expensive_limit
+async def upload(
+    request: Request,
+    background: BackgroundTasks,
+    file: UploadFile = File(..., description="PDF, PNG, JPEG or WebP. The contents must match the extension."),
+    principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
+):
+    """
+    Investigate an uploaded document (PDF) or image (screenshot, photo).
+
+    The file is streamed to storage under a size cap, hashed, and accepted only
+    if its magic bytes match its extension. It is parsed, never executed.
+    """
+    inv = await _receive_file(file, session, principal)
+    return await run_in_threadpool(_dispatch_or_fail, session, inv, background)
 
 
 @investigations_router.get("")
@@ -196,6 +232,30 @@ def export(
     return Response(buffer.getvalue(), media_type="text/csv", headers=headers)
 
 
+@investigations_router.get("/{ident}/file")
+def get_file(
+    ident: str,
+    principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
+):
+    """The uploaded file, to its owner (or an admin). Served inert: no sniffing, sandboxed."""
+    from truthshield.storage import get_storage
+
+    inv = _find(session, principal, ident)
+    source = inv.inputs[0] if inv.inputs else None
+    if source is None or not source.storage_key:
+        raise ApiError(404, "NOT_FOUND", "This investigation has no uploaded file.")
+    path = get_storage().path_for(source.storage_key)
+    if not path.exists():
+        raise ApiError(404, "NOT_FOUND", "The stored file is no longer available.")
+    return FileResponse(
+        path, media_type=source.mime_type or "application/octet-stream",
+        filename=source.filename, content_disposition_type="inline",
+        headers={"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox",
+                 "Cache-Control": "private, no-store"},
+    )
+
+
 @investigations_router.delete("/{ident}", status_code=204)
 def delete_investigation(
     ident: str,
@@ -243,6 +303,37 @@ def analyze_email(request: Request, body: ContentBody, principal: Principal = De
     return _analyze_inline(session, principal, "email", body.content)
 
 
+async def _analyze_file_inline(file: UploadFile, session, principal, expected: str):
+    inv = await _receive_file(file, session, principal)
+    if inv.type != expected:
+        inv.status = "FAILED"
+        inv.error = f"Expected a {expected} upload."
+        session.commit()
+        raise ApiError(415, "UNSUPPORTED_FILE",
+                       f"This endpoint takes a {'PDF' if expected == 'document' else 'PNG, JPEG or WebP image'}.")
+    await run_in_threadpool(service.dispatch, inv, mode="inline")
+    session.expire_all()
+    return service.detail(service.find(session, principal, str(inv.id)), principal)
+
+
+@analyze_v2_router.post("/pdf")
+@expensive_limit
+async def analyze_pdf(request: Request, file: UploadFile = File(...),
+                      principal: Principal = Depends(require_principal),
+                      session: Session = Depends(get_session)):
+    """Investigate a PDF and return the completed result in one call."""
+    return await _analyze_file_inline(file, session, principal, "document")
+
+
+@analyze_v2_router.post("/image")
+@expensive_limit
+async def analyze_image(request: Request, file: UploadFile = File(...),
+                        principal: Principal = Depends(require_principal),
+                        session: Session = Depends(get_session)):
+    """Investigate a screenshot or photo (metadata + OCR) and return the completed result."""
+    return await _analyze_file_inline(file, session, principal, "image")
+
+
 @analyze_v2_router.post("/url")
 @expensive_limit
 def analyze_url(request: Request, body: UrlBody, principal: Principal = Depends(require_principal),
@@ -287,10 +378,14 @@ def system_health(session: Session = Depends(get_session)):
 
     settings = get_settings()
     base = health().model_dump()
+    from truthshield.providers import get_embedding_model, status as providers_status
+    from truthshield.rag import EvidenceStore
+
     try:
         completed = session.query(Investigation).filter(Investigation.status == "COMPLETED").count()
+        evidence_stats = EvidenceStore(session, get_embedding_model()).stats()
     except Exception:
-        completed = None
+        completed, evidence_stats = None, None
     return {
         **base,
         "engines": catalogue(),
@@ -303,6 +398,8 @@ def system_health(session: Session = Depends(get_session)):
             "completed_total": completed,
         },
         "languages": ["en", "hi", "ta"],
+        "providers": providers_status(),
+        "evidence_store": evidence_stats,
     }
 
 

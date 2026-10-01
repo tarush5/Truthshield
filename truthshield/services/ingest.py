@@ -225,7 +225,7 @@ def _read_document(packet: ContentPacket, path: str) -> None:
     ext = os.path.splitext(path)[1].lower()
     if ext == ".pdf":
         try:
-            from PyPDF2 import PdfReader
+            from pypdf import PdfReader
             pages = [p.extract_text() or "" for p in PdfReader(path).pages]
             joined = "\n".join(pages).strip()
             if joined:

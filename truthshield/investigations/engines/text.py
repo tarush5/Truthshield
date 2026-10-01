@@ -27,6 +27,8 @@ from truthshield.investigations.types import (
 # URL engine, so a link is scored once, by the engine that understands it.
 TEXT_DETECTORS = ("message_scam", "email_fraud")
 
+TRANSACTIONAL_DOCUMENTS = {"invoice", "receipt", "bank_statement"}
+
 HINTS = {
     InvestigationType.MESSAGE: "SMS",
     InvestigationType.EMAIL: "EMAIL_MESSAGE",
@@ -40,13 +42,13 @@ class TextEngine(Engine):
     describes = "Language, entities, claims, intent, scam and manipulation signals in text"
 
     def applies_to(self, ctx: InvestigationContext) -> bool:
-        return ctx.type is not InvestigationType.URL and bool(ctx.content.strip())
+        return ctx.type is not InvestigationType.URL and bool((ctx.text or ctx.content).strip())
 
     def _signal(self, **kwargs) -> Signal:
         return Signal(engine=self.name, engine_version=self.version, **kwargs)
 
     def _run(self, ctx: InvestigationContext, result: EngineResult) -> None:
-        text = ctx.content
+        text = ctx.text or ctx.content
 
         # ── Language, normalisation, segmentation ────────────
         language = nlp.detect_language(text)
@@ -88,14 +90,26 @@ class TextEngine(Engine):
             )
 
         # ── Claims ───────────────────────────────────────────
-        result.artifacts["claims"] = self._claims(normalized, language.detected, result)
+        # Invoices, receipts and statements are transactional: their lines are
+        # amounts and parties, not public claims, and messaging-scam wording
+        # ("GST ... amount due") is simply what they say. Their own consistency
+        # checks live in the document engine.
+        transactional = ctx.artifacts.get("document_type") in TRANSACTIONAL_DOCUMENTS
+        if transactional:
+            result.artifacts["claims"] = []
+            result.limitations.append(
+                "Transactional document: message-scam, persuasion and claim checks do not apply to "
+                "invoice or statement lines; the document engine's consistency checks cover it."
+            )
+        else:
+            result.artifacts["claims"] = self._claims(normalized, language.detected, result)
 
         # ── Intent ───────────────────────────────────────────
         intents = nlp.detect_intents(normalized)
         result.artifacts["intents"] = intents
 
         # ── Scam / phishing (1.x detectors) ──────────────────
-        covered = self._fraud_detectors(ctx, normalized, result)
+        covered = set() if transactional else self._fraud_detectors(ctx, normalized, result)
 
         # ── Intent signals not already covered ───────────────
         intent_codes = {i["intent"]: i for i in intents}
@@ -121,7 +135,8 @@ class TextEngine(Engine):
             ))
 
         # ── Manipulation register (1.x) ──────────────────────
-        self._manipulation(normalized, covered, result, ctx)
+        if not transactional:
+            self._manipulation(normalized, covered, result, ctx)
 
         # ── Prompt injection ─────────────────────────────────
         injections = nlp.detect_prompt_injection(normalized)
@@ -143,8 +158,14 @@ class TextEngine(Engine):
     # Sentences that ask the reader to *do* something are not factual claims:
     # "update your KYC at <link> and share the OTP" has no truth value to look
     # up, and sending it to web search costs seconds and returns noise.
-    INSTRUCTION_INTENTS = {"credential_request", "otp_request", "payment_request", "link_click"}
+    # Statements *about the recipient* ("you have won", "your account will be
+    # blocked") are not public facts either: no source can confirm what one
+    # stranger told another, so searching them only returns noise.
+    INSTRUCTION_INTENTS = {"credential_request", "otp_request", "payment_request", "link_click",
+                           "prize_claim", "account_threat"}
     MIN_CLAIM_WORDS = 5
+    # Longer than this is a paragraph or a whole page, not one assertion.
+    MAX_CLAIM_WORDS = 60
 
     def _claims(self, text: str, language: str, result: EngineResult) -> List[dict]:
         from truthshield.domain.verdict.claim_extractor import ClaimExtractor
@@ -159,7 +180,8 @@ class TextEngine(Engine):
                 continue
             # "It is 100% proven" has no subject to look up; searching it
             # matches any page containing the same words.
-            if len(nlp.WORD_RE.findall(claim.text)) < self.MIN_CLAIM_WORDS:
+            words = len(nlp.WORD_RE.findall(claim.text))
+            if words < self.MIN_CLAIM_WORDS or words > self.MAX_CLAIM_WORDS:
                 excluded += 1
                 continue
             claims.append({
@@ -173,8 +195,8 @@ class TextEngine(Engine):
         if excluded:
             result.limitations.append(
                 f"{excluded} sentence{'s were' if excluded != 1 else ' was'} not fact-checked: "
-                "instructions, links and fragments without a subject have no truth value to "
-                "verify against sources."
+                "instructions, links, statements addressed to the recipient and fragments "
+                "without a subject cannot be verified against public sources."
             )
         return claims
 
@@ -248,7 +270,8 @@ class TextEngine(Engine):
             severity = Severity.MEDIUM if strong else Severity.LOW
             # Typographic emphasis alone ("See you then!") is ordinary writing;
             # only heavy shouting is worth a point.
-            if item["signal"] == "shouting" and item["strength"] < 0.5:
+            # In an uploaded file, capitals are layout (headings), not emphasis.
+            if item["signal"] == "shouting" and (item["strength"] < 0.5 or ctx.type.is_file):
                 severity = Severity.INFO
             result.signals.append(self._signal(
                 code=f"manipulation_{item['signal']}",

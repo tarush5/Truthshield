@@ -173,13 +173,27 @@ class TestPageAnalysis:
 
 
 class TestEvidenceEngine:
-    def test_offline_claims_are_reported_as_not_checked(self):
+    def test_offline_checks_the_local_store_only_and_says_so(self):
+        text = "The zorbulax festival of quintwhistle was cancelled by its organisers."
+        c = ctx(text)
+        c.artifacts["claims"] = [{"id": "C1", "text": text}]
+        result = EvidenceEngine().run(c)
+        claim = result.artifacts["claims"][0]
+        assert claim["assessment"] == "INSUFFICIENT_EVIDENCE" and claim["sources"] == []
+        assert claim["retrieval"]["live_search"] == "unavailable"
+        assert "evidence store" in claim["reasoning"]
+        assert any("local evidence store only" in lim for lim in result.limitations)
+        assert result.signals == [], "an unsupported claim is never scored as contradicted"
+
+    def test_disabled_retrieval_reports_claims_as_not_checked(self, monkeypatch):
+        from truthshield.settings import get_settings
+
+        monkeypatch.setattr(get_settings(), "EVIDENCE_RETRIEVAL_ENABLED", False)
         c = ctx("The moon is made of cheese.")
         c.artifacts["claims"] = [{"id": "C1", "text": "The moon is made of cheese."}]
         result = EvidenceEngine().run(c)
         assert result.status is EngineStatus.UNAVAILABLE
         assert result.artifacts["claims"][0]["assessment"] == "NOT_CHECKED"
-        assert result.signals == [], "an unchecked claim is never scored as contradicted"
 
     def test_contradicted_claim_becomes_a_retrieved_signal(self, monkeypatch):
         from truthshield.domain.types import ClaimVerdict, Claim, EvidenceItem, Stance, Verdict

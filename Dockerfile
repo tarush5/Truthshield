@@ -11,8 +11,11 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # libpq for psycopg2; the rest are what OpenCV and Pillow link against.
+# tesseract-ocr (+ Hindi and Tamil traineddata) is the OCR provider for
+# scanned PDFs and screenshots; without it OCR reports itself unavailable.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpq5 libglib2.0-0 libgl1 curl \
+        tesseract-ocr tesseract-ocr-eng tesseract-ocr-hin tesseract-ocr-tam \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -27,7 +30,7 @@ COPY alembic.ini .
 
 # Non-root. A container that gets popped should not also be root.
 RUN useradd --create-home --uid 10001 app \
-    && mkdir -p /app/.uploads /app/.model_cache \
+    && mkdir -p /app/.uploads /app/.model_cache /app/.storage \
     && chown -R app:app /app
 USER app
 

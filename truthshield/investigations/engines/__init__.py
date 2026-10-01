@@ -12,13 +12,21 @@ from __future__ import annotations
 from typing import List
 
 from truthshield.investigations.engines.base import Engine
+from truthshield.investigations.engines.document import DocumentEngine
 from truthshield.investigations.engines.evidence import EvidenceEngine
+from truthshield.investigations.engines.image import ImageEngine
 from truthshield.investigations.engines.text import TextEngine
 from truthshield.investigations.engines.url import UrlEngine
 
 # (engine, pipeline stage it runs in)
+_MEDIA_ENGINES: List[Engine] = [DocumentEngine(), ImageEngine()]
 _ANALYSIS_ENGINES: List[Engine] = [TextEngine(), UrlEngine()]
 _EVIDENCE_ENGINES: List[Engine] = [EvidenceEngine()]
+
+
+def media_engines() -> List[Engine]:
+    """File engines: extract text (and file-level signals) before the text engine runs."""
+    return list(_MEDIA_ENGINES)
 
 
 def analysis_engines() -> List[Engine]:
@@ -30,7 +38,7 @@ def evidence_engines() -> List[Engine]:
 
 
 def catalogue() -> List[dict]:
-    return [e.describe() for e in _ANALYSIS_ENGINES + _EVIDENCE_ENGINES]
+    return [e.describe() for e in _MEDIA_ENGINES + _ANALYSIS_ENGINES + _EVIDENCE_ENGINES]
 
 
-__all__ = ["Engine", "analysis_engines", "catalogue", "evidence_engines"]
+__all__ = ["Engine", "analysis_engines", "catalogue", "evidence_engines", "media_engines"]

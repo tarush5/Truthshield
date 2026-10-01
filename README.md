@@ -22,20 +22,22 @@ Every result keeps five kinds of information apart: **verified input facts**
 
 ---
 
-## What works today (Phase 1)
+## What works today (Phases 1–2)
 
 | | |
 |---|---|
 | **Investigations** | `TS-2026-000042` IDs · 12 audited pipeline stages · SHA-256 on every input · live progress |
 | **Text engine** | English / Hindi / Tamil detection · entities (URLs, phones, UPI, amounts, dates, organisations) · claims · intent · scam categories (Hinglish-aware) · manipulation tactics · prompt-injection flag |
 | **URL engine** | Typosquats · brand mismatch · structural phishing rules · feature vector (entropy, digit ratio, …) · SSRF-guarded page inspection (forms, redirects, scripts), never executing JS |
-| **Evidence engine** | Claim verification against retrieved sources: `SUPPORTED` / `CONTRADICTED` / `MIXED` / `INSUFFICIENT_EVIDENCE`, never forced |
+| **Evidence (RAG)** | Evidence store on pgvector: hybrid semantic + keyword search, query expansion, reranking, live search when the store is thin. Claims end `SUPPORTED` / `CONTRADICTED` / `MIXED` / `INSUFFICIENT_EVIDENCE`, never forced, never decided by an LLM |
+| **Documents & images** | PDF forensics (active content, incremental edits, metadata, totals and dates, reused invoice numbers), OCR of scanned pages and screenshots, secure uploads (bytes must match the extension) |
+| **Providers** | Swappable LLM (Claude, Gemini), search, embeddings and OCR, with retries and circuit breakers. LLM output is a labelled, citation-checked interpretation only |
 | **Risk engine** | Configurable weights · noisy-OR across signal families · exact per-signal attribution (the breakdown sums to the score) · confidence as its own axis |
 | **Security** | JWT + rotating refresh tokens with reuse detection · USER/ANALYST/ADMIN · lockout · audit log · rate limits · error envelope with request IDs |
 | **Frontend** | React 19 + TypeScript: landing page, dashboard (real aggregates), investigate workspace, 9-tab result page, history, URL intelligence |
 
-Image, audio, video, PDF/OCR, transactions, pgvector RAG, agents and the
-knowledge graph are **planned, not faked**. The UI labels each one with its
+Pixel forensics, audio, video, transactions, agents and the knowledge
+graph are **planned, not faked**. The UI labels each one with its
 phase. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Run it
@@ -71,7 +73,7 @@ The synthetic demos work either way.
 ## Test
 
 ```bash
-pytest tests/ -q            # backend: 409 tests, offline and deterministic
+pytest tests/ -q            # backend: 477 tests, offline and deterministic
 ruff check truthshield tests
 cd frontend && npm run typecheck && npm test && npm run build
 ```
@@ -85,7 +87,7 @@ and up again, fails on model/migration drift (`alembic check`), and enforces a
 [Architecture](ARCHITECTURE.md) · [Migration from 1.x](docs/MIGRATION.md) ·
 [Database](docs/DATABASE.md) · [API](docs/API.md) ·
 [AI services](docs/AI_SERVICES.md) · [Workers](docs/WORKERS.md) ·
-[Frontend](docs/FRONTEND.md) · [Roadmap & acceptance status](docs/ROADMAP.md)
+[Frontend](docs/FRONTEND.md) · [RAG](docs/RAG.md) · [Roadmap & acceptance status](docs/ROADMAP.md)
 
 ## Known limitations
 

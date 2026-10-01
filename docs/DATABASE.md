@@ -97,14 +97,23 @@ Postgres and SQLite (≥ 3.35).
 `reports`, `evidence`, `feedback`: the fact-check report store. These are
 still written by `/analyze` and read by history and share links.
 
+### 1.4 Evidence store and files (Phase 2, migration `b52e81c0d9a3`)
+
+| Table | Key columns |
+|---|---|
+| `sources` | `domain` (unique), `category` (`PRIMARY`/`OFFICIAL`/`SECONDARY`/`COMMUNITY`/`UNKNOWN`), `credibility`, `curated`, first/last seen |
+| `evidence_documents` | `url_sha256` (unique), `source_id`, title, `published_at`, `retrieved_at`, `content_scope`, `content_sha256`, provider |
+| `evidence_chunks` | `document_id` (CASCADE), `chunk_index`, text, char offsets, **`embedding vector(384)`** (JSON on SQLite), `embedding_model`. PostgreSQL: HNSW (`vector_cosine_ops`) and GIN `to_tsvector('simple', text)` indexes |
+| `claims` | `investigation_id` (CASCADE), `claim_key`, text, `assessment`, confidence, `source_count` |
+| `investigation_inputs.storage_key` | SHA-256 key of an uploaded file in content-addressed storage |
+
+Uploaded files live in `STORAGE_DIR` under their SHA-256 (`ab/cd/<digest>`), never under a user-supplied
+name. Identical uploads share one copy; the file is deleted with the last investigation that references it.
+
 ## 2. Planned tables
 
 | Table | Phase | Notes |
 |---|---|---|
-| `files` | 3 | Object-storage key, SHA-256, sniffed MIME, size, retention deadline |
-| `claims` | 2 | Extracted claims normalised out of `result` for search |
-| `sources` | 2 | Publisher, domain, category (`PRIMARY` / `OFFICIAL` / `SECONDARY` / `COMMUNITY` / `UNKNOWN`), first/last seen |
-| `evidence_chunks` | 2 | `document_id`, `chunk_id`, text, `embedding vector(384)` (**pgvector**), metadata; HNSW index |
 | `entities`, `relationships` | 5 | Knowledge graph as adjacency tables (`MENTIONS`, `SUPPORTS`, `CONTRADICTS`, …) |
 | `transactions` | 4 | Normalised transaction rows plus engineered features |
 | `reports` (v2) | 6 | Generated PDF/CSV artefacts per investigation |

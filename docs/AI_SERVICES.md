@@ -101,21 +101,35 @@ stance → verdict. The verdict maps to the spec vocabulary:
 domain, credibility score, stance and `retrieved_at`. It is skipped, with a
 stated reason, when `OFFLINE_MODE=true` or no claims were found.
 
+### 2.4 Document engine (`document`, heuristic, v1.0.0, Phase 2)
+
+PDF → structure scan (JavaScript, launch actions, embedded files; incremental saves via `%%EOF` count) →
+metadata (producer/creator, creation/modification dates) → text per page (page cap `MAX_PDF_PAGES`) → OCR
+for pages with no text layer → document type (invoice, receipt, bank statement, contract, certificate,
+government, other) → fields (invoice number, dates, subtotal/tax/total, GSTIN, PAN, IFSC) → consistency
+(totals, due vs. issue date, future dates, invoice number reused on a different file by the same owner).
+All findings are `document_media` signals phrased as **potential manipulation indicators**. Extracted text
+goes on to the text, URL and evidence engines; transactional documents skip message-scam and claim checks.
+
+### 2.5 Image engine (`image`, heuristic, v1.0.0, Phase 2)
+
+Decode with a pixel cap (decompression-bomb guard) → EXIF (software, camera, dates) → OCR with per-word
+boxes and confidence → extracted text to the text engine. Pixel forensics are Phase 3 and listed as not
+performed on every image result.
+
 ## 3. Explanation layer
 
 Deterministic. It builds the summary sentence, the top signals and the
-recommended actions (1.x per-category safety guidance) from the risk
-assessment. `explanation.llm` is `null` in Phase 1. When an LLM provider is
-configured (Phase 2), it receives only structured findings, never raw input
-as instructions. Its output must cite signal codes or source ids that
-exist, or it is discarded.
+recommended actions (1.x per-category safety guidance, plus document-specific
+guidance) from the risk assessment. When an LLM provider is configured, a
+grounded interpretation is added beside it: findings-only prompt, validated
+citations, no score changes. See [RAG.md](RAG.md#grounded-interpretation).
 
 ## 4. Planned engines
 
 | Engine | Phase | Approach |
 |---|---|---|
-| Document (PDF) | 2 | pypdf metadata/text → OCR fallback → table extraction → numeric consistency (totals, dates, duplicate invoice IDs) |
-| OCR | 2 | Tesseract / PaddleOCR behind `BaseOCRProvider`; boxes and confidences |
+| PDF tables | 3 | Table extraction to check line items against the subtotal |
 | Image forensics | 3 | EXIF, ELA / JPEG ghosts, copy-move (ORB keypoints), heatmap |
 | Image synthetic media | 3 | Face detect → align → classifier (EfficientNet/ViT) with calibrated confidence and model version |
 | Audio | 3 | VAD → Whisper transcript → ECAPA embeddings → synthetic-speech classifier → text engine on the transcript |

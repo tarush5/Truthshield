@@ -28,10 +28,10 @@ from typing import Callable, List, Optional
 from sqlalchemy.orm import Session
 
 from truthshield.infra.models import (
-    Investigation, InvestigationEvent, ModelPrediction as PredictionRow, RiskFactor,
+    ClaimRecord, Investigation, InvestigationEvent, ModelPrediction as PredictionRow, RiskFactor,
 )
 from truthshield.investigations import explain
-from truthshield.investigations.engines import analysis_engines, evidence_engines
+from truthshield.investigations.engines import analysis_engines, evidence_engines, media_engines
 from truthshield.investigations.risk import RiskEngine
 from truthshield.investigations.types import (
     STAGE_STATUS, EngineResult, EngineStatus, InvestigationContext, InvestigationStatus,
@@ -43,7 +43,10 @@ logger = logging.getLogger(__name__)
 SCHEMA_VERSION = "2.0"
 
 # Which families an engine can assess when it runs.
-ENGINE_FAMILIES = {"text": {"nlp"}, "url": {"url"}, "evidence": {"evidence"}}
+ENGINE_FAMILIES = {
+    "text": {"nlp"}, "url": {"url"}, "evidence": {"evidence"},
+    "document": {"document_media"}, "image": {"document_media"},
+}
 
 
 def _now() -> datetime:
@@ -163,16 +166,36 @@ class InvestigationRunner:
         settings = get_settings()
         engines: List[EngineResult] = []
 
+        kind = InvestigationType(inv.type)
+        file_path = None
+
         with recorder.stage(Stage.VALIDATION, "gateway") as st:
-            content = source.content or ""
-            if not content.strip():
-                raise ValueError("empty input")
-            if len(content) > settings.MAX_TEXT_LENGTH:
-                raise ValueError("input exceeds the configured limit")
-            st.message = f"{inv.type} input, {len(content)} characters, within limits"
+            if kind.is_file:
+                from truthshield.storage import get_storage
+
+                path = get_storage().path_for(source.storage_key)
+                if not path.exists():
+                    raise FileNotFoundError("stored upload is missing")
+                file_path = str(path)
+                content = ""
+                st.message = f"{source.mime_type} upload, {source.size_bytes:,} bytes, type verified at intake"
+            else:
+                content = source.content or ""
+                if not content.strip():
+                    raise ValueError("empty input")
+                if len(content) > settings.MAX_TEXT_LENGTH:
+                    raise ValueError("input exceeds the configured limit")
+                st.message = f"{inv.type} input, {len(content)} characters, within limits"
 
         with recorder.stage(Stage.HASHING, "gateway") as st:
-            digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            if file_path:
+                hasher = hashlib.sha256()
+                with open(file_path, "rb") as fh:
+                    for block in iter(lambda: fh.read(1024 * 1024), b""):
+                        hasher.update(block)
+                digest = hasher.hexdigest()
+            else:
+                digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
             if digest != source.sha256:
                 # The stored input no longer matches what was hashed at intake.
                 raise RuntimeError("input integrity check failed")
@@ -181,31 +204,51 @@ class InvestigationRunner:
 
         ctx = InvestigationContext(
             investigation_id=str(inv.id),
-            type=InvestigationType(inv.type),
+            type=kind,
             content=content,
+            text=content,
             input_sha256=digest,
             allow_page_fetch=not inv.is_demo,
+            file_path=file_path,
+            mime_type=source.mime_type,
+            filename=source.filename,
+            owner_id=str(inv.user_id) if inv.user_id else None,
         )
         text_engine, url_engine = analysis_engines()
 
         with recorder.stage(Stage.EXTRACTION, text_engine.name) as st:
+            parts = []
+            for media in media_engines():
+                media_result = media.run(ctx)
+                if media_result.status is EngineStatus.NOT_APPLICABLE:
+                    continue
+                engines.append(media_result)
+                st.service = media.name
+                if media.name == "document":
+                    self._duplicate_invoice(recorder.session, inv, media_result)
+                parts.append(f"{media.name}: {len(ctx.text):,} characters extracted")
             text_result = text_engine.run(ctx)
             engines.append(text_result)
             ctx.artifacts.update(text_result.artifacts)
             if text_result.status is EngineStatus.NOT_APPLICABLE:
+                if kind.is_file:
+                    raise StageSkipped("; ".join(parts) or "No text could be extracted from the file.")
                 raise StageSkipped("Input is a bare URL; no free text to extract from.")
             entities = text_result.artifacts.get("entities", {})
-            st.message = (
-                f"Language {text_result.artifacts.get('language', {}).get('detected', '?')}; "
+            parts.append(
+                f"language {text_result.artifacts.get('language', {}).get('detected', '?')}; "
                 f"{sum(len(v) for v in entities.values())} entities, "
                 f"{len(text_result.artifacts.get('claims', []))} claims"
             )
+            st.message = "; ".join(parts)
             inv.language = text_result.artifacts.get("language", {}).get("detected")
 
         with recorder.stage(Stage.CLASSIFICATION, text_engine.name) as st:
-            if text_result.status is EngineStatus.NOT_APPLICABLE:
+            if text_result.status is EngineStatus.NOT_APPLICABLE and kind is InvestigationType.URL:
                 ctx.urls = [content.strip()]
                 st.message = "Classified as URL"
+            elif text_result.status is EngineStatus.NOT_APPLICABLE:
+                st.message = f"Classified as {kind.value}; no text to classify"
             else:
                 kinds = text_result.artifacts.get("input_kinds", [])
                 cats = text_result.artifacts.get("fraud_categories", [])
@@ -265,11 +308,20 @@ class InvestigationRunner:
             )
 
         with recorder.stage(Stage.EXPLANATION, "explainer") as st:
+            from truthshield.investigations.interpret import interpret
+
             classification, category = explain.classify(assessment, engines)
-            explanation = explain.explanation(assessment, classification)
             uncertainties = explain.uncertainties(engines, assessment)
             actions = explain.recommended_actions(classification, category)
-            st.message = f"Classified as {classification.replace('_', ' ')}"
+            evidence_result = next((e for e in engines if e.engine == "evidence"), None)
+            checked_claims = (evidence_result.artifacts.get("claims") or []) if evidence_result else []
+            llm_block, llm_record = interpret(assessment, checked_claims, uncertainties, ctx.input_sha256)
+            extra_predictions = [llm_record] if llm_record is not None else []
+            explanation = explain.explanation(assessment, classification, llm_block)
+            st.message = (
+                f"Classified as {classification.replace('_', ' ')}; "
+                f"LLM interpretation: {llm_block['status'].replace('_', ' ')}"
+            )
 
         with recorder.stage(Stage.REPORT, "report") as st:
             result = self._payload(inv, source, ctx, engines, assessment, classification,
@@ -287,13 +339,18 @@ class InvestigationRunner:
                     confidence=contribution.confidence, evidence=contribution.evidence,
                     explanation=contribution.explanation,
                 ))
-            for engine in engines:
-                for p in engine.predictions:
-                    session.add(PredictionRow(
-                        investigation_id=inv.id, model_name=p.model_name, model_version=p.model_version,
-                        model_kind=p.model_kind.value, task=p.task, input_sha256=p.input_sha256,
-                        prediction=p.prediction, confidence=p.confidence,
-                    ))
+            for p in [p for e in engines for p in e.predictions] + extra_predictions:
+                session.add(PredictionRow(
+                    investigation_id=inv.id, model_name=p.model_name, model_version=p.model_version,
+                    model_kind=p.model_kind.value, task=p.task, input_sha256=p.input_sha256,
+                    prediction=p.prediction, confidence=p.confidence,
+                ))
+            for claim in result["claims"]:
+                session.add(ClaimRecord(
+                    investigation_id=inv.id, claim_key=claim["id"], text=claim["text"],
+                    assessment=claim.get("assessment") or "NOT_CHECKED",
+                    confidence=claim.get("confidence"), source_count=len(claim.get("sources") or []),
+                ))
             inv.result = result
             inv.risk_score = assessment.score
             inv.risk_level = assessment.level
@@ -304,6 +361,35 @@ class InvestigationRunner:
                 f"{len(assessment.contributions)} risk factors and "
                 f"{sum(len(e.predictions) for e in engines)} predictions stored"
             )
+
+    @staticmethod
+    def _duplicate_invoice(session, inv: Investigation, result: EngineResult) -> None:
+        """Same invoice number, different file, same owner: a classic re-issue fraud."""
+        from truthshield.fraud.contract import Severity
+        from truthshield.investigations.types import Family, Provenance, Signal
+
+        number = ((result.artifacts.get("document") or {}).get("fields") or {}).get("invoice_number")
+        if not number or inv.user_id is None:
+            return
+        prior = (
+            session.query(Investigation)
+            .filter(Investigation.user_id == inv.user_id, Investigation.type == "document",
+                    Investigation.id != inv.id, Investigation.input_sha256 != inv.input_sha256,
+                    Investigation.status == "COMPLETED")
+            .order_by(Investigation.created_at.desc()).limit(500).all()
+        )
+        matches = [p.public_id for p in prior
+                   if (((p.result or {}).get("document") or {}).get("fields") or {}).get("invoice_number") == number]
+        if matches:
+            result.signals.append(Signal(
+                code="duplicate_invoice_number", title="Invoice number seen on a different document",
+                family=Family.DOCUMENT_MEDIA, severity=Severity.MEDIUM, provenance=Provenance.HEURISTIC,
+                engine=result.engine, engine_version=result.version,
+                explanation="A document with different content but the same invoice number was investigated "
+                            "before. Re-issuing an invoice number with altered details is a common fraud pattern; "
+                            "a corrected re-issue is the innocent explanation.",
+                evidence=f"{number} also in {', '.join(matches[:3])}", confidence=0.6,
+            ))
 
     def _payload(self, inv, source, ctx, engines, assessment, classification, category,
                  explanation, uncertainties, actions) -> dict:
@@ -344,6 +430,8 @@ class InvestigationRunner:
             "claims": claims,
             "url_intelligence": url_artifacts.get("urls", []),
             "prompt_injection": text_artifacts.get("prompt_injection", []),
+            "document": next((e.artifacts.get("document") for e in engines if e.engine == "document"), None),
+            "image": next((e.artifacts.get("image") for e in engines if e.engine == "image"), None),
             "features": features,
             "explanation": explanation,
             "uncertainties": uncertainties,
@@ -355,5 +443,7 @@ class InvestigationRunner:
                 "redacted": source.redacted_content,
                 "redactions": (source.meta or {}).get("redactions", []),
                 "is_demo": inv.is_demo,
+                "filename": source.filename,
+                "mime_type": source.mime_type,
             },
         }

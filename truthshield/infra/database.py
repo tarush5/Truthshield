@@ -17,7 +17,7 @@ from typing import Iterator
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
-from sqlalchemy.types import CHAR, TypeDecorator
+from sqlalchemy.types import CHAR, JSON, TypeDecorator
 
 from truthshield.settings import get_settings
 
@@ -49,6 +49,42 @@ class GUID(TypeDecorator):
         if value is None:
             return None
         return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
+
+
+EMBEDDING_DIM = 384
+
+
+class Embedding(TypeDecorator):
+    """
+    A vector column: pgvector `vector(384)` on PostgreSQL, JSON elsewhere.
+
+    On Postgres the database does the nearest-neighbour search (HNSW, cosine).
+    SQLite has no vector type, so development and tests store the list as
+    JSON and the evidence store scores it in Python -- same vectors, same
+    maths, different place.
+    """
+
+    impl = JSON
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            from pgvector.sqlalchemy import Vector
+            return dialect.type_descriptor(Vector(EMBEDDING_DIM))
+        return dialect.type_descriptor(JSON())
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        vector = [float(v) for v in value]
+        if len(vector) != EMBEDDING_DIM:
+            raise ValueError(f"Embedding must have {EMBEDDING_DIM} dimensions, got {len(vector)}")
+        return vector
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return [float(v) for v in value]
 
 
 def _build_engine() -> Engine:

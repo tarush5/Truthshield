@@ -1,26 +1,30 @@
-import { FileText, Globe, Link2, Mail, MessageSquare, Play } from 'lucide-react';
+import { FileText, Globe, Link2, Mail, MessageSquare, Paperclip, Play } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
+import { FileDropzone } from '@/components/investigation/FileDropzone';
 import { Badge, Button, Card, CardHeader, ErrorNotice, Input, Label, PageHeader, Skeleton, Textarea } from '@/components/ui';
 import { useCreateInvestigation, useDemos } from '@/hooks/queries';
 import { cn } from '@/lib/format';
 import { MODALITIES } from '@/lib/modules';
 import type { InvestigationType } from '@/types/api';
 
-const TYPES: { id: InvestigationType; label: string; icon: typeof Globe; placeholder: string; hint: string }[] = [
+type Mode = InvestigationType | 'file';
+
+const TYPES: { id: Mode; label: string; icon: typeof Globe; placeholder: string; hint: string }[] = [
   { id: 'message', label: 'Message', icon: MessageSquare, placeholder: 'Paste an SMS, WhatsApp or social-media message…', hint: 'Scam categories, urgency, links and requests for codes or payment.' },
   { id: 'email', label: 'Email', icon: Mail, placeholder: 'From: …\nReply-To: …\nSubject: …\n\nPaste the email, headers included if you have them.', hint: 'Headers make sender, reply-to and display-name mismatches checkable.' },
   { id: 'url', label: 'URL', icon: Link2, placeholder: 'https://example.com/login', hint: 'Lookalike domains, structure, feature vector and page inspection.' },
   { id: 'text', label: 'Text', icon: FileText, placeholder: 'Paste an article excerpt, post or claim to check…', hint: 'Claims are extracted and checked against retrieved sources.' },
+  { id: 'file', label: 'File', icon: Paperclip, placeholder: '', hint: 'PDF documents (invoices, statements, certificates) and screenshots or photos (PNG, JPEG, WebP).' },
 ];
 
 const MAX_CHARS = 20_000;
 
 export default function Investigate() {
   const [params] = useSearchParams();
-  const initial = (params.get('type') as InvestigationType) || 'message';
-  const [type, setType] = useState<InvestigationType>(TYPES.some((t) => t.id === initial) ? initial : 'message');
+  const initial = (params.get('type') as Mode) || 'message';
+  const [type, setType] = useState<Mode>(TYPES.some((t) => t.id === initial) ? initial : 'message');
   const [content, setContent] = useState('');
   const create = useCreateInvestigation();
   const demos = useDemos();
@@ -31,6 +35,7 @@ export default function Investigate() {
 
   const submit = async (e?: FormEvent) => {
     e?.preventDefault();
+    if (type === 'file') return;
     const created = await create.mutateAsync({ type, content });
     navigate(`/app/investigations/${created.id}`);
   };
@@ -69,6 +74,13 @@ export default function Investigate() {
               ))}
             </div>
 
+            {type === 'file' ? (
+              <>
+                <FileDropzone />
+                <p className="mt-3 text-xs text-muted">{current.hint}</p>
+              </>
+            ) : (
+            <>
             <Label htmlFor="content" hint={type !== 'url' ? `${content.length.toLocaleString()} / ${MAX_CHARS.toLocaleString()}` : undefined}>
               {current.label}
             </Label>
@@ -97,6 +109,8 @@ export default function Investigate() {
                 Start investigation
               </Button>
             </div>
+            </>
+            )}
           </form>
         </Card>
 
@@ -141,8 +155,8 @@ export default function Investigate() {
             <ul className="flex flex-wrap gap-2 p-5 pt-4 sm:p-6 sm:pt-4">
               {MODALITIES.map((m) => (
                 <li key={m.label}>
-                  <Badge tone={m.availability === 'live' ? 'good' : 'neutral'}>
-                    {m.label} {m.availability === 'live' ? '· live' : `· phase ${m.phase}`}
+                  <Badge tone={m.availability === 'live' ? 'good' : m.availability === 'partial' ? 'accent' : 'neutral'}>
+                    {m.label} {m.availability === 'live' ? '· live' : m.availability === 'partial' ? '· partial' : `· phase ${m.phase}`}
                   </Badge>
                 </li>
               ))}

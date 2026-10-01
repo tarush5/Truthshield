@@ -1,8 +1,9 @@
-import { ArrowLeft, Copy, Download, Trash2 } from 'lucide-react';
+import { ArrowLeft, Copy, Download, Sparkles, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { ClaimCard, SourceCard } from '@/components/investigation/evidence';
+import { DocumentPanel, ImagePanel } from '@/components/investigation/media';
 import { AgentActivityPanel, InvestigationTimeline, ProcessingStatus } from '@/components/investigation/process';
 import { ConfidenceBadge, RiskBreakdown, RiskLevelBadge, RiskScoreCard } from '@/components/investigation/risk';
 import { EntityList, GuidanceCard, SignalCard, UncertaintyList } from '@/components/investigation/signals';
@@ -111,7 +112,7 @@ function Completed({ inv, result }: { inv: InvestigationDetail; result: Result }
     { id: 'analysis', label: 'AI analysis', count: result.signals.length },
     { id: 'evidence', label: 'Evidence', count: result.claims.length },
     { id: 'url', label: 'URL intelligence', count: result.url_intelligence.length },
-    { id: 'media', label: 'Media forensics' },
+    { id: 'media', label: result.document ? 'Document' : 'Media forensics', count: result.document || result.image ? 1 : undefined },
     { id: 'financial', label: 'Financial analysis' },
     { id: 'timeline', label: 'Timeline', count: inv.timeline.length },
     { id: 'sources', label: 'Sources', count: sources.length },
@@ -142,6 +143,7 @@ function Completed({ inv, result }: { inv: InvestigationDetail; result: Result }
                 </div>
               )}
             </Card>
+            <LlmInterpretation explanation={result.explanation} />
             <Card className="p-6">
               <p className="mb-4 text-[11px] uppercase tracking-[0.25em] text-muted">Recommended safety actions</p>
               <GuidanceCard guidance={result.recommended_actions} />
@@ -229,7 +231,11 @@ function Completed({ inv, result }: { inv: InvestigationDetail; result: Result }
         )
       )}
 
-      {tab === 'media' && <EmptyState title="Not applicable" body="Media forensics (images, audio, video) runs on uploaded files and arrives in Phase 3. This investigation had no media." />}
+      {tab === 'media' && (
+        result.document ? <DocumentPanel inv={inv} doc={result.document} />
+          : result.image ? <ImagePanel inv={inv} image={result.image} />
+            : <EmptyState title="Not applicable" body="Document and image analysis run on uploaded files; audio and video arrive in Phase 3. This investigation had no file." />
+      )}
       {tab === 'financial' && <EmptyState title="Not applicable" body="Transaction anomaly detection runs on transaction exports and arrives in Phase 4. This investigation had no transaction data." />}
 
       {tab === 'timeline' && <Card className="p-6"><InvestigationTimeline events={inv.timeline} /></Card>}
@@ -290,5 +296,36 @@ function Stat({ label, value }: { label: string; value: string }) {
       <dt className="text-[11px] uppercase tracking-[0.2em] text-muted">{label}</dt>
       <dd className="mt-1 text-sm text-text-primary">{value}</dd>
     </div>
+  );
+}
+
+/** The language model's reading, shown beside -- never instead of -- the deterministic summary. */
+function LlmInterpretation({ explanation }: { explanation: Result['explanation'] }) {
+  if (explanation.llm_status === 'generated' && explanation.llm) {
+    const meta = explanation.llm_meta ?? {};
+    const cites = meta.citations
+      ? [...meta.citations.signals, ...meta.citations.sources.map((n) => `[${n}]`)].join(', ')
+      : '';
+    return (
+      <Card className="border-[#4E85BF]/30 p-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <Sparkles className="h-4 w-4 text-[#89AACC]" aria-hidden />
+          <p className="text-[11px] uppercase tracking-[0.25em] text-muted">LLM interpretation</p>
+          <Badge tone="warn" title="Written by a language model from the findings. It decided nothing above.">
+            Interpretation, not evidence
+          </Badge>
+        </div>
+        <p className="mt-3 text-sm leading-relaxed text-text-primary/90">{explanation.llm}</p>
+        <p className="mt-3 text-[11px] text-muted">
+          {meta.model} · {meta.input_tokens ?? 0} input / {meta.output_tokens ?? 0} output tokens
+          {cites && ` · cites ${cites}`}
+        </p>
+      </Card>
+    );
+  }
+  return (
+    <p className="px-1 text-xs text-muted">
+      LLM interpretation: {humanize(explanation.llm_status)}. {explanation.llm_note}
+    </p>
   );
 }

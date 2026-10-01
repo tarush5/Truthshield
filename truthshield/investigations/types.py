@@ -24,6 +24,12 @@ class InvestigationType(str, Enum):
     URL = "url"
     MESSAGE = "message"
     EMAIL = "email"
+    DOCUMENT = "document"      # PDF upload
+    IMAGE = "image"            # screenshot / photo upload
+
+    @property
+    def is_file(self) -> bool:
+        return self in (InvestigationType.DOCUMENT, InvestigationType.IMAGE)
 
 
 class InvestigationStatus(str, Enum):
@@ -176,8 +182,15 @@ class InvestigationContext(BaseModel):
 
     investigation_id: str
     type: InvestigationType
-    content: str                     # original, as submitted
+    content: str                     # original, as submitted (empty for files)
+    # The text the language engines analyse: the submission itself, or what
+    # a document/OCR engine extracted from an uploaded file.
+    text: str = ""
     normalized: str = ""             # filled by the text engine
+    file_path: Optional[str] = None  # stored upload, read-only
+    mime_type: Optional[str] = None
+    filename: Optional[str] = None
+    owner_id: Optional[str] = None   # for cross-investigation checks scoped to the owner
     input_sha256: str
     language_hint: str = "auto"
     # Demo samples use invented domains that someone may since have

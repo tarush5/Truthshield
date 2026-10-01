@@ -32,12 +32,28 @@ not a benchmark):
 | Typosquat URL (demo) | 0.15 s |
 | Health-misinformation claim, with live evidence retrieval | 4.1–5.2 s |
 
-## Phases 2–8
+## Phase 2 — evidence, documents, providers
+
+| Item | Status | Evidence |
+|---|---|---|
+| Provider abstractions: LLM (Anthropic SDK, Gemini, none), search, embeddings, OCR; resilience (retry, backoff, circuit breaker) | ✅ | `tests/test_v2_rag.py::TestProviders` |
+| Evidence store on pgvector: HNSW cosine + GIN full-text, RRF fusion, filters, query expansion, reranking | ✅ | `tests/test_v2_rag.py`, `tests/test_v2_postgres.py` (CI) |
+| Source registry with admin curation; claim records and claim search | ✅ | `tests/test_v2_evidence_api.py` |
+| Evidence engine on RAG; deterministic adjudication (1.x LLM verdict paths off); credibility guard | ✅ | `tests/test_v2_engines.py::TestEvidenceEngine` |
+| Grounded LLM interpretation: findings-only prompt, citation validation, refusal handling, token usage recorded | ✅ | `tests/test_v2_interpret.py` (fake provider; no live LLM call made in tests) |
+| Secure file intake: magic-byte sniffing, size cap, SHA-256, content-addressed storage, temp cleanup, deletion | ✅ | `tests/test_v2_documents.py::TestIntake` |
+| PDF engine: structure (active content, incremental saves), metadata, fields, consistency, OCR for scanned pages | ✅ | `tests/test_v2_documents.py` |
+| Image engine: decode guard, EXIF, OCR with word boxes | ✅ OCR needs the Tesseract binary (in Docker and CI; not on this dev machine) | `tests/test_v2_ocr_real.py` (CI) |
+| Frontend: file upload, Document/Image result views, OCR overlay, Evidence page, Document Forensics page | ✅ | type check, build, browser run |
+| Table extraction from PDFs | ⬜ | moved to Phase 3 |
+| Retrieval evaluation (Recall@K, MRR, NDCG) of the store-first path | ⬜ | Phase 6 |
+
+## Phases 3–8
 
 | Phase | Scope | Status |
 |---|---|---|
-| 2 | pgvector hybrid RAG with reranking, source registry, claim workspace, PDF + OCR, LLM and search provider abstractions, grounded LLM interpretation | ⬜ |
-| 3 | Object storage, magic-byte MIME validation, upload cleanup, image forensics, image synthetic-media, audio, chunked video, Celery media queue | ⬜ |
+| 2 | pgvector hybrid RAG with reranking, source registry, claim workspace, PDF + OCR, LLM and search provider abstractions, grounded LLM interpretation | ✅ (see above) |
+| 3 | S3-compatible storage backend, image forensics (ELA, copy-move), image synthetic-media, audio, chunked video, PDF tables, Celery media queue | ⬜ |
 | 4 | Transaction feature pipeline, Isolation Forest, transaction graph, QR decoding | ⬜ |
 | 5 | Knowledge graph tables, multimodal fusion, LangGraph agents with tool allowlists, threat-intel views | ⬜ |
 | 6 | PDF reports, analytics (feedback, FP/FN), MLflow model registry, feedback capture | ⬜ |
@@ -59,6 +75,8 @@ not a benchmark):
 | Investigation timeline | ✅ |
 | Evidence provenance | 🟡 Signal → excerpt and claim → source → passage are shown. A graph view comes in Phase 5 |
 | Reports | 🟡 JSON/CSV. PDF in Phase 6 |
+| PDF analysis, OCR | ✅ OCR requires Tesseract (installed in Docker/CI) |
+| RAG retrieval, pgvector | ✅ |
 | Dashboard uses real data | ✅ |
 | Security controls | 🟡 Auth, RBAC, SSRF, rate limits, lockout, audit, CSV-injection and unsafe-href guards. Upload hardening in Phase 3 |
 | Prompt-injection protections | 🟡 Detection and isolation (no LLM in the decision path). Agent sandboxing in Phase 5 |
@@ -67,7 +85,7 @@ not a benchmark):
 | Background workers | ✅ Celery path wired and tested (eager). Media queues in Phase 3 |
 | PostgreSQL | ✅ Migrations run against Postgres in CI |
 | Redis | ✅ Cache, OTP, lockout counters, Celery broker (with a declared degraded fallback) |
-| Tests pass | ✅ 409 backend, 16 frontend |
+| Tests pass | ✅ 477 backend (+3 Postgres/OCR tests that run in CI), 16 frontend |
 | Demo mode without credentials | ✅ `OFFLINE_MODE=true` plus synthetic demos through the real pipeline |
 | No fake metrics or fabricated evidence | ✅ No model metrics are displayed; landing-page statistics come from `/system/health` |
-| PDF, OCR, image, audio, video, deepfake, fraud ML, RAG (pgvector), multi-agent, knowledge graph, model registry, feedback, monitoring, CI deploy | ⬜ Phases 2–8 |
+| Image forensics, audio, video, deepfake, fraud ML, multi-agent, knowledge graph, model registry, feedback, monitoring, CI deploy | ⬜ Phases 3–8 |

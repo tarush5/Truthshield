@@ -51,7 +51,7 @@ the changes can be reviewed against it.
 
 The memory issue called out for 1.x (reading whole uploads into memory) is **already fixed**: uploads stream in 1 MB chunks under a running cap. What remains:
 
-- **Uploaded files and extracted frames are never deleted** (`.uploads/`, `.uploads/frames/`), so disk use grows without bound. Fixed in Phase 3, when file ingestion moves into the worker with guaranteed cleanup.
+- **Uploaded files and extracted frames are never deleted** (`.uploads/`, `.uploads/frames/`) on the 1.x `/analyze` path. 2.0 uploads use content-addressed storage with temp-file cleanup on every failure path, and the file is deleted with its investigation. The 1.x path is retired in Phase 3.
 - Video frame extraction seeks frame-by-frame in the API process when run synchronously. Phase 3 moves all media to Celery workers.
 - Evidence retrieval runs about 1.5 s median per claim and fans out across providers. Bounded by `MAX_CLAIMS_PER_SUBMISSION` and timeouts, and cached per claim in Phase 2.
 
@@ -62,7 +62,7 @@ The memory issue called out for 1.x (reading whole uploads into memory) is **alr
 | Auth endpoints limited only by the global 60/min per-IP limit | Medium | 1 |
 | No account lockout on repeated failed sign-ins | Medium | 1 |
 | Access tokens cannot be revoked (no logout) | Medium | 1 (refresh tokens are revocable; access tokens stay short-lived) |
-| File type decided by extension only, with no content sniffing | Medium | 3 (with file ingestion) |
+| File type decided by extension only, with no content sniffing | Medium | **Fixed in Phase 2** for 2.0 uploads (magic bytes must match the extension) |
 | Tokens stored in `localStorage` (XSS exposure) | Low–Medium | Documented trade-off; revisit with same-site cookie deployment |
 | Unhandled errors already return only a request ID; SSRF, CORS and secrets are handled well | — | — |
 
@@ -136,3 +136,14 @@ The phase contents follow §95 of the master spec. Status is tracked in
 | 6 | Reports (PDF/CSV), analytics, model registry (MLflow), feedback |
 | 7 | Security hardening, OpenTelemetry/Prometheus/Grafana, caching, per-role rate limits, cost tracking |
 | 8 | E2E tests, CI/CD deploy stages, documentation set |
+
+## Phase 2 notes
+
+- **The 1.x verdict engine let an LLM decide claims.** With a Gemini or Anthropic key configured,
+  `VerdictEngine.evaluate_claim` asked the model for the verdict. 2.0 adjudicates with that engine's
+  LLM paths switched off (`DeterministicAdjudicator`), which is also the path the benchmark measures.
+  The 1.x `/analyze` endpoint is unchanged.
+- **Anthropic SDK upgraded to 1.x** (`anthropic>=1.10`, built on `httpx2`). The only 1.x use was a client
+  constructor, which is compatible. The 2.0 adapter uses `claude-opus-5-5` with server-side refusal
+  fallback (`fallbacks="default"`).
+- **`PyPDF2` replaced by `pypdf`** (its maintained successor; same `PdfReader` API).

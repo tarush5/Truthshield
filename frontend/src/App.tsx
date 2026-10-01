@@ -16,6 +16,8 @@ const InvestigationResult = lazy(() => import('@/pages/InvestigationResult'));
 const History = lazy(() => import('@/pages/History'));
 const UrlIntelligence = lazy(() => import('@/pages/UrlIntelligence'));
 const Settings = lazy(() => import('@/pages/Settings'));
+const Evidence = lazy(() => import('@/pages/Evidence'));
+const Documents = lazy(() => import('@/pages/Documents'));
 const ModulePage = lazy(() => import('@/pages/ModulePage'));
 const LegacyReport = lazy(() => import('@/pages/LegacyReport'));
 
@@ -94,6 +96,10 @@ function AnimatedRoutes() {
           <Route path="/app/history" element={<History />} />
           <Route path="/app/url-intelligence" element={<UrlIntelligence />} />
           <Route path="/app/settings" element={<Settings />} />
+          <Route path="/app/evidence" element={<Evidence />} />
+          <Route path="/app/documents" element={<Documents />} />
+          <Route path="/app/m/rag" element={<Navigate to="/app/evidence" replace />} />
+          <Route path="/app/m/documents" element={<Navigate to="/app/documents" replace />} />
           <Route path="/app/m/:module" element={<ModulePage />} />
           {/* 1.x report links keep working. */}
           <Route path="/report/:id" element={<LegacyReport />} />

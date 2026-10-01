@@ -207,12 +207,56 @@ def list_investigations(
     return rows, total
 
 
+def create_file_investigation(session: Session, principal: Principal, stored) -> Investigation:
+    """An investigation over an uploaded file already validated and stored by `files.receive`."""
+    inv = Investigation(
+        public_id=next_public_id(session),
+        user_id=principal.user_id,
+        org_id=principal.org_id,
+        type=stored.investigation_type,
+        status=InvestigationStatus.QUEUED.value,
+        input_sha256=stored.sha256,
+        excerpt=f"{stored.filename} ({stored.size / 1024:,.0f} KB)",
+    )
+    session.add(inv)
+    session.flush()
+    session.add(InvestigationInput(
+        investigation_id=inv.id,
+        kind=stored.investigation_type,
+        content=None,
+        redacted_content=None,
+        sha256=stored.sha256,
+        size_bytes=stored.size,
+        mime_type=stored.mime_type,
+        filename=stored.filename,
+        storage_key=stored.key,
+        meta={"sniffed_kind": stored.kind},
+    ))
+    session.commit()
+    session.refresh(inv)
+
+    from truthshield.services.audit import record
+    record(session, principal, "investigation.create", f"investigation:{inv.public_id}",
+           {"type": inv.type, "file_sha256": stored.sha256, "size": stored.size})
+    return inv
+
+
 def delete(session: Session, principal: Principal, inv: Investigation) -> None:
     public_id = inv.public_id
+    keys = {i.storage_key for i in inv.inputs if i.storage_key}
     session.delete(inv)
     session.commit()
+
+    # The file goes too, unless another investigation uploaded identical bytes
+    # (storage is content-addressed, so they share one stored copy).
+    from truthshield.storage import get_storage
+    for key in keys:
+        if not session.query(InvestigationInput).filter(InvestigationInput.storage_key == key).count():
+            get_storage().delete(key)
+
     from truthshield.services.audit import record
-    record(session, principal, "investigation.delete", f"investigation:{public_id}", {})
+    record(session, principal, "investigation.delete", f"investigation:{public_id}",
+           {"files_deleted": len(keys)})
 
 
 # ── Serialisation ─────────────────────────────────────────────
@@ -292,6 +336,9 @@ def detail(inv: Investigation, principal: Principal) -> dict:
             # The original is the submitter's own data; nobody else sees it.
             "content": source.content if (source and owner) else None,
             "redacted": source.redacted_content if source else None,
+            "filename": source.filename if source else None,
+            "mime_type": source.mime_type if source else None,
+            "has_file": bool(source and source.storage_key and owner),
         },
         "result": inv.result,
     }

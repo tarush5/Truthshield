@@ -17,7 +17,7 @@ export interface TokenResponse {
   user: User;
 }
 
-export type InvestigationType = 'text' | 'url' | 'message' | 'email';
+export type InvestigationType = 'text' | 'url' | 'message' | 'email' | 'document' | 'image';
 
 export type InvestigationStatus =
   | 'QUEUED'
@@ -137,6 +137,33 @@ export interface Source {
   passage: string;
   retrieved_at: string;
   published_at: string | null;
+  document_id?: string | null;
+  chunk_id?: string | null;
+  content_scope?: string | null;
+  scores?: SourceScores | null;
+}
+
+export interface SourceScores {
+  final: number;
+  components: Record<string, number>;
+  semantic: number;
+  keyword: number;
+  rrf?: number;
+  matched_by: string[];
+}
+
+export interface RetrievalDiagnostics {
+  query_variants: { strategy: string; query: string }[];
+  embedding: { model: string; kind: 'semantic' | 'lexical' };
+  reranker: string;
+  filters: Record<string, unknown>;
+  local_relevant_before: number;
+  live_search: 'not_needed' | 'used' | 'unavailable' | 'failed';
+  live_hits: number;
+  ingested: number;
+  live_detail: string | null;
+  candidates: number;
+  passages: number;
 }
 
 export interface ClaimResult {
@@ -149,6 +176,37 @@ export interface ClaimResult {
   confidence?: number | null;
   reasoning?: string;
   sources?: Source[];
+  downgraded?: boolean;
+  retrieval?: RetrievalDiagnostics | null;
+}
+
+export interface OCRWord { text: string; confidence: number; bbox: [number, number, number, number] }
+
+export interface DocumentAnalysis {
+  encrypted: boolean;
+  pages?: number;
+  pages_analysed?: number;
+  scanned_pages?: number[];
+  ocr?: { status: string; engine?: string; pages?: number[]; mean_confidence?: number | null; detail?: string };
+  type?: string;
+  type_scores?: Record<string, number>;
+  fields?: Record<string, string | number | string[]>;
+  metadata?: Record<string, string | null>;
+  active_content?: string[];
+  incremental_saves?: number;
+  size_bytes?: number;
+  text_chars?: number;
+  page_previews?: string[];
+}
+
+export interface ImageAnalysis {
+  width: number;
+  height: number;
+  format: string;
+  mode: string;
+  exif: Record<string, string>;
+  ocr: { status: 'done' | 'unavailable'; engine?: string; languages?: string; mean_confidence?: number | null;
+         text?: string; words?: OCRWord[]; detail?: string };
 }
 
 export interface PageInspection {
@@ -202,6 +260,8 @@ export interface InvestigationResult {
   claims: ClaimResult[];
   url_intelligence: UrlIntel[];
   prompt_injection: string[];
+  document: DocumentAnalysis | null;
+  image: ImageAnalysis | null;
   features: Record<string, number>;
   explanation: {
     summary: string;
@@ -210,10 +270,13 @@ export interface InvestigationResult {
     llm: string | null;
     llm_status: string;
     llm_note: string;
+    llm_meta?: { model?: string; provider?: string; input_tokens?: number; output_tokens?: number;
+                 citations?: { signals: string[]; sources: number[] } };
   };
   uncertainties: string[];
   recommended_actions: Guidance;
-  input: { type: string; sha256: string; size_bytes: number; redacted: string; redactions: { kind: string; count: number }[]; is_demo: boolean };
+  input: { type: string; sha256: string; size_bytes: number; redacted: string | null; redactions: { kind: string; count: number }[];
+           is_demo: boolean; filename?: string | null; mime_type?: string | null };
   processing_ms?: number;
 }
 
@@ -230,7 +293,8 @@ export interface InvestigationDetail extends InvestigationSummary {
     confidence: number | null;
     created_at: string;
   }[];
-  input: { kind: string; sha256: string; size_bytes: number; content: string | null; redacted: string | null };
+  input: { kind: string; sha256: string; size_bytes: number; content: string | null; redacted: string | null;
+           filename?: string | null; mime_type?: string | null; has_file?: boolean };
   result: InvestigationResult | null;
 }
 
@@ -297,4 +361,62 @@ export interface SystemHealth {
 export interface ApiErrorBody {
   error?: { code: string; message: string; request_id: string };
   detail?: unknown;
+}
+
+export interface EvidenceResult {
+  chunk_id: string;
+  document_id: string;
+  title: string;
+  url: string;
+  publisher: string;
+  category: Source['category'];
+  credibility: number;
+  content_scope: string;
+  published_at: string | null;
+  retrieved_at: string | null;
+  passage: string;
+  scores: SourceScores;
+}
+
+export interface EvidenceSearch {
+  query: string;
+  embedding: { model: string; kind: 'semantic' | 'lexical' };
+  reranker: { name: string; learned: boolean };
+  filters: Record<string, unknown>;
+  results: EvidenceResult[];
+}
+
+export interface EvidenceStats {
+  documents: number;
+  chunks: number;
+  sources: number;
+  chunks_for_active_model: number;
+  embedding_model: string;
+  embedding_kind: 'semantic' | 'lexical';
+  backend: string;
+  reranker: string;
+}
+
+export interface SourceEntry {
+  id: string;
+  domain: string;
+  name: string | null;
+  category: Source['category'];
+  credibility: number;
+  curated: boolean;
+  notes: string | null;
+  first_seen_at: string | null;
+  last_seen_at: string | null;
+  documents: number;
+}
+
+export interface ClaimIndexItem {
+  claim_key: string;
+  text: string;
+  assessment: string;
+  confidence: number | null;
+  source_count: number;
+  investigation_id: string;
+  public_id: string;
+  created_at: string | null;
 }

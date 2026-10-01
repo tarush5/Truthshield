@@ -36,7 +36,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { label: 'Fraud Intelligence', to: '/app/m/fraud', icon: ShieldAlert, moduleId: 'fraud' },
       { label: 'Misinformation', to: '/app/m/misinformation', icon: Newspaper, moduleId: 'misinformation' },
       { label: 'Deepfake Detection', to: '/app/m/deepfake', icon: ScanFace, moduleId: 'deepfake' },
-      { label: 'Document Forensics', to: '/app/m/documents', icon: FileSearch, moduleId: 'documents' },
+      { label: 'Document Forensics', to: '/app/documents', icon: FileSearch, moduleId: 'documents' },
       { label: 'URL Intelligence', to: '/app/url-intelligence', icon: Link2 },
       { label: 'Transaction Analysis', to: '/app/m/transactions', icon: ArrowLeftRight, moduleId: 'transactions' },
     ],
@@ -44,7 +44,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Evidence & insight',
     items: [
-      { label: 'Evidence', to: '/app/m/rag', icon: Library, moduleId: 'rag' },
+      { label: 'Evidence', to: '/app/evidence', icon: Library, moduleId: 'rag' },
       { label: 'Reports', to: '/app/m/reports', icon: FileText, moduleId: 'reports' },
       { label: 'Analytics', to: '/app/m/analytics', icon: BarChart3, moduleId: 'analytics' },
       { label: 'Model Intelligence', to: '/app/m/models', icon: Cpu, moduleId: 'models' },

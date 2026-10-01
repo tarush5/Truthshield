@@ -75,3 +75,14 @@ export function useHealth() {
 export function useEngines() {
   return useQuery({ queryKey: keys.engines, queryFn: platformService.engines, staleTime: 300_000 });
 }
+
+export function useUploadInvestigation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => investigationService.upload(file),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ['investigations'] });
+      client.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}

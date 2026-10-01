@@ -20,7 +20,8 @@ jobs:
     # cross-worker cache visibility.
     services:
       postgres:
-        image: postgres:16-alpine
+        # pgvector for the evidence store's vector column and HNSW index.
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: truthshield
           POSTGRES_PASSWORD: truthshield
@@ -43,6 +44,9 @@ jobs:
       REDIS_URL: redis://localhost:6379/0
       CELERY_TASK_ALWAYS_EAGER: "true"
       CORS_ORIGINS: http://localhost:5173
+      # The pgvector/FTS tests connect here directly; everything else runs on
+      # the SQLite database conftest sets up.
+      TEST_POSTGRES_URL: postgresql+psycopg2://truthshield:truthshield@localhost:5432/truthshield_test
 
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +57,11 @@ jobs:
           cache: pip
 
       - name: Install
-        run: pip install -r requirements-dev.txt
+        run: |
+          # Tesseract binary for the real-OCR test (the Python package alone
+          # imports fine on a machine with no OCR at all).
+          sudo apt-get update -qq && sudo apt-get install -y -qq tesseract-ocr
+          pip install -r requirements-dev.txt
 
       - name: Lint
         # Pyflakes-class findings only (undefined names, unused imports and

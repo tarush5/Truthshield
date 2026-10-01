@@ -165,6 +165,32 @@ class Settings(BaseSettings):
     # sign-in -- the only way the first administrator comes to exist.
     BOOTSTRAP_ADMIN_EMAILS: str = ""
 
+    # ── Providers (2.0 Phase 2) ───────────────────────────────
+    # Each is "auto" (first available, in a fixed order) or a named provider.
+    # A provider that is named but unavailable is reported, never silently
+    # swapped for a different one.
+    LLM_PROVIDER: str = "auto"            # auto | anthropic | gemini | none
+    LLM_MODEL: str = ""                   # blank = the provider's default
+    LLM_EFFORT: str = "low"               # grounded summaries are short, bounded tasks
+    LLM_TIMEOUT_SECONDS: float = 30.0
+    EMBEDDING_PROVIDER: str = "auto"      # auto | sentence-transformers | hashing
+    OCR_PROVIDER: str = "auto"            # auto | tesseract | none
+    OCR_LANGUAGES: str = "eng+hin+tam"
+
+    # ── Evidence store / RAG ──────────────────────────────────
+    RAG_LIVE_SEARCH: bool = True
+    # Below this many relevant passages already in the store, live search runs
+    # and its results are ingested before the store is queried again.
+    RAG_LOCAL_MIN_HITS: int = 3
+    RAG_TOP_K: int = 8
+    RERANKER_MODEL: str = ""              # optional cross-encoder; blank = feature reranker
+
+    # ── Files ─────────────────────────────────────────────────
+    STORAGE_BACKEND: str = "local"        # local (S3-compatible arrives with Phase 3 media)
+    STORAGE_DIR: Path = REPO_ROOT / ".storage"
+    MAX_PDF_PAGES: int = 50
+    MAX_IMAGE_PIXELS: int = 40_000_000    # decompression-bomb guard
+
     # ── Third-party keys (all optional) ───────────────────────
     ANTHROPIC_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
@@ -297,7 +323,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _ensure_directories(self) -> "Settings":
-        for directory in (self.UPLOAD_DIR, self.MODEL_CACHE_DIR):
+        for directory in (self.UPLOAD_DIR, self.MODEL_CACHE_DIR, self.STORAGE_DIR):
             try:
                 directory.mkdir(parents=True, exist_ok=True)
             except OSError as exc:

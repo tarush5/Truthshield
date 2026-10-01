@@ -121,6 +121,7 @@ env/
 .venv/
 venv/
 .uploads/
+.storage/
 .model_cache/
 *.db
 truthshield_*.db
@@ -130,3 +131,4 @@ truthshield_*.db
 # databases. Everything here is reproducible and none of it belongs in the
 # repository.
 .lab/
+.pytest_storage/

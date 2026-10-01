@@ -81,6 +81,28 @@ def source_category(domain: str, score: float) -> str:
     return "UNKNOWN"
 
 
+class DeterministicAdjudicator:
+    """
+    The 1.x verdict engine with its LLM verdict paths switched off.
+
+    Stance comes from NLI (when installed) and the lexical rules the benchmark
+    fixture measures. A language model may later *explain* the result -- it
+    never decides it.
+    """
+
+    def __new__(cls):
+        from truthshield.domain.verdict.engine import VerdictEngine
+
+        class _Engine(VerdictEngine):
+            def _get_gemini_client(self):
+                return None
+
+            def _get_claude_client(self):
+                return None
+
+        return _Engine()
+
+
 def run_coroutine(coro):
     """Run a coroutine from sync code, whether or not a loop is already running here."""
     try:
@@ -93,9 +115,10 @@ def run_coroutine(coro):
 
 class EvidenceEngine(Engine):
     name = "evidence"
-    version = "1.0.0"
+    version = "2.0.0"
     kind = EngineKind.RETRIEVAL
-    describes = "Claim verification against retrieved sources (search, credibility ranking, NLI stance)"
+    describes = ("Claim verification: hybrid retrieval over the evidence store (pgvector + keyword), "
+                 "live search when the store lacks evidence, reranking, deterministic stance")
 
     def applies_to(self, ctx: InvestigationContext) -> bool:
         return bool(ctx.artifacts.get("claims"))
@@ -106,15 +129,22 @@ class EvidenceEngine(Engine):
         settings = get_settings()
         claims = ctx.artifacts["claims"][: settings.MAX_CLAIMS_PER_SUBMISSION]
 
-        if not (settings.network_allowed and settings.EVIDENCE_RETRIEVAL_ENABLED):
+        if not settings.EVIDENCE_RETRIEVAL_ENABLED:
             result.status = EngineStatus.UNAVAILABLE
-            result.detail = "Evidence retrieval is disabled (offline mode)."
+            result.detail = "Evidence retrieval is disabled in this deployment."
             result.artifacts["claims"] = [self._unchecked(c, result.detail) for c in claims]
             result.limitations.append(
-                "Extracted claims were not checked against external sources: evidence "
-                "retrieval is disabled in this deployment (offline mode)."
+                "Extracted claims were not checked against any sources: evidence retrieval "
+                "is disabled in this deployment."
             )
             return
+        if not settings.network_allowed:
+            # Offline still consults the local evidence store -- curated
+            # documents are exactly what an offline deployment has.
+            result.limitations.append(
+                "Offline mode: claims were checked against the local evidence store only; "
+                "no live search was run."
+            )
 
         budget = settings.EVIDENCE_TIMEOUT_SECONDS * 2 + 4
         try:
@@ -131,58 +161,108 @@ class EvidenceEngine(Engine):
 
         assessed = []
         retrieved_at = datetime.now(timezone.utc).isoformat()
-        for claim, verdict in zip(claims, verdicts):
-            if isinstance(verdict, Exception) or verdict is None:
+        for claim, outcome in zip(claims, verdicts):
+            if isinstance(outcome, Exception) or outcome is None:
                 assessed.append(self._unchecked(claim, "Retrieval failed for this claim."))
                 result.limitations.append(f"Evidence for claim {claim['id']} was unavailable from the providers.")
                 continue
-            assessed.append(self._assess(ctx, claim, verdict, retrieved_at, result))
+            verdict, retrieval = outcome if isinstance(outcome, tuple) else (outcome, None)
+            item = self._assess(ctx, claim, verdict, retrieved_at, result, retrieval)
+            if retrieval is not None and retrieval.live_detail and retrieval.live_search == "failed":
+                result.limitations.append(f"Claim {claim['id']}: {retrieval.live_detail}")
+            assessed.append(item)
 
         result.artifacts["claims"] = assessed
         result.features["claims_checked"] = sum(1 for a in assessed if a["checked"])
         result.features["sources_retrieved"] = sum(len(a["sources"]) for a in assessed)
 
     async def _verify(self, claims: List[dict]):
-        from truthshield.domain.evidence.ranker import SourceRanker
+        """
+        Retrieve with the RAG engine, adjudicate with the 1.x deterministic path.
+
+        Returns (ClaimVerdict, Retrieval) per claim. Adjudication deliberately
+        bypasses the 1.x LLM verdict paths: a language model never decides a
+        claim here, and the deterministic path is the one the frozen-evidence
+        benchmark measured.
+        """
         from truthshield.domain.verdict import adapters
-        from truthshield.domain.verdict.engine import VerdictEngine
         from truthshield.domain.verdict.legacy_types import Claim as LegacyClaim
-        from truthshield.infra.evidence.retriever import EvidenceRetriever
+        from truthshield.domain.verdict.legacy_types import Evidence as LegacyEvidence
+        from truthshield.infra.database import SessionLocal
+        from truthshield.rag import RAGEngine
 
-        retriever, ranker, engine = EvidenceRetriever(), SourceRanker(), VerdictEngine()
-
-        async def check(item: dict):
-            claim = LegacyClaim(text=item["text"], entity=item.get("entity"),
-                                date=item.get("date"), location=item.get("location"))
-            evidence = await retriever.retrieve(claim)
-            evidence = ranker.filter_disinfo(ranker.rank_evidence(evidence))
-            legacy = await asyncio.to_thread(engine.evaluate_claim, claim, evidence, False)
-            return adapters.from_legacy_claim_verdict(legacy)
-
-        return await asyncio.gather(*(check(c) for c in claims), return_exceptions=True)
+        session = SessionLocal()
+        try:
+            rag = RAGEngine(session)
+            adjudicator = DeterministicAdjudicator()
+            outcomes = []
+            for item in claims:
+                try:
+                    retrieval = await rag.retrieve(item["text"])
+                    evidence = [
+                        LegacyEvidence(title=p["title"] or p["publisher"], url=p["url"], snippet=p["passage"],
+                                       source_score=p["credibility"], source_domain=p["publisher"])
+                        for p in retrieval.passages
+                    ]
+                    claim = LegacyClaim(text=item["text"], entity=item.get("entity"),
+                                        date=item.get("date"), location=item.get("location"))
+                    if not evidence:
+                        # Nothing to weigh: insufficient evidence, without
+                        # spinning up the adjudicator to reach the same answer.
+                        from truthshield.domain.types import Claim, ClaimVerdict, Verdict
+                        outcomes.append((ClaimVerdict(claim=Claim(text=item["text"]),
+                                                      verdict=Verdict.INSUFFICIENT_EVIDENCE,
+                                                      confidence=0.0), retrieval))
+                        continue
+                    legacy = await asyncio.to_thread(adjudicator.evaluate_claim, claim, evidence, False)
+                    outcomes.append((adapters.from_legacy_claim_verdict(legacy), retrieval))
+                except Exception as exc:
+                    logger.warning("Evidence check failed for %s: %s", item.get("id"), exc, exc_info=True)
+                    session.rollback()
+                    outcomes.append(exc)
+            return outcomes
+        finally:
+            session.close()
 
     def _unchecked(self, claim: dict, reason: str) -> dict:
         return {**claim, "assessment": "NOT_CHECKED", "checked": False, "confidence": None,
                 "reasoning": reason, "sources": []}
 
-    def _assess(self, ctx, claim: dict, verdict, retrieved_at: str, result: EngineResult) -> dict:
+    def _assess(self, ctx, claim: dict, verdict, retrieved_at: str, result: EngineResult,
+                retrieval=None) -> dict:
+        from truthshield.rag.store import normalise_url
+
         assessment = ASSESSMENT.get(verdict.verdict.value, "INSUFFICIENT_EVIDENCE")
         reasoning = verdict.reasoning
+        passages = {normalise_url(p["url"]): p for p in (retrieval.passages if retrieval else [])}
 
         sources = []
         for item in verdict.evidence[:8]:
             domain = publisher_of(item.source_domain, item.url)
+            stored = passages.get(normalise_url(item.url), {})
             sources.append({
                 "title": item.title,
                 "url": item.url,
                 "publisher": domain,
-                "category": source_category(domain, item.source_score),
+                "category": stored.get("category") or source_category(domain, item.source_score),
                 "credibility": round(item.source_score, 2),
                 "stance": item.stance.value,
                 "passage": (item.snippet or "")[:500],
-                "retrieved_at": retrieved_at,
-                "published_at": None,   # not exposed by every provider; never guessed
+                "retrieved_at": stored.get("retrieved_at") or retrieved_at,
+                # Only what the source itself stated; never guessed.
+                "published_at": stored.get("published_at"),
+                "document_id": stored.get("document_id"),
+                "chunk_id": stored.get("chunk_id"),
+                "content_scope": stored.get("content_scope"),
+                "scores": stored.get("scores"),
             })
+
+        if retrieval is not None and not retrieval.passages and assessment == "INSUFFICIENT_EVIDENCE":
+            reasoning = (
+                "No relevant passage was found in the evidence store"
+                + (" and live search was unavailable." if retrieval.live_search in ("unavailable", "failed")
+                   else " or in live search results.")
+            )
 
         # A decision resting only on low-credibility sources is not a decision.
         # Measured failure: "It is 100% proven" was marked SUPPORTED on the
@@ -244,6 +324,7 @@ class EvidenceEngine(Engine):
             "reasoning": reasoning,
             "downgraded": downgraded,
             "sources": sources,
+            "retrieval": retrieval.diagnostics() if retrieval is not None else None,
             "support_count": sum(1 for s in sources if s["stance"] == "SUPPORTS"),
             "contradict_count": len(refuting),
         }

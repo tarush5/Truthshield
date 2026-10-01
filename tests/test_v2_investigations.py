@@ -320,7 +320,7 @@ class TestDashboard:
 class TestPlatform:
     def test_system_health_reports_capabilities_honestly(self, client):
         body = client.get("/api/v1/system/health").json()
-        assert {e["name"] for e in body["engines"]} == {"text", "url", "evidence"}
+        assert {e["name"] for e in body["engines"]} == {"document", "image", "text", "url", "evidence"}
         assert body["investigations"]["offline_mode"] is True
         assert body["investigations"]["evidence_retrieval"] is False
 

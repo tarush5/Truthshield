@@ -1,8 +1,8 @@
 // Typed calls per resource. Components never build URLs.
 import { api, request } from '@/lib/api';
 import type {
-  DashboardSummary, DemoCatalogue, EngineInfo, InvestigationDetail, InvestigationSummary,
-  InvestigationType, Page, SystemHealth, TimelineEvent, TokenResponse, User,
+  ClaimIndexItem, DashboardSummary, DemoCatalogue, EngineInfo, EvidenceSearch, EvidenceStats, InvestigationDetail,
+  InvestigationSummary, InvestigationType, Page, SourceEntry, SystemHealth, TimelineEvent, TokenResponse, User,
 } from '@/types/api';
 
 export const authService = {
@@ -40,6 +40,15 @@ export const investigationService = {
   get: (id: string) => api.get<InvestigationDetail>(`/investigations/${encodeURIComponent(id)}`),
   events: (id: string) =>
     api.get<{ status: string; current_stage: string | null; events: TimelineEvent[] }>(`/investigations/${encodeURIComponent(id)}/events`),
+  upload: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post<{ id: string; public_id: string; status: string; executor: string }>('/investigations/upload', form);
+  },
+  fileBlob: async (id: string) => {
+    const response = await request<Response>(`/investigations/${encodeURIComponent(id)}/file`, { raw: true });
+    return response.blob();
+  },
   remove: (id: string) => api.del<void>(`/investigations/${encodeURIComponent(id)}`),
   exportFile: async (id: string, format: 'json' | 'csv') => {
     const response = await request<Response>(`/investigations/${encodeURIComponent(id)}/export?format=${format}`, { raw: true });
@@ -57,4 +66,29 @@ export const platformService = {
 export const legacyService = {
   report: (id: string) => api.get<Record<string, unknown>>(`/reports/${encodeURIComponent(id)}`),
   shared: (token: string) => api.get<Record<string, unknown>>(`/shared/${encodeURIComponent(token)}`, { auth: false }),
+};
+
+export interface EvidenceQuery {
+  q: string;
+  category?: string[];
+  min_credibility?: number;
+  limit?: number;
+}
+
+export const evidenceService = {
+  search: ({ q, category = [], min_credibility, limit = 10 }: EvidenceQuery) => {
+    const params = new URLSearchParams({ q, limit: String(limit) });
+    category.forEach((c) => params.append('category', c));
+    if (min_credibility !== undefined) params.set('min_credibility', String(min_credibility));
+    return api.get<EvidenceSearch>(`/evidence/search?${params}`);
+  },
+  stats: () => api.get<EvidenceStats>('/evidence/stats'),
+  ingest: (body: { url?: string; title?: string; text?: string; source_url?: string }) =>
+    api.post<{ id: string; created: boolean; chunks: number; url: string; source: SourceEntry | null }>('/evidence/documents', body),
+  sources: (params: { q?: string; category?: string; page?: number }) =>
+    api.get<Page<SourceEntry> & { categories: string[] }>(`/sources${query(params)}`),
+  updateSource: (id: string, body: { category?: string; credibility?: number; notes?: string }) =>
+    api.patch<SourceEntry>(`/sources/${encodeURIComponent(id)}`, body),
+  claims: (params: { q?: string; assessment?: string }) =>
+    api.get<{ items: ClaimIndexItem[] }>(`/claims${query(params)}`),
 };

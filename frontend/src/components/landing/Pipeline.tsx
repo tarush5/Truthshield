@@ -59,14 +59,16 @@ export function Pipeline() {
                 transition={{ duration: 0.5, delay: i * 0.05, ease: EASE }}
                 className={cn(
                   'flex items-center gap-3 rounded-full border px-5 py-3',
-                  m.availability === 'live' ? 'border-stroke bg-surface' : 'border-dashed border-stroke bg-transparent',
+                  m.availability !== 'planned' ? 'border-stroke bg-surface' : 'border-dashed border-stroke bg-transparent',
                 )}
               >
-                <span className={cn('text-sm font-medium tracking-wide', m.availability === 'live' ? 'text-text-primary' : 'text-muted')}>
+                <span className={cn('text-sm font-medium tracking-wide', m.availability !== 'planned' ? 'text-text-primary' : 'text-muted')}>
                   {m.label.toUpperCase()}
                 </span>
                 {m.availability === 'live' ? (
                   <Badge tone="good">Live</Badge>
+                ) : m.availability === 'partial' ? (
+                  <Badge tone="accent">Partial</Badge>
                 ) : (
                   <Badge>Phase {m.phase}</Badge>
                 )}

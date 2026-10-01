@@ -92,14 +92,17 @@ export async function request<T>(path: string, options: RequestOptions = {}, ret
   const { body, auth = true, raw = false, headers, ...rest } = options;
   const token = useAuth.getState().accessToken;
 
+  // FormData (file uploads) goes as-is: the browser sets the multipart
+  // boundary in Content-Type itself, so we must not.
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
   const init: RequestInit = {
     ...rest,
     headers: {
-      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(body !== undefined && !isForm ? { 'Content-Type': 'application/json' } : {}),
       ...(auth && token ? { Authorization: `Bearer ${token}` } : {}),
       ...(headers as Record<string, string> | undefined),
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
   };
 
   let response: Response;

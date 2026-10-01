@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 
 from truthshield.api.routes import analysis_router, auth_router, meta_router
 from truthshield.api.errors import register as register_error_handlers
+from truthshield.api.evidence import claims_v2_router, evidence_router, sources_router
 from truthshield.api.fraud import fraud_router
 from truthshield.api.investigations import (
     admin_router, analyze_v2_router, investigations_router, platform_router,
@@ -195,6 +196,9 @@ app.include_router(investigations_router, prefix="/api/v1")
 app.include_router(analyze_v2_router, prefix="/api/v1")
 app.include_router(platform_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
+app.include_router(evidence_router, prefix="/api/v1")
+app.include_router(sources_router, prefix="/api/v1")
+app.include_router(claims_v2_router, prefix="/api/v1")
 
 
 @app.get("/", tags=["meta"])

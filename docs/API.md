@@ -131,6 +131,30 @@ investigation, run it inline, and return the full detail (`200`). They are
 convenient for scripts. Media routes (`/analyze/image|audio|video|pdf`) land
 in Phases 2–3.
 
+## Files (Phase 2)
+
+| Route | Notes |
+|---|---|
+| `POST /investigations/upload` | multipart `file`: PDF, PNG, JPEG, WebP up to `MAX_UPLOAD_SIZE_MB`. `415 UNSUPPORTED_FILE` when the extension is not allowed **or the bytes do not match it**; `413` over the cap. Returns `202` like `POST /investigations` |
+| `POST /analyze/pdf`, `POST /analyze/image` | Same, run inline, full result returned |
+| `GET /investigations/{id}/file` | The upload, to its owner or an admin, with `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`, `Cache-Control: private, no-store` |
+
+Result additions: `result.document` (type, fields, metadata, active content, incremental saves, OCR),
+`result.image` (dimensions, EXIF, OCR text and word boxes), `claims[].retrieval` (query variants, live-search
+outcome, embedding kind, reranker) and `claims[].sources[].scores`, and `explanation.llm` / `llm_status` / `llm_meta`.
+
+## Evidence (Phase 2)
+
+| Route | Auth | Notes |
+|---|---|---|
+| `GET /evidence/search?q=&category=&min_credibility=&exclude_domain=&limit=` | user | Hybrid search; each result carries `scores.components` |
+| `GET /evidence/stats` | user | Counts, backend (`pgvector` or in-process), embedding model and kind, reranker |
+| `GET /evidence/{document_id}` | user | Document with chunks (no vectors) |
+| `POST /evidence/documents` | ANALYST, ADMIN | `{url}` (fetched through the SSRF guard) or `{title, text, source_url}`; audited |
+| `GET /sources?q=&category=` | user | Source registry |
+| `PATCH /sources/{id}` | ADMIN | `{category, credibility, notes}`; marks the source curated; audited |
+| `GET /claims?q=&assessment=` | user | Claims from your investigations (all, for admins) |
+
 ## Platform
 
 | Route | Auth | Notes |

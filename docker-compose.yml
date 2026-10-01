@@ -10,7 +10,8 @@ name: truthshield
 
 services:
   db:
-    image: postgres:16-alpine
+    # pgvector: the evidence store keeps embeddings in a vector(384) column.
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: truthshield
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-truthshield}

@@ -34,6 +34,8 @@ os.environ.update({
     "RATE_LIMIT": "100000/minute",
     "RATE_LIMIT_AUTH": "100000/minute",
     "RATE_LIMIT_ANALYSIS": "100000/minute",
+    # Uploads land in a throwaway directory, never the developer's storage.
+    "STORAGE_DIR": str(Path(__file__).resolve().parent.parent / ".pytest_storage"),
 })
 
 

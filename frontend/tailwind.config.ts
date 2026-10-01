@@ -33,6 +33,9 @@ export default {
       },
       animation: {
         'scroll-down': 'scroll-down 1.5s ease-in-out infinite',
+        // CSS rather than a GSAP tween: a transform-only loop runs on the
+        // compositor and needs no JavaScript on the main thread.
+        marquee: 'marquee 40s linear infinite',
         'role-fade-in': 'role-fade-in 0.4s ease-out',
         'gradient-shift': 'gradient-shift 6s ease infinite',
         'pulse-soft': 'pulse-soft 2s ease-in-out infinite',

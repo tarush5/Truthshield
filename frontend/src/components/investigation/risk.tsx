@@ -1,4 +1,4 @@
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 
 import { Badge } from '@/components/ui';
 import { CONFIDENCE_LABEL, FAMILY_LABEL, PROVENANCE_LABEL, RISK_STYLE, cn } from '@/lib/format';
@@ -14,7 +14,7 @@ export function RiskGauge({ score, level, size = 168 }: { score: number; level: 
     <div className="relative" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" aria-hidden>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(var(--stroke))" strokeWidth={stroke} />
-        <motion.circle
+        <m.circle
           cx={size / 2}
           cy={size / 2}
           r={r}
@@ -102,7 +102,7 @@ export function ContributionRow({ c, max }: { c: Contribution; max: number }) {
           <span className="text-[11px] text-muted">{FAMILY_LABEL[c.family] ?? c.family}</span>
         </div>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stroke/60">
-          <motion.div className={cn('h-full rounded-full', style)} initial={{ width: 0 }} animate={{ width: `${max ? (c.points / max) * 100 : 0}%` }} transition={{ duration: 0.8 }} />
+          <m.div className={cn('h-full rounded-full', style)} initial={{ width: 0 }} animate={{ width: `${max ? (c.points / max) * 100 : 0}%` }} transition={{ duration: 0.8 }} />
         </div>
       </div>
     </li>

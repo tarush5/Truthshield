@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { Suspense, lazy, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useOutlet } from 'react-router-dom';
 
@@ -7,7 +7,7 @@ import { SKIP_MOTION } from '@/lib/env';
 import { useAuth } from '@/stores/auth';
 
 // The shell is only needed once signed in, so landing visitors never download it.
-const AppShell = lazy(() => import('@/components/shell/AppShell').then((m) => ({ default: m.AppShell })));
+const AppShell = lazy(() => import('@/components/shell/AppShell').then((mod) => ({ default: mod.AppShell })));
 const Landing = lazy(() => import('@/pages/Landing'));
 const Login = lazy(() => import('@/pages/Login'));
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
@@ -44,9 +44,9 @@ const fade = {
 function Page({ children }: { children: ReactNode }) {
   if (SKIP_MOTION) return <Suspense fallback={<Fallback />}>{children}</Suspense>;
   return (
-    <motion.div {...fade}>
+    <m.div {...fade}>
       <Suspense fallback={<Fallback />}>{children}</Suspense>
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -57,9 +57,9 @@ function AnimatedOutlet() {
   if (SKIP_MOTION) return <Suspense fallback={<Fallback />}>{outlet}</Suspense>;
   return (
     <AnimatePresence mode="wait" onExitComplete={() => window.scrollTo(0, 0)}>
-      <motion.div key={location.pathname} {...fade}>
+      <m.div key={location.pathname} {...fade}>
         <Suspense fallback={<Fallback />}>{outlet}</Suspense>
-      </motion.div>
+      </m.div>
     </AnimatePresence>
   );
 }

@@ -1,8 +1,7 @@
 # Frontend
 
 `frontend/`: React 19 · TypeScript · Vite · Tailwind CSS 3 · Motion
-(Framer Motion) · GSAP · hls.js · React Query · Zustand · Recharts ·
-react-router 7.
+(Framer Motion) · GSAP · hls.js · React Query · Zustand · react-router 7.
 
 The 1.x JSX app was retired in the 2.0 fresh start; 1.x report and share links
 are rendered by the read-only `LegacyReport` page (see [MIGRATION](MIGRATION.md)).
@@ -47,7 +46,7 @@ src/
     investigation/             RiskScoreCard, ConfidenceBadge, RiskBreakdown, SignalCard,
                                ProcessingStatus, InvestigationTimeline, AgentActivityPanel,
                                EvidenceCard, ClaimCard, UrlIntelCard, ProvenanceTag, …
-    charts/                    Recharts wrappers
+    charts.tsx                 dependency-free SVG area and bar charts
     ui/                        Button, GradientButton, Card, Badge, Tabs, Field, …
   pages/                       Landing, Login, Dashboard, Investigate, InvestigationResult,
                                History, UrlIntelligence, Settings, Module (planned), LegacyReport
@@ -76,6 +75,30 @@ src/
 | `/app/settings` | Account, session, role | 1 |
 | `/app/threat-intel`, `/fraud`, `/misinformation`, `/deepfake`, `/documents`, `/transactions`, `/evidence`, `/reports`, `/analytics`, `/models` | Module pages. Each states honestly what it will do and in which phase | 2–6 |
 | `/report/:id`, `/shared/:token` | Read-only 1.x report view (keeps old links working) | 1 |
+
+## Performance
+
+Measured with `npm run build` (gzipped):
+
+| | Before | After |
+|---|---|---|
+| Initial payload (React, entry, data, CSS) | ~149 kB | ~124 kB (CI budget 140 kB) |
+| Dashboard route | 110.7 kB | 4.9 kB |
+| Footer video (hls.js + stream) | on page load | only when scrolled within a screen of it |
+
+- **Motion** uses `LazyMotion` + `m.*` components; the animation engine
+  (`lib/motion-features.ts`, ~15 kB) loads asynchronously after first paint.
+  `strict` mode throws in development if a full `motion.*` component slips in.
+- **Charts** are hand-written SVG (`components/charts.tsx`) instead of
+  Recharts, which brought D3, Redux Toolkit and Immer for two charts. Each
+  chart renders its data as a visually hidden table for screen readers.
+- **Video**: `HlsVideo` fetches nothing until the element is within one
+  viewport height, and pauses when off-screen or when the tab is hidden.
+- **Images**: Unsplash `srcset`/`sizes` per card width; 80 px thumbnails
+  ask for 80/160 px images rather than 300 px.
+- **Marquee** is a CSS transform animation (compositor only), not a GSAP tween.
+- **Fonts**: only the Inter weights used (400/500/600) are requested.
+- The landing intro plays once per tab session, including across reloads.
 
 ## Testing in automated browsers
 

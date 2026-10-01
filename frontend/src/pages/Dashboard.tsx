@@ -1,7 +1,7 @@
 import { Activity, AlertOctagon, Gauge, Timer } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
+import { AreaChart, BarChart } from '@/components/charts';
 import { InvestigationRow } from '@/components/investigation/InvestigationRow';
 import { Badge, ButtonLink, Card, CardHeader, EmptyState, ErrorNotice, PageHeader, Skeleton } from '@/components/ui';
 import { useDashboard, useHealth } from '@/hooks/queries';
@@ -9,7 +9,6 @@ import { RISK_STYLE, cn, formatMs, humanize } from '@/lib/format';
 import type { RiskLevel } from '@/types/api';
 
 const WINDOWS = [7, 30, 90];
-const tooltipStyle = { background: 'hsl(0 0% 8%)', border: '1px solid hsl(0 0% 14%)', borderRadius: 12, fontSize: 12 };
 
 function Metric({ label, value, note, icon }: { label: string; value: ReactNode; note?: string; icon: ReactNode }) {
   return (
@@ -77,39 +76,26 @@ export default function Dashboard() {
             <Card className="xl:col-span-2">
               <CardHeader eyebrow={`Last ${days} days`} title="Investigations per day" />
               <div className="h-64 p-3 pr-5">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data.volume} margin={{ top: 10, left: -20, right: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="vol" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#89AACC" stopOpacity={0.45} />
-                        <stop offset="100%" stopColor="#4E85BF" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid stroke="hsl(0 0% 12%)" vertical={false} />
-                    <XAxis dataKey="date" tickFormatter={(d: string) => d.slice(5)} stroke="hsl(0 0% 40%)" fontSize={11} tickLine={false} axisLine={false} minTickGap={24} />
-                    <YAxis allowDecimals={false} stroke="hsl(0 0% 40%)" fontSize={11} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: '#aaa' }} />
-                    <Area type="monotone" dataKey="total" name="All" stroke="#89AACC" fill="url(#vol)" strokeWidth={2} />
-                    <Area type="monotone" dataKey="high_or_critical" name="High / critical" stroke={RISK_STYLE.CRITICAL.hex} fill="transparent" strokeWidth={1.5} />
-                  </AreaChart>
-                </ResponsiveContainer>
+                <AreaChart
+                  data={data.volume}
+                  xKey="date"
+                  formatX={(d) => d.slice(5)}
+                  label={`Investigations per day, last ${days} days`}
+                  series={[
+                    { key: 'total', label: 'All', color: '#89AACC', fill: true },
+                    { key: 'high_or_critical', label: 'High / critical', color: RISK_STYLE.CRITICAL.hex },
+                  ]}
+                />
               </div>
             </Card>
 
             <Card>
               <CardHeader eyebrow="Completed" title="Risk distribution" />
               <div className="h-64 p-3 pr-5">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as RiskLevel[]).map((l) => ({ level: RISK_STYLE[l].label, count: data.risk_levels[l], hex: RISK_STYLE[l].hex }))} margin={{ top: 10, left: -20, right: 0, bottom: 0 }}>
-                    <CartesianGrid stroke="hsl(0 0% 12%)" vertical={false} />
-                    <XAxis dataKey="level" stroke="hsl(0 0% 40%)" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis allowDecimals={false} stroke="hsl(0 0% 40%)" fontSize={11} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'hsl(0 0% 12% / 0.5)' }} />
-                    <Bar dataKey="count" radius={[8, 8, 0, 0]}>
-                      {(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as RiskLevel[]).map((l) => <Cell key={l} fill={RISK_STYLE[l].hex} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <BarChart
+                  label="Completed investigations by risk level"
+                  data={(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as RiskLevel[]).map((l) => ({ label: RISK_STYLE[l].label, value: data.risk_levels[l], color: RISK_STYLE[l].hex }))}
+                />
               </div>
             </Card>
           </div>

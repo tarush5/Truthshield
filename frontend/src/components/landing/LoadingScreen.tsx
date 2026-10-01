@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
 const WORDS = ['Verify', 'Investigate', 'Trust'];
@@ -34,7 +34,7 @@ export function LoadingScreen({ onComplete }: { onComplete: () => void }) {
   }, [onComplete]);
 
   return (
-    <motion.div
+    <m.div
       className="fixed inset-0 z-[9999] bg-bg"
       // Never block the page underneath while fading out.
       exit={{ opacity: 0, pointerEvents: 'none' }}
@@ -45,18 +45,18 @@ export function LoadingScreen({ onComplete }: { onComplete: () => void }) {
       aria-valuemin={0}
       aria-valuemax={100}
     >
-      <motion.p
+      <m.p
         className="absolute left-6 top-6 text-xs uppercase tracking-[0.3em] text-muted md:left-10 md:top-10"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6 }}
       >
         TruthShield
-      </motion.p>
+      </m.p>
 
       <div className="absolute inset-0 flex items-center justify-center">
         <AnimatePresence mode="wait">
-          <motion.span
+          <m.span
             key={WORDS[word]}
             className="font-display text-4xl italic text-text-primary/80 md:text-6xl lg:text-7xl"
             initial={{ y: 20, opacity: 0 }}
@@ -65,7 +65,7 @@ export function LoadingScreen({ onComplete }: { onComplete: () => void }) {
             transition={{ duration: 0.35 }}
           >
             {WORDS[word]}
-          </motion.span>
+          </m.span>
         </AnimatePresence>
       </div>
 
@@ -79,6 +79,6 @@ export function LoadingScreen({ onComplete }: { onComplete: () => void }) {
           style={{ transform: `scaleX(${count / 100})`, boxShadow: '0 0 8px rgba(137, 170, 204, 0.35)' }}
         />
       </div>
-    </motion.div>
+    </m.div>
   );
 }

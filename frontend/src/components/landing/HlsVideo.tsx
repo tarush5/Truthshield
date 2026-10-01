@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 
 import { cn } from '@/lib/format';
-import { HLS_SOURCE } from '@/lib/scroll';
 
 export function Backdrop() {
   // Shown under the video: while it buffers, when it cannot play, and for
@@ -15,9 +14,13 @@ export function Backdrop() {
   );
 }
 
+export const HLS_SOURCE = 'https://stream.mux.com/Aa02T7oM1wH5Mk5EEVDYhbZ1ChcdhRsS2m1NYyx4Ua1g.m3u8';
+
 /**
- * Background HLS video. hls.js is imported lazily so it never sits on the
- * initial bundle; Safari plays HLS natively and skips it entirely.
+ * Background HLS video. Nothing is fetched until the video is within a
+ * screen of the viewport: hls.js (~114 kB gzipped) and the stream are
+ * loaded on approach, so a visitor who never scrolls to the footer never
+ * pays for its video.
  */
 export function HlsVideo({ className, flip = false }: { className?: string; flip?: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -28,36 +31,62 @@ export function HlsVideo({ className, flip = false }: { className?: string; flip
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     let destroyed = false;
+    let started = false;
+    let visible = false;
     let hls: { destroy: () => void } | null = null;
 
-    // hls.js first wherever Media Source Extensions exist; native HLS only as
-    // the fallback. Some Chromium builds answer "maybe" to canPlayType for
-    // HLS and then play nothing, so the native answer cannot be trusted first.
-    import('hls.js/light')
-      .then(({ default: Hls }) => {
-        if (destroyed) return;
-        if (Hls.isSupported()) {
-          const instance = new Hls({ capLevelToPlayerSize: true, maxBufferLength: 10 });
-          instance.loadSource(HLS_SOURCE);
-          instance.attachMedia(video);
-          hls = instance;
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-          video.src = HLS_SOURCE;
-        }
-      })
-      .catch(() => undefined);
-
-    // Pause when off-screen: two full-bleed videos decoding at once is a
-    // noticeable battery cost on a laptop for no visible benefit.
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) video.play().catch(() => undefined);
+    const sync = () => {
+      if (visible && !document.hidden) video.play().catch(() => undefined);
       else video.pause();
+    };
+
+    const start = () => {
+      started = true;
+      // hls.js first wherever Media Source Extensions exist; native HLS only
+      // as the fallback. Some Chromium builds answer "maybe" to canPlayType
+      // for HLS and then play nothing, so the native answer cannot be
+      // trusted first.
+      import('hls.js/light')
+        .then(({ default: Hls }) => {
+          if (destroyed) return;
+          if (Hls.isSupported()) {
+            const instance = new Hls({ capLevelToPlayerSize: true, maxBufferLength: 10 });
+            instance.loadSource(HLS_SOURCE);
+            instance.attachMedia(video);
+            hls = instance;
+          } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = HLS_SOURCE;
+          }
+          // Some browsers reject play() before the first segment arrives.
+          video.addEventListener('canplay', sync, { once: true });
+          sync();
+        })
+        .catch(() => undefined);
+    };
+
+    // Start on approach; afterwards, pause whenever off-screen or the tab is
+    // hidden. Two full-bleed videos decoding at once is a noticeable battery
+    // cost for no visible benefit.
+    const near = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !started) start();
+      },
+      { rootMargin: '100% 0px' },
+    );
+    const onScreen = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (started) sync();
     });
-    observer.observe(video);
+    near.observe(video);
+    onScreen.observe(video);
+    document.addEventListener('visibilitychange', sync);
 
     return () => {
       destroyed = true;
-      observer.disconnect();
+      near.disconnect();
+      onScreen.disconnect();
+      document.removeEventListener('visibilitychange', sync);
+      video.removeEventListener('canplay', sync);
       hls?.destroy();
     };
   }, []);
@@ -65,7 +94,7 @@ export function HlsVideo({ className, flip = false }: { className?: string; flip
   return (
     <video
       ref={ref}
-      autoPlay
+      preload="none"
       muted
       loop
       playsInline

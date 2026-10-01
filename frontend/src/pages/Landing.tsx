@@ -13,14 +13,30 @@ import { Principles } from '@/components/landing/Principles';
 import { Stats } from '@/components/landing/Stats';
 import { SKIP_MOTION } from '@/lib/env';
 
-// Once per tab session: the intro is a welcome, not a toll on every visit.
-let introShown = SKIP_MOTION;
+// Once per tab session (surviving reloads): the intro is a welcome, not a
+// toll on every visit. Storage can throw in private modes; then it shows once
+// per page load.
+const INTRO_KEY = 'ts.introShown';
+let introShown = SKIP_MOTION || readIntro();
+
+function readIntro() {
+  try {
+    return sessionStorage.getItem(INTRO_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 export default function Landing() {
   const [loading, setLoading] = useState(!introShown);
 
   const finish = useCallback(() => {
     introShown = true;
+    try {
+      sessionStorage.setItem(INTRO_KEY, '1');
+    } catch {
+      /* not persisted; harmless */
+    }
     setLoading(false);
   }, []);
 

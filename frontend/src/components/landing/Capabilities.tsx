@@ -1,11 +1,11 @@
 import { ArrowRight } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import { Link } from 'react-router-dom';
 
 import { EASE, SectionHeader } from '@/components/landing/SectionHeader';
 import { Badge, ButtonLink } from '@/components/ui';
 import { cn } from '@/lib/format';
-import { AVAILABILITY_LABEL, CAPABILITIES } from '@/lib/modules';
+import { AVAILABILITY_LABEL, CAPABILITIES, unsplashSrcSet } from '@/lib/modules';
 import { useAuth } from '@/stores/auth';
 
 // Alternating 7/5, 5/7 rhythm; the last card closes the grid full-width.
@@ -31,7 +31,7 @@ export function Capabilities() {
 
         <div className="grid grid-cols-1 gap-5 md:grid-cols-12 md:gap-6">
           {CAPABILITIES.map((cap, i) => (
-            <motion.div
+            <m.div
               key={cap.id}
               className={SPANS[i]}
               initial={{ opacity: 0, y: 40 }}
@@ -48,8 +48,13 @@ export function Capabilities() {
               >
                 <img
                   src={cap.image}
+                  srcSet={unsplashSrcSet(cap.image, [480, 800, 1200, 1600])}
+                  // Cards are full width on phones, 5/12 or 7/12 of a 1200px
+                  // container on desktop; the last one spans the whole row.
+                  sizes={i === CAPABILITIES.length - 1 ? '(min-width: 1200px) 1100px, 100vw' : '(min-width: 1200px) 640px, (min-width: 768px) 58vw, 100vw'}
                   alt=""
                   loading="lazy"
+                  decoding="async"
                   className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                 />
                 <div className="halftone absolute inset-0 opacity-20 mix-blend-multiply" aria-hidden />
@@ -73,7 +78,7 @@ export function Capabilities() {
                   </span>
                 </div>
               </Link>
-            </motion.div>
+            </m.div>
           ))}
         </div>
       </div>

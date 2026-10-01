@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MotionGlobalConfig } from 'motion/react';
+import { LazyMotion, MotionGlobalConfig } from 'motion/react';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -9,6 +9,8 @@ import { SKIP_MOTION } from '@/lib/env';
 import './index.css';
 
 if (SKIP_MOTION) MotionGlobalConfig.skipAnimations = true;
+
+const loadMotionFeatures = () => import('@/lib/motion-features').then((mod) => mod.default);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,7 +26,10 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      {/* `strict` makes a stray full-size <motion.*> component throw in dev. */}
+      <LazyMotion features={loadMotionFeatures} strict>
+        <App />
+      </LazyMotion>
     </QueryClientProvider>
   </StrictMode>,
 );

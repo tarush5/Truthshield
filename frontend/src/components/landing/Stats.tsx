@@ -1,4 +1,4 @@
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 
 import { EASE } from '@/components/landing/SectionHeader';
 import { useHealth } from '@/hooks/queries';
@@ -20,7 +20,7 @@ export function Stats() {
     <section className="bg-bg py-16 md:py-24">
       <div className="mx-auto grid max-w-[1200px] grid-cols-1 gap-10 px-6 md:grid-cols-3 md:px-10 lg:px-16">
         {stats.map((s, i) => (
-          <motion.div
+          <m.div
             key={s.label}
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -31,7 +31,7 @@ export function Stats() {
             <p className="font-display text-6xl tabular-nums text-text-primary md:text-7xl">{s.value}</p>
             <p className="mt-3 text-sm uppercase tracking-[0.2em] text-muted">{s.label}</p>
             {s.note && <p className="mt-1 text-xs text-muted/80">{s.note}</p>}
-          </motion.div>
+          </m.div>
         ))}
       </div>
       {isError && (

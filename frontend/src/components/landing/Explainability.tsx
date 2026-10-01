@@ -1,7 +1,7 @@
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { X } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { ButtonLink, Eyebrow } from '@/components/ui';
@@ -128,7 +128,7 @@ export function Explainability() {
 
       <AnimatePresence>
         {open && (
-          <motion.div
+          <m.div
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -138,7 +138,7 @@ export function Explainability() {
             aria-modal="true"
             aria-label={open.title}
           >
-            <motion.div
+            <m.div
               initial={{ scale: 0.92, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0 }}
@@ -152,8 +152,8 @@ export function Explainability() {
               <p className="mt-3 font-display text-4xl italic text-text-primary">{open.title}</p>
               <p className="mt-2 text-xs uppercase tracking-[0.15em] text-muted">{open.meta}</p>
               <p className="mt-6 text-sm leading-relaxed text-text-primary/85">{open.detail}</p>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
     </section>

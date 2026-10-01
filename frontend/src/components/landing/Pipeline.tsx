@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowRight } from 'lucide-react';
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 
 import { EASE, SectionHeader } from '@/components/landing/SectionHeader';
 import { Badge } from '@/components/ui';
@@ -26,7 +26,7 @@ export function Pipeline() {
 
         <ol className="grid gap-3 md:grid-cols-5 md:gap-4">
           {STEPS.map((step, i) => (
-            <motion.li
+            <m.li
               key={step.title}
               initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -43,36 +43,36 @@ export function Pipeline() {
                   <ArrowDown className="absolute -bottom-3 left-1/2 z-10 h-4 w-4 -translate-x-1/2 text-muted md:hidden" aria-hidden />
                 </>
               )}
-            </motion.li>
+            </m.li>
           ))}
         </ol>
 
         <div className="mt-12">
           <p className="mb-4 text-xs uppercase tracking-[0.3em] text-muted">Inputs</p>
           <div className="flex flex-wrap gap-3">
-            {MODALITIES.map((m, i) => (
-              <motion.div
-                key={m.label}
+            {MODALITIES.map((mod, i) => (
+              <m.div
+                key={mod.label}
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: i * 0.05, ease: EASE }}
                 className={cn(
                   'flex items-center gap-3 rounded-full border px-5 py-3',
-                  m.availability !== 'planned' ? 'border-stroke bg-surface' : 'border-dashed border-stroke bg-transparent',
+                  mod.availability !== 'planned' ? 'border-stroke bg-surface' : 'border-dashed border-stroke bg-transparent',
                 )}
               >
-                <span className={cn('text-sm font-medium tracking-wide', m.availability !== 'planned' ? 'text-text-primary' : 'text-muted')}>
-                  {m.label.toUpperCase()}
+                <span className={cn('text-sm font-medium tracking-wide', mod.availability !== 'planned' ? 'text-text-primary' : 'text-muted')}>
+                  {mod.label.toUpperCase()}
                 </span>
-                {m.availability === 'live' ? (
+                {mod.availability === 'live' ? (
                   <Badge tone="good">Live</Badge>
-                ) : m.availability === 'partial' ? (
+                ) : mod.availability === 'partial' ? (
                   <Badge tone="accent">Partial</Badge>
                 ) : (
-                  <Badge>Phase {m.phase}</Badge>
+                  <Badge>Phase {mod.phase}</Badge>
                 )}
-              </motion.div>
+              </m.div>
             ))}
           </div>
         </div>

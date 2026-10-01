@@ -1,4 +1,4 @@
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 import type { ReactNode } from 'react';
 
 import { Eyebrow } from '@/components/ui';
@@ -13,7 +13,7 @@ export function SectionHeader({ eyebrow, title, subtext, action, center = false 
   center?: boolean;
 }) {
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-100px' }}
@@ -26,6 +26,6 @@ export function SectionHeader({ eyebrow, title, subtext, action, center = false 
         <p className="mt-4 max-w-lg text-sm text-muted md:text-base">{subtext}</p>
       </div>
       {action && <div className="hidden md:inline-flex">{action}</div>}
-    </motion.div>
+    </m.div>
   );
 }

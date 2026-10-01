@@ -1,8 +1,8 @@
-import { motion } from 'motion/react';
+import { m } from 'motion/react';
 
 import { EASE, SectionHeader } from '@/components/landing/SectionHeader';
 
-const img = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=300&q=60`;
+const img = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=80&q=60`;
 
 const PRINCIPLES = [
   {
@@ -46,7 +46,7 @@ export function Principles() {
         />
         <ul className="flex flex-col gap-4">
           {PRINCIPLES.map((p, i) => (
-            <motion.li
+            <m.li
               key={p.title}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -54,7 +54,15 @@ export function Principles() {
               transition={{ duration: 0.8, delay: i * 0.06, ease: EASE }}
               className="flex items-center gap-6 rounded-[40px] border border-stroke bg-surface/30 p-4 transition-colors hover:bg-surface sm:rounded-full"
             >
-              <img src={p.image} alt="" loading="lazy" className="h-16 w-16 shrink-0 rounded-full object-cover sm:h-20 sm:w-20" />
+              <img
+                src={p.image}
+                srcSet={`${p.image} 1x, ${p.image.replace('w=80', 'w=160')} 2x`}
+                width={80}
+                height={80}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="h-16 w-16 shrink-0 rounded-full object-cover sm:h-20 sm:w-20" />
               <div className="min-w-0 flex-1">
                 <p className="text-base font-medium text-text-primary sm:text-lg">{p.title}</p>
                 <p className="mt-1 text-sm text-muted">{p.body}</p>
@@ -63,7 +71,7 @@ export function Principles() {
                 <span className="text-xs uppercase tracking-[0.2em] text-muted">{p.tag}</span>
                 <span className="text-sm text-text-primary/80">See: {p.where}</span>
               </div>
-            </motion.li>
+            </m.li>
           ))}
         </ul>
       </div>

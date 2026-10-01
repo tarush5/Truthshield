@@ -80,7 +80,7 @@ cd frontend && npm run typecheck && npm test && npm run build
 
 CI runs all of this on real Postgres and Redis, applies migrations up, down
 and up again, fails on model/migration drift (`alembic check`), and enforces a
-165 kB gzipped budget on the initial frontend payload.
+140 kB gzipped budget on the initial frontend payload (124 kB today).
 
 ## Documentation
 

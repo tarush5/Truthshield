@@ -3,7 +3,7 @@ import {
   LogOut, Menu, Newspaper, Radar, ScanFace, Search, Settings, ShieldAlert, X,
   type LucideIcon,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 
@@ -173,8 +173,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <AnimatePresence>
         {open && (
           <>
-            <motion.div className="fixed inset-0 z-40 bg-black/70 lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpen(false)} />
-            <motion.aside
+            <m.div className="fixed inset-0 z-40 bg-black/70 lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpen(false)} />
+            <m.aside
               className="fixed inset-y-0 left-0 z-50 w-72 border-r border-stroke bg-bg lg:hidden"
               initial={{ x: -300 }}
               animate={{ x: 0 }}
@@ -185,7 +185,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <X className="h-5 w-5" />
               </button>
               <SidebarContent onNavigate={() => setOpen(false)} />
-            </motion.aside>
+            </m.aside>
           </>
         )}
       </AnimatePresence>

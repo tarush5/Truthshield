@@ -21,6 +21,10 @@ export interface Capability {
 
 const img = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=1200&q=70`;
 
+/** A `srcset` for an Unsplash URL, so phones are not sent desktop-sized images. */
+export const unsplashSrcSet = (src: string, widths: number[]) =>
+  widths.map((w) => `${src.replace(/([?&])w=\d+/, `$1w=${w}`)} ${w}w`).join(', ');
+
 export const CAPABILITIES: Capability[] = [
   {
     id: 'multimodal',

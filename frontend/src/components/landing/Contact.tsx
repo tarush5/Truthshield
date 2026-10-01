@@ -1,6 +1,4 @@
-import gsap from 'gsap';
 import { ArrowRight } from 'lucide-react';
-import { useLayoutEffect, useRef } from 'react';
 
 import { Backdrop, HlsVideo } from '@/components/landing/HlsVideo';
 import { ButtonLink } from '@/components/ui';
@@ -40,16 +38,7 @@ function SystemStatus() {
 }
 
 export function Contact() {
-  const track = useRef<HTMLDivElement>(null);
   const signedIn = useAuth((s) => Boolean(s.accessToken));
-
-  useLayoutEffect(() => {
-    if (!track.current || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const tween = gsap.to(track.current, { xPercent: -50, duration: 40, ease: 'none', repeat: -1 });
-    return () => {
-      tween.kill();
-    };
-  }, []);
 
   return (
     <footer id="contact" className="relative overflow-hidden bg-bg pb-8 pt-16 md:pb-12 md:pt-20">
@@ -60,7 +49,7 @@ export function Contact() {
 
       <div className="relative z-10">
         <div className="overflow-hidden whitespace-nowrap py-6" aria-hidden>
-          <div ref={track} className="inline-block font-display text-6xl italic text-text-primary/90 md:text-8xl">
+          <div className="inline-block animate-marquee font-display text-6xl italic text-text-primary/90 md:text-8xl">
             {PHRASE.repeat(10)}
           </div>
         </div>

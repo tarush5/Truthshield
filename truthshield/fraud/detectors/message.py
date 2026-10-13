@@ -45,6 +45,11 @@ class Pattern:
     explanation: str
     action: str
     patterns: Tuple[str, ...]
+    code: str = ""
+
+    @property
+    def indicator_code(self) -> str:
+        return self.code or f"scam_{self.category.value.lower()}"
 
 
 # Written against how these messages are actually worded, including the
@@ -57,13 +62,18 @@ PATTERNS: Tuple[Pattern, ...] = (
         "Do not use the link. Call your bank on the number printed on your card "
         "or in its official app.",
         (
-            r"\b(?:kyc)\b.{0,40}\b(?:expir|updat|pending|complet|suspend)",
+            r"\b(?:e-?)?kyc\b.{0,40}\b(?:expir|pending|suspend|incomplete|block|not\s*(?:been\s*)?(?:updated|completed))",
+            r"\b(?:update|complete|verify|renew)\s*(?:your\s*)?(?:e-?)?kyc\b",
+            r"\bincomplete\s*(?:e-?)?kyc\b",
             r"\b(?:account|a/c|acct)\b.{0,30}\b(?:block|suspend|freez|deactivat|clos)",
             r"\bnet\s*banking\b.{0,30}\b(?:block|suspend|expir)",
             r"\bpan\s*card\b.{0,30}\b(?:updat|link|expir)",
-            r"kyc.{0,30}(?:expire|ho gaya|karo|kijiye|update)",
+            r"kyc.{0,30}(?:expire|ho gaya|karo|kijiye|kare|update\s*kar)",
             r"(?:khata|account).{0,20}band ho",
             r"\bdebit\s*card\b.{0,30}\b(?:block|expir|deactivat)",
+            r"(?:खाता|अकाउंट|account).{0,40}(?:बंद|ब्लॉक|निलंबित)",
+            r"(?:केवाईसी|kyc).{0,30}अपडेट\s*कर",
+            r"வங்கி\s*கணக்கு.{0,60}(?:முடக்க|நிறுத்த|மூட)",
         ),
     ),
     Pattern(
@@ -78,9 +88,19 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"\b(?:share|send|tell|provide|forward|batao|bhejo|do)\b",
             r"\b(?:share|send|tell|provide|forward)\b.{0,30}\b(?:otp|pin|cvv)\b",
             r"\bcollect\s*request\b",
+            r"\b(?:tell|give|read|share)\s*(?:me|us)\b.{0,25}\b(?:code|otp|pin)\b",
+            r"\bto\s*(?:get|receive)\b.{0,60}\b(?:scan|qr\s*code|upi\s*pin|enter\s*(?:your\s*)?pin)",
+            r"\bscan\b.{0,30}\bqr\b.{0,40}\bpin\b",
             r"\bapprove\b.{0,25}\b(?:request|payment|debit)\b",
             r"\bupi\s*pin\b.{0,30}\b(?:enter|share|daal)",
             r"\bpay\s*now\b.{0,30}\b(?:receive|claim|get)\b",
+            r"\b\d\s*[-\s]?digit\s*(?:code|otp|number)\b.{0,80}\b(?:forward|send|share|tell|batao|bhejo)",
+            r"\b(?:accidentally|by\s*mistake|galti\s*se)\b.{0,50}\b(?:code|otp)\b",
+            r"\b(?:card\s*(?:number|details|no)|cvv|expiry\s*date)\b.{0,60}\b(?:cvv|expiry|pin|otp)",
+            r"\b(?:enter|share|type)\b.{0,20}\b(?:upi\s*)?pin\b.{0,40}\b(?:receive|get|credit|add)",
+            r"\baccept\b.{0,25}\b(?:payment|collect|money)\s*request\b",
+            r"\b(?:verification\s*)?code\b.{0,60}\b(?:read|tell|give)\s*(?:it|them)?\s*(?:out\s*)?to\s*me\b",
+            r"\b(?:scan|send|pay)\b.{0,40}\bqr\s*code\b.{0,60}\b(?:receive|verify|get|refund)",
         ),
     ),
     Pattern(
@@ -90,7 +110,7 @@ PATTERNS: Tuple[Pattern, ...] = (
         "Do not pay. Track the parcel through the courier's own site or app using "
         "the reference from your original order.",
         (
-            r"\b(?:parcel|package|shipment|consignment|courier)\b.{0,50}"
+            r"\b(?:parcel|package|shipment|consignment|courier)\b.{0,80}"
             r"\b(?:held|hold|pending|customs|duty|fee|charge|undeliver|address)",
             r"\b(?:customs|import)\s*(?:duty|fee|charge|clearance)\b",
             r"\b(?:delivery|shipping)\s*(?:fee|charge|attempt failed)\b",
@@ -110,6 +130,9 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"\blucky\s*(?:draw|winner)\b",
             r"\bclaim\b.{0,25}\b(?:prize|reward|amount|money)\b",
             r"\binaam\b|\blottery\s*jeet",
+            r"\byou\s*(?:are|have\s*been|'ve\s*been)\s*(?:selected|chosen)\b.{0,40}\b(?:winner|prize|reward|gift)",
+            r"\b(?:winner|won)\b.{0,40}\b(?:iphone|car|bike|gift|voucher|laptop)",
+            r"\bgiveaway\b.{0,60}\bclaim",
         ),
     ),
     Pattern(
@@ -140,6 +163,7 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"within\s*\d+\s*(?:minute|hour))\b",
             r"\b(?:processing|advance|file)\s*(?:fee|charge)\b.{0,30}\bloan\b",
             r"\bloan\s*(?:approved|sanction)\b.{0,40}\bpay\b",
+            r"\bloan\b.{0,40}\b(?:is\s*)?(?:approved|sanctioned)\b.{0,80}\b(?:pay|fee|charge)",
         ),
     ),
     Pattern(
@@ -154,6 +178,10 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"\b(?:\d{2,4})\s*%\s*(?:return|profit|monthly|weekly|daily)\b",
             r"\b(?:risk[\s-]?free|no\s*risk)\b.{0,30}\b(?:invest|return|trading)\b",
             r"\b(?:trading|investment)\s*(?:tip|signal|group|expert)\b",
+            r"\b\d{1,4}\s*%\s*(?:returns?|profits?|monthly|weekly|daily|interest)",
+            r"\bguaranteed\b.{0,20}\b(?:returns?|profits?|income|allotment|listing)",
+            r"\b\d+\s*x\s*(?:returns?|gains?|profits?|listing\s*gains?)",
+            r"\b(?:stock|share\s*market|trading|investment)\s*(?:tips?|signals?|groups?|experts?)",
         ),
     ),
     Pattern(
@@ -180,6 +208,9 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"\b(?:virus|malware|infected)\b.{0,40}\b(?:call|contact|support)\b",
             r"\b(?:microsoft|apple|google)\s*(?:support|technician|engineer)\b",
             r"\binstall\b.{0,30}\bapp\b.{0,30}\b(?:resolve|fix|verify|refund)\b",
+            # Fake renewal: an invented charge, and a number to call to "cancel" it.
+            r"\b(?:subscription|membership|plan)\b.{0,40}\brenewed\b.{0,160}\b(?:call|contact)\b",
+            r"\b(?:did\s*not|didn'?t)\s*(?:authori[sz]e|make|place|request)\b.{0,80}\b(?:call|contact)\b",
         ),
     ),
     Pattern(
@@ -191,10 +222,122 @@ PATTERNS: Tuple[Pattern, ...] = (
         (
             r"\b(?:police|court|arrest|warrant|legal action|summons)\b.{0,50}"
             r"\b(?:pay|fine|settle|immediately|penalty)\b",
-            r"\b(?:income\s*tax|gst|irs|hmrc)\b.{0,40}\b(?:refund|notice|penalty|due)\b",
-            r"\b(?:aadhaar|social security)\b.{0,35}\b(?:suspend|block|misuse|link)\b",
+            r"\b(?:income\s*tax|gst|irs|hmrc|itr)\b.{0,60}\b(?:refund|notice|penalty|due)\b.{0,80}"
+            r"\b(?:click|submit|update|verify|claim|link|details|pay)",
+            r"(?:आयकर|इनकम\s*टैक्स).{0,80}(?:क्लिक|अपडेट|लिंक)",
+            r"\b(?:aadhaar|social security)\b.{0,35}\b(?:suspend|block|misuse|link)",
             r"\bdigital\s*arrest\b",
+            r"\bfir\b.{0,40}\b(?:registered|filed|lodged)\b",
+            r"\b(?:arrest\s*)?warrant\b.{0,30}\b(?:issued|will\s*be)",
+            r"\b(?:number|sim|mobile\s*number)\b.{0,30}\bwill\s*be\s*(?:blocked|deactivated|suspended|disconnected)",
+            r"\b(?:illegal|drugs|narcotics|contraband)\b.{0,60}\b(?:parcel|package|seized|customs)",
+            r"\bseized\b.{0,40}\b(?:customs|police|cbi|ncb)",
+            r"\b(?:parcel|package|courier)\b.{0,80}\b(?:drugs|narcotics|mdma|passports|contraband)",
+            r"\bnarcotics\s*(?:officer|department|bureau)",
+            r"\bmoney\s*laundering\b",
+            r"\b(?:cbi|ncb|cyber\s*crime|crime\s*branch)\s*(?:officer|department|police|cell)",
+            r"\bsim\b.{0,40}\b(?:deactivat|block|suspend|disconnect)",
+            r"\btrai\b.{0,60}\b(?:block|deactivat|disconnect|suspend|guideline)",
         ),
+    ),
+    Pattern(
+        FraudCategory.JOB_SCAM, "Paid-task job offer", Severity.HIGH,
+        "Money promised for trivial online tasks (liking videos, rating products) or a "
+        "recruiter reached only through a messaging handle. These schemes pay small "
+        "amounts at first and then demand deposits.",
+        "Do not pay any deposit or fee, and do not join task groups. A real employer "
+        "never charges to hire you.",
+        (
+            r"\bearn\b.{0,30}\d[\d,]*(?:\s*-\s*\d[\d,]*)?\s*(?:rs\.?|inr|₹|\$|rupees)?\s*"
+            r"(?:daily|per\s*day|a\s*day|weekly|per\s*week)",
+            r"\b(?:liking|like|rating|rate|reviewing|review)\b.{0,30}\b(?:youtube|videos?|products?|hotels?|"
+            r"posts?|tasks?)\b.{0,60}\b(?:earn|salary|income|paid)",
+            r"\b(?:hr|recruiter|recruitment|hiring)\b.{0,40}\b(?:telegram|whatsapp)\b",
+            r"\b(?:salary|income)\b.{0,30}\d[\d,]*\s*(?:weekly|daily|per\s*day)",
+        ),
+        code="scam_paid_task_job",
+    ),
+    Pattern(
+        FraudCategory.ADVANCE_FEE, "Fee to release money", Severity.HIGH,
+        "A fee must be paid before a prize, loan, refund, parcel or inheritance is "
+        "released. Genuine payouts are never conditional on an upfront payment.",
+        "Do not pay. Contact the organisation named through details you find yourself.",
+        (
+            r"\b(?:processing|clearance|release|insurance|activation|registration|handling|"
+            r"transfer|verification|file|delivery)\s*(?:fees?|charges?|amount)\b.{0,60}"
+            r"(?:rs\.?|inr|₹|\$|\d|pay|today|first|to\s*(?:get|receive|release))",
+            r"\bto\s*(?:release|receive|get|claim|activate)\b.{0,50}\bpay\b",
+            r"\b(?:refundable\s*)?security\s*deposit\b",
+            r"\bpay\b.{0,40}\b(?:fees?|charges?|tax)\b.{0,40}\b(?:receive|release|claim|get|deliver)",
+            r"\b(?:inheritance|unclaimed\s*(?:funds?|estate|money|deposits?)|next\s*of\s*kin)\b",
+            r"\bbeneficiary\b.{0,40}\b(?:funds?|estate|million|transfer)",
+        ),
+    ),
+    Pattern(
+        FraudCategory.UTILITY_SCAM, "Disconnection threat", Severity.HIGH,
+        "Electricity, gas or phone service is said to be cut off tonight unless you "
+        "call a number or pay now. Providers send notices on bills and in their apps, "
+        "not from a mobile number with a same-day deadline.",
+        "Do not call the number given. Check your account in the provider's official "
+        "app or on the number printed on your bill.",
+        (
+            r"\b(?:electricity|power|bijli|light|gas)\b.{0,60}\b(?:disconnect|cut|kaat|katega|kat\s*jayegi|"
+            r"band\s*ho|will\s*be\s*stopped)",
+            r"\bbill\b.{0,40}\bnot\s*(?:been\s*)?updat",
+            r"\bbill\s*update\s*nahi",
+            r"\belectricity\s*(?:officer|department\s*officer)",
+            r"बिजली.{0,60}(?:काट|बंद)",
+        ),
+    ),
+    Pattern(
+        FraudCategory.SOCIAL_ENGINEERING, "Impersonating someone you know", Severity.HIGH,
+        "A family member, friend or manager writing from a new number or in a rush, "
+        "asking for money or gift cards. The urgency and the new channel are what "
+        "stop you checking.",
+        "Call the person on the number you already have for them before sending anything.",
+        (
+            r"\b(?:new\s*number|changed\s*my\s*number|lost\s*my\s*phone|dropped\s*my\s*phone|"
+            r"phone\s*(?:broke|is\s*broken|got\s*damaged))\b.{0,160}\b(?:transfer|send|pay|money|bill)",
+            r"\b(?:gift\s*cards?|google\s*play\s*(?:gift\s*)?cards?|itunes\s*cards?|"
+            r"amazon\s*(?:gift\s*)?vouchers?)\b.{0,80}\b(?:codes?|send|buy|scratch)",
+            r"\b(?:i\s*am|i'm)\s*(?:in\s*a\s*meeting|travell?ing|busy)\b.{0,80}\b(?:buy|transfer|pay|send)",
+        ),
+        code="scam_impersonation_known_contact",
+    ),
+    Pattern(
+        FraudCategory.SOCIAL_ENGINEERING, "Request for secrecy", Severity.MEDIUM,
+        "The sender asks you not to call, not to tell anyone, or to keep the request "
+        "confidential. Secrecy cuts you off from the one check that would expose a scam.",
+        "Tell someone you trust about the request before acting on it.",
+        (
+            r"\b(?:don'?t|do\s*not|can'?t|cannot)\s*(?:call|talk|tell\s*any(?:one|body))\b",
+            r"\b(?:strictly\s*)?confidential\b",
+            r"\bkeep\s*(?:this|it)\s*(?:secret|between\s*us|confidential)",
+        ),
+        code="secrecy_request",
+    ),
+    Pattern(
+        FraudCategory.ROMANCE_SCAM, "Affection paired with a payment", Severity.MEDIUM,
+        "Terms of endearment alongside a parcel, gift or fee. A gift that needs you to "
+        "pay to receive it is a standard romance-scam script.",
+        "Do not pay to receive a gift. Talk it through with someone you trust first.",
+        (
+            r"\b(?:my\s*love|sweetheart|darling|honey|my\s*dear)\b.{0,160}\b(?:customs|clearance|gift\s*box|"
+            r"parcel|fee|transfer)",
+        ),
+    ),
+    Pattern(
+        FraudCategory.PHISHING, "Billing or account pretext", Severity.MEDIUM,
+        "A failed payment or a held account is used as the reason to \"update\" card "
+        "or sign-in details through a link.",
+        "Open the service's own app or type its address yourself to check your billing.",
+        (
+            r"\b(?:payment|billing|card)\b.{0,40}\b(?:declined|failed|unsuccessful)\b.{0,100}"
+            r"\b(?:update|verify|confirm)",
+            r"\b(?:membership|subscription|account)\b.{0,20}\b(?:on\s*hold|suspended|paused)",
+            r"\bmailbox\b.{0,40}\b(?:full|exceeded|limit)",
+        ),
+        code="scam_billing_pretext",
     ),
 )
 
@@ -202,7 +345,8 @@ PATTERNS: Tuple[Pattern, ...] = (
 # urgent -- but combined with a category it sharpens the finding, because
 # pressure is what stops someone checking.
 URGENCY_RE = re.compile(
-    r"\b(?:immediately|urgent(?:ly)?|within\s*\d+\s*(?:hour|hr|minute|min)|"
+    r"\b(?:immediately|urgent(?:ly)?|(?:within|in)\s*\d+\s*(?:hours?|hrs?|minutes?|mins?)\b|"
+    r"tonight|aaj\s*raat|expires?\s*today|ends\s*tonight|"
     r"today\s*itself|right\s*now|last\s*chance|final\s*(?:notice|warning)|"
     r"turant|abhi|jaldi|fauran)\b",
     re.IGNORECASE,
@@ -213,6 +357,43 @@ CODE_SWITCH_RE = re.compile(
     r"turant|abhi|jaldi|paisa|rupaye|khata|band|link\s*par|click\s*karo)\b",
     re.IGNORECASE,
 )
+
+
+# Genuine notices are full of the same words as scams, negated: "do not
+# share this OTP with anyone", "never click links", "no processing fee".
+# A pattern occurrence is skipped when it is negated, either just before the
+# match or inside it ("your OTP -- do not share it").
+_NEGATION_BEFORE = re.compile(r"(?:\b(?:do\s*not|don'?t|never|not\s*to|no|zero|without|kabhi\s*bhi)\s*\S*\s*)$")
+_WEAK_NEGATION = re.compile(r"(?:no|zero|without)\b")
+_FEE_RE = re.compile(r"\b(?:fees?|charges?|cost|deposit)\b")
+_NEGATION_INSIDE = re.compile(r"\b(?:do\s*not|don'?t|never|not\s*to)\b")
+# Awareness messages describe the scam: "beware of digital arrest scams".
+_AWARENESS_BEFORE = re.compile(r"\b(?:beware\s*of|be\s*aware\s*of|alert\s*about|warn(?:s|ing)?\s*(?:about|of)|"
+                               r"scams?\s*(?:like|such\s*as)|report)\b[^.!?]*$")
+# A delivery OTP is meant to be shown to the courier at the door.
+_ROUTINE_AFTER = re.compile(r"^.{0,40}\b(?:delivery\s*(?:agent|partner|executive|boy|person)|at\s*the\s*time\s*of\s*delivery)")
+_SECRECY_CODES = ("don't", "do not", "can't", "cannot", "dont")
+
+
+def _first_affirmative(expression: str, text: str) -> Optional[str]:
+    """The first match of `expression` in `text` that is not negated, or None."""
+    for found in re.finditer(expression, text, re.IGNORECASE | re.DOTALL):
+        span = found.group(0)
+        before = text[max(0, found.start() - 25):found.start()]
+        # The secrecy pattern is itself a negation ("don't call"): judge it by
+        # what comes before only.
+        is_secrecy = span.lstrip().startswith(_SECRECY_CODES)
+        negation = _NEGATION_BEFORE.search(before)
+        if negation and (not _WEAK_NEGATION.match(negation.group(0).strip()) or _FEE_RE.search(span)):
+            continue
+        if _AWARENESS_BEFORE.search(text[max(0, found.start() - 60):found.start()]):
+            continue
+        if _ROUTINE_AFTER.search(text[found.end():found.end() + 60]):
+            continue
+        if not is_secrecy and _NEGATION_INSIDE.search(span):
+            continue
+        return span
+    return None
 
 
 class MessageScamDetector(FraudDetector):
@@ -233,9 +414,9 @@ class MessageScamDetector(FraudDetector):
         matched: List[Tuple[Pattern, str]] = []
         for pattern in PATTERNS:
             for expression in pattern.patterns:
-                found = re.search(expression, lowered, re.IGNORECASE | re.DOTALL)
+                found = _first_affirmative(expression, lowered)
                 if found:
-                    matched.append((pattern, found.group(0)[:110].strip()))
+                    matched.append((pattern, found[:110].strip()))
                     break
 
         if not matched:
@@ -243,7 +424,7 @@ class MessageScamDetector(FraudDetector):
 
         indicators = [
             Indicator(
-                code=f"scam_{p.category.value.lower()}",
+                code=p.indicator_code,
                 title=p.title,
                 severity=p.severity,
                 explanation=p.explanation,

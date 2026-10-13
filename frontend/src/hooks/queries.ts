@@ -22,7 +22,11 @@ export function useInvestigation(id: string | undefined) {
     enabled: Boolean(id),
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status && TERMINAL.has(status) ? false : 800;
+      if (status && TERMINAL.has(status)) return false;
+      // Most text and URL investigations finish in well under a second, so
+      // poll quickly at first; back off for the ones waiting on live
+      // evidence retrieval (seconds), capped at 1.5 s.
+      return Math.min(1500, 250 + 125 * query.state.dataUpdateCount);
     },
   });
 }

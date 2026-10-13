@@ -103,6 +103,16 @@ def _build_engine() -> Engine:
         def _fk_on(dbapi_connection, _):
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
+            # Write-ahead logging: the pipeline commits once per stage so the
+            # UI can show progress, and in the default journal mode every one
+            # of those commits was a full disk sync that also blocked the
+            # progress poll reading alongside it. WAL lets readers run during
+            # a write; NORMAL sync is crash-safe for the application (an OS
+            # crash can lose the last commit -- acceptable for the
+            # development and test databases this branch serves).
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA busy_timeout=5000")
             cursor.close()
 
         return engine

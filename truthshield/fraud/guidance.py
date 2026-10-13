@@ -264,6 +264,38 @@ GUIDANCE: Dict[FraudCategory, Guidance] = {
             *_UNIVERSAL_AFTER,
         ],
     ),
+    FraudCategory.ADVANCE_FEE: Guidance(
+        headline="A fee to release money, a prize or a parcel is the scam itself.",
+        do_now=[
+            "Stop before paying anything. Genuine winnings, refunds, loans and inheritances are never released for an upfront fee.",
+            "Check any claimed organisation through contact details you find yourself.",
+        ],
+        do_not=[
+            "Do not pay a processing, clearance, insurance or registration fee.",
+            "Do not send identity documents or bank details to the sender.",
+        ],
+        if_already_acted=[
+            "Contact your bank straight away and ask whether the payment can be stopped or recalled.",
+            "Expect follow-up demands for further fees; they will not lead to the promised money.",
+            "In India, the cybercrime helpline is 1930.",
+            *_UNIVERSAL_AFTER,
+        ],
+    ),
+    FraudCategory.UTILITY_SCAM: Guidance(
+        headline="Utilities and telecom operators do not disconnect you through a text from a mobile number.",
+        do_now=[
+            "Check your bill status in the provider's official app or website, or on the number printed on your last bill.",
+        ],
+        do_not=[
+            "Do not call the number in the message.",
+            "Do not install apps or share screen access to \"update\" a bill.",
+        ],
+        if_already_acted=[
+            "If you installed an app, uninstall it and contact your bank about any card or UPI details entered.",
+            "In India, the cybercrime helpline is 1930.",
+            *_UNIVERSAL_AFTER,
+        ],
+    ),
     FraudCategory.SOCIAL_ENGINEERING: Guidance(
         headline="Slow down. Pressure is the technique.",
         do_now=[

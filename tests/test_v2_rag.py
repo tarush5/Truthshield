@@ -147,6 +147,37 @@ class TestStore:
 
 # ── Reranking ────────────────────────────────────────────────
 
+class TestCorpusIndex:
+    def test_indexed_bm25_matches_the_reference_implementation(self):
+        from types import SimpleNamespace
+
+        from truthshield.rag.store import _Corpus
+
+        texts = ["Lemon water does not cure cancer, doctors say.",
+                 "Stock markets rose today as banks gained.",
+                 "Cancer researchers found no effect of lemon water on tumours. Lemon lemon.",
+                 ""]
+        rows = [(SimpleNamespace(text=t, embedding=[0.0, 1.0]), None, None) for t in texts]
+        corpus = _Corpus.build(rows)
+        for query in ("lemon water cancer", "banks banks", "nothing matches here"):
+            reference = bm25_scores(query, texts)
+            indexed = corpus.bm25(query)
+            assert [round(indexed.get(i, 0.0), 9) for i in range(len(texts))] == [round(x, 9) for x in reference]
+
+    def test_corpus_is_reused_across_searches_and_dropped_on_ingest(self, store):
+        # Invented words only: this store is shared with tests that expect
+        # ordinary claims to find nothing.
+        a, b, c = unique("orvane"), unique("plessit"), unique("quorrad")
+        store.ingest(url=f"https://example.org/{a}", title=a, content=f"{a} {b} returns.", provider="test")
+        store.search(f"{a} {b}")
+        cached = dict(store._corpora)
+        store.search(f"{a}")
+        assert store._corpora == cached and cached, "second search should reuse the scanned corpus"
+        store.ingest(url=f"https://example.org/{a}-2", title=a, content=f"{a} {c} again.", provider="test")
+        assert not store._corpora
+        assert any(c in cand.text for cand in store.search(f"{a} {c}"))
+
+
 class TestRerank:
     def test_components_are_exposed_and_credibility_matters(self, store):
         from truthshield.rag.store import Candidate
@@ -201,6 +232,49 @@ class TestRAGEngine:
         # Whatever the store already held may still be returned; nothing new
         # was invented or ingested on the failed provider's behalf.
         assert retrieval.ingested == 0 and retrieval.live_hits == 0
+
+    def test_live_searches_for_several_claims_run_concurrently(self, session):
+        class SlowSearch(FakeSearch):
+            async def search(self, query, *, limit=12):
+                self.calls += 1
+                await asyncio.sleep(0.4)
+                marker = query.split()[1]
+                return [SearchHit(title=f"{marker} report", url=f"https://apnews.com/{marker}",
+                                  snippet=f"{query}, officials said.", publisher="apnews.com",
+                                  credibility=0.9, provider="slow")]
+
+        import time
+
+        claims = [f"The {unique('kestrel')} canal reopened after repairs on Tuesday" for _ in range(3)]
+        search = SlowSearch()
+        # Force the live path whatever earlier tests left in the shared store.
+        engine = RAGEngine(session, embedder=HashingEmbedding(), search=search, min_local_hits=10_000)
+        started = time.perf_counter()
+        retrievals = asyncio.run(engine.retrieve_many(claims))
+        elapsed = time.perf_counter() - started
+
+        assert search.calls == 3
+        assert elapsed < 1.0, f"three 0.4 s searches took {elapsed:.2f} s; they ran one after another"
+        # Each claim keeps its own results, in order.
+        for claim, retrieval in zip(claims, retrievals):
+            assert retrieval.claim == claim and retrieval.live_search == "used"
+            assert claim.split()[1] in retrieval.passages[0]["url"]
+
+    def test_one_failed_search_does_not_sink_the_others(self, session):
+        class Flaky(FakeSearch):
+            async def search(self, query, *, limit=12):
+                self.calls += 1
+                if "broken" in query:
+                    raise TimeoutError("slow provider")
+                return [SearchHit(title=query, url=f"https://bbc.co.uk/{uuid.uuid4().hex}", snippet=query,
+                                  publisher="bbc.co.uk", credibility=0.85, provider="flaky")]
+
+        good = f"The {unique('harbour')} ferry service resumed on Monday morning"
+        bad = f"The broken {unique('pier')} story spread quickly online"
+        engine = RAGEngine(session, embedder=HashingEmbedding(), search=Flaky(), min_local_hits=10_000)
+        ok, failed = asyncio.run(engine.retrieve_many([good, bad]))
+        assert ok.live_search == "used" and ok.passages
+        assert failed.live_search == "failed" and failed.ingested == 0
 
 
 # ── Providers ────────────────────────────────────────────────

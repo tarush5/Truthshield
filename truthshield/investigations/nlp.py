@@ -17,6 +17,10 @@ from typing import Dict, List, Tuple
 from truthshield.fraud.classify import extract_entities
 from truthshield.fraud.detectors.url import WATCHED_BRANDS
 
+# Brand names that are also everyday words ("the outlook is positive"): not
+# tagged as organisations from free text.
+COMMON_WORD_BRANDS = frozenset({"outlook"})
+
 SUPPORTED_LANGUAGES = ("en", "hi", "ta")
 
 # ── Language ──────────────────────────────────────────────────

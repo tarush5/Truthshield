@@ -20,7 +20,10 @@ domain allow/deny, publication window) apply to both.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
+import math
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Optional, Sequence
@@ -31,7 +34,7 @@ from sqlalchemy.orm import Session
 
 from truthshield.infra.models import EvidenceChunk, EvidenceDocument, Source
 from truthshield.providers.base import BaseEmbeddingModel
-from truthshield.rag.text import bm25_scores, chunk_text
+from truthshield.rag.text import chunk_text, terms
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +96,11 @@ class EvidenceStore:
     def __init__(self, session: Session, embedder: BaseEmbeddingModel):
         self.session = session
         self.embedder = embedder
+        # SQLite only: the scanned corpus, kept for the life of this store
+        # (one request) and dropped on ingest. Every claim searches several
+        # query variants, and reloading and re-tokenising up to 20k chunks for
+        # each one was the dominant cost of a local evidence check.
+        self._corpora: Dict[str, "_Corpus"] = {}
 
     @property
     def is_postgres(self) -> bool:
@@ -153,6 +161,7 @@ class EvidenceStore:
                 and all(c.embedding_model == self.embedder.name for c in document.chunks):
             document.retrieved_at = _now()
             self.session.commit()
+            self._corpora.clear()
             return document, False
 
         if document is None:
@@ -184,6 +193,7 @@ class EvidenceStore:
                 embedding=vector, embedding_model=self.embedder.name,
             ))
         self.session.commit()
+        self._corpora.clear()
         return document, True
 
     # ── Retrieval ─────────────────────────────────────────────
@@ -242,24 +252,38 @@ class EvidenceStore:
                 existing.matched_by.append(label)
         return sorted(fused.values(), key=lambda c: -c.rrf)[:limit]
 
+    def _corpus(self, filters: Filters) -> Optional["_Corpus"]:
+        key = json.dumps(filters.as_dict(), sort_keys=True, default=str)
+        corpus = self._corpora.get(key)
+        if corpus is None:
+            rows = self.session.execute(
+                self._filtered_chunks(filters).order_by(EvidenceChunk.created_at.desc()).limit(SQLITE_SCAN_LIMIT)
+            ).all()
+            corpus = _Corpus.build(rows) if rows else None
+            self._corpora[key] = corpus
+        return corpus
+
     def _search_python(self, query: str, q_vec: List[float], filters: Filters):
         import numpy as np
 
-        rows = self.session.execute(
-            self._filtered_chunks(filters).order_by(EvidenceChunk.created_at.desc()).limit(SQLITE_SCAN_LIMIT)
-        ).all()
-        if not rows:
+        corpus = self._corpus(filters)
+        if corpus is None:
             return [], []
-        cands = [self._candidate(c, d, s) for c, d, s in rows]
-        matrix = np.array([c.embedding for c, _, _ in rows], dtype=float)
-        sims = matrix @ np.array(q_vec, dtype=float)
-        for cand, sim in zip(cands, sims):
-            cand.semantic = float(sim)
-        bm25 = bm25_scores(query, [c.text for c in cands])
-        for cand, score in zip(cands, bm25):
-            cand.keyword = float(score)
-        semantic = sorted(cands, key=lambda c: -c.semantic)[:CANDIDATES_PER_LIST]
-        keyword = [c for c in sorted(cands, key=lambda c: -c.keyword) if c.keyword > 0][:CANDIDATES_PER_LIST]
+        sims = corpus.matrix @ np.asarray(q_vec, dtype=float)
+        keyword_scores = corpus.bm25(query)
+
+        def take(index: int) -> Candidate:
+            cand = self._candidate(*corpus.rows[index])
+            cand.semantic = float(sims[index])
+            cand.keyword = float(keyword_scores.get(index, 0.0))
+            return cand
+
+        # Candidates are built for the top of each list only, not the corpus.
+        top_semantic = np.argsort(-sims, kind="stable")[:CANDIDATES_PER_LIST]
+        top_keyword = sorted(keyword_scores, key=lambda i: (-keyword_scores[i], i))[:CANDIDATES_PER_LIST]
+        built: Dict[int, Candidate] = {}
+        semantic = [built.setdefault(int(i), take(int(i))) for i in top_semantic]
+        keyword = [built.setdefault(i, take(i)) for i in top_keyword if keyword_scores[i] > 0]
         return semantic, keyword
 
     def _search_postgres(self, query: str, q_vec: List[float], filters: Filters):
@@ -304,6 +328,51 @@ class EvidenceStore:
             "embedding_kind": self.embedder.kind,
             "backend": "pgvector" if self.is_postgres else "in-process (SQLite)",
         }
+
+
+@dataclass
+class _Corpus:
+    """An in-process search index over scanned chunks (the SQLite path)."""
+
+    rows: list
+    matrix: "object"                 # numpy array, one embedding per row
+    postings: Dict[str, List[tuple]]  # term -> [(row, count)]
+    lengths: List[int]
+    avgdl: float
+
+    @classmethod
+    def build(cls, rows) -> "_Corpus":
+        import numpy as np
+
+        postings: Dict[str, List[tuple]] = {}
+        lengths = []
+        for index, (chunk, _, _) in enumerate(rows):
+            words = terms(chunk.text)
+            lengths.append(len(words))
+            for term, count in Counter(words).items():
+                postings.setdefault(term, []).append((index, count))
+        return cls(
+            rows=rows,
+            matrix=np.array([chunk.embedding for chunk, _, _ in rows], dtype=float),
+            postings=postings,
+            lengths=lengths,
+            avgdl=(sum(lengths) / len(lengths)) or 1.0,
+        )
+
+    def bm25(self, query: str, k1: float = 1.5, b: float = 0.75) -> Dict[int, float]:
+        """Okapi BM25, scored only for rows that contain a query term."""
+        n = len(self.rows)
+        scores: Dict[int, float] = {}
+        for term in terms(query):
+            hits = self.postings.get(term)
+            if not hits:
+                continue
+            idf = math.log(1 + (n - len(hits) + 0.5) / (len(hits) + 0.5))
+            for index, f in hits:
+                length = self.lengths[index] or 1
+                scores[index] = scores.get(index, 0.0) + idf * f * (k1 + 1) / (
+                    f + k1 * (1 - b + b * length / self.avgdl))
+        return scores
 
 
 def iter_texts(candidates: Iterable[Candidate]) -> List[str]:

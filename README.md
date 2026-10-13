@@ -73,7 +73,8 @@ The synthetic demos work either way.
 ## Test
 
 ```bash
-pytest tests/ -q            # backend: 477 tests, offline and deterministic
+pytest tests/ -q            # backend: 498 tests, offline and deterministic
+python -m truthshield.investigations.evaluation tests/eval/fraud_blind.jsonl   # detector accuracy
 ruff check truthshield tests
 cd frontend && npm run typecheck && npm test && npm run build
 ```
@@ -96,8 +97,11 @@ and up again, fails on model/migration drift (`alembic check`), and enforces a
   Wikipedia and RSS, and many claims honestly end as
   `INSUFFICIENT_EVIDENCE`. `GET /api/v1/system/health` reports `degraded`
   in that state.
-- **Phase 1 detectors are rule-based.** No trained-model metrics are shown,
-  because none have been measured. Confidence is capped accordingly.
+- **Detectors are rule-based.** No trained-model metrics are shown, because
+  no model is trained. The rules are checked against small labelled sets
+  written for this project (on the blind set: precision 1.00, recall 0.77
+  before it was used for fixes). Those are regression checks, not real-world
+  accuracy; see [AI services §2.1.2](docs/AI_SERVICES.md#212-evaluation).
 - **Reputation, WHOIS and certificate checks** need providers that are not
   configured yet. Every URL result lists them as unchecked.
 

@@ -228,6 +228,9 @@ class Investigation(Base, TimestampMixin):
     __tablename__ = "investigations"
     __table_args__ = (
         Index("ix_investigations_user_created", "user_id", "created_at"),
+        # Administrators see every investigation: their dashboard window and
+        # history sort have no user_id to lead with.
+        Index("ix_investigations_created", "created_at"),
     )
 
     id = Column(GUID, primary_key=True, default=uuid.uuid4)

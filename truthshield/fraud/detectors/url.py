@@ -38,7 +38,21 @@ WATCHED_BRANDS = (
     "facebook", "instagram", "whatsapp", "linkedin", "dhl", "fedex", "ups",
     "usps", "hmrc", "irs", "gov", "sbi", "hdfc", "icici", "axis", "paytm",
     "phonepe", "gpay", "npci", "upi", "binance", "coinbase", "metamask",
+    # Indian government, banking, retail and telecom names that scam
+    # campaigns imitate most often.
+    "incometax", "irctc", "uidai", "aadhaar", "epfo", "indiapost", "digilocker",
+    "kotak", "yono", "bhim", "flipkart", "myntra", "airtel", "jio", "bluedart",
+    "delhivery", "outlook", "office365", "yahoo", "dropbox", "docusign", "telegram",
 )
+
+# Brands added for exact-token and digit-substitution matching only. Their
+# names are close to ordinary words ("myntra" ~ "mantra", "kotak" ~ "kodak"),
+# so an edit-distance match would flag legitimate sites.
+EXACT_ONLY_BRANDS = frozenset({
+    "incometax", "irctc", "uidai", "aadhaar", "epfo", "indiapost", "digilocker",
+    "kotak", "yono", "bhim", "flipkart", "myntra", "airtel", "jio", "bluedart",
+    "delhivery", "outlook", "office365", "yahoo", "dropbox", "docusign", "telegram",
+})
 
 # TLDs that are free or near-free to register, and correspondingly common in
 # throwaway phishing infrastructure. Not damning on their own -- plenty of
@@ -46,6 +60,9 @@ WATCHED_BRANDS = (
 CHEAP_TLDS = frozenset({
     "tk", "ml", "ga", "cf", "gq", "xyz", "top", "buzz", "click", "link",
     "work", "loan", "zip", "mov", "rest", "country", "kim", "download",
+    # Consistently among the most abused suffixes in phishing reports.
+    "online", "site", "icu", "cyou", "cfd", "sbs", "bond", "live", "fun",
+    "space", "monster", "quest", "lol", "pw",
 })
 
 SHORTENERS = frozenset({
@@ -58,6 +75,7 @@ HARVEST_PATHS = (
     "login", "signin", "sign-in", "verify", "verification", "secure",
     "account", "update", "confirm", "password", "reset", "billing",
     "payment", "wallet", "unlock", "suspend", "kyc", "authorize",
+    "redeem", "reward", "claim", "refund", "recover", "netbanking",
 )
 
 # Free hosting and form builders. Legitimate uses exist; a *bank login page*

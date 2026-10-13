@@ -132,3 +132,7 @@ truthshield_*.db
 # repository.
 .lab/
 .pytest_storage/
+
+# SQLite write-ahead log files (journal_mode=WAL)
+*.db-wal
+*.db-shm

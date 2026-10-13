@@ -18,7 +18,7 @@ from difflib import SequenceMatcher
 from typing import Dict, Optional
 from urllib.parse import parse_qsl, unquote, urlparse
 
-from truthshield.fraud.detectors.url import HARVEST_PATHS, WATCHED_BRANDS, _registrable
+from truthshield.fraud.detectors.url import EXACT_ONLY_BRANDS, HARVEST_PATHS, WATCHED_BRANDS, _registrable
 
 SPECIAL_CHARS = set("@-_~%=&?!$*+,;")
 ENCODED_RE = re.compile(r"%[0-9a-fA-F]{2}")
@@ -45,6 +45,17 @@ def _similarity(a: str, b: str) -> float:
         return SequenceMatcher(None, a, b).ratio()
 
 
+# Characters swapped in to make a lookalike read as the brand at a glance:
+# "faceb00k", "paypa1", "amaz0n", "micr0s0ft". 1 can stand for l or i.
+_HOMOGLYPHS = str.maketrans({"0": "o", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b", "@": "a", "$": "s"})
+
+
+def deglyph(token: str) -> set:
+    """Readings of a token with common digit/letter swaps undone."""
+    base = token.translate(_HOMOGLYPHS).replace("rn", "m").replace("vv", "w")
+    return {base.replace("1", "l"), base.replace("1", "i")}
+
+
 @dataclass(frozen=True)
 class BrandMatch:
     similarity: float          # best fuzzy similarity to a watched brand, 0-1
@@ -69,8 +80,17 @@ def brand_similarity(registrable: str) -> BrandMatch:
     exact = next((p for p in parts if p in WATCHED_BRANDS), None)
 
     best, closest = 0.0, None
+    # A token that *becomes* a brand once swapped digits are read as letters
+    # is a deliberate lookalike, whatever its edit distance.
+    for part in parts:
+        if part in WATCHED_BRANDS:
+            continue
+        hit = next((b for b in WATCHED_BRANDS if b in deglyph(part)), None)
+        if hit:
+            best, closest = 0.95, hit
+            break
     for brand in WATCHED_BRANDS:
-        if brand in SIMILARITY_EXCLUDED or len(brand) < 4:
+        if brand in SIMILARITY_EXCLUDED or brand in EXACT_ONLY_BRANDS or len(brand) < 4:
             continue
         for part in dict.fromkeys(parts + [label]):
             score = 1.0 if part == brand else _similarity(part, brand)

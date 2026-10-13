@@ -108,50 +108,81 @@ class RAGEngine:
         return sorted(merged.values(), key=lambda c: -c.rrf)
 
     async def retrieve(self, claim: str) -> Retrieval:
-        variants = expand_query(claim)
-        retrieval = Retrieval(
-            claim=claim,
-            variants=variants,
-            embedding={"model": self.embedder.name, "kind": self.embedder.kind},
-            reranker=self.reranker.name,
-            filters=self.filters.as_dict(),
-        )
+        return (await self.retrieve_many([claim]))[0]
 
-        candidates = self._search_variants(variants)
-        relevant = self._relevant(candidates)
-        retrieval.local_relevant_before = len(relevant)
+    async def retrieve_many(self, claims: List[str]) -> List[Retrieval]:
+        """
+        Retrieve for several claims at once.
 
-        if len(relevant) < self.min_local_hits:
-            if not self.search_provider.available:
-                retrieval.live_search = "unavailable"
-                retrieval.live_detail = getattr(self.search_provider, "reason", "No live search provider.")
-            else:
-                try:
-                    hits = await self.search_provider.search(claim, limit=15)
-                    retrieval.live_search = "used"
-                    retrieval.live_hits = len(hits)
-                    for hit in hits:
-                        if not (hit.snippet or hit.title):
-                            continue
-                        try:
-                            _, created = self.store.ingest(
-                                url=hit.url, title=hit.title, content=hit.snippet or hit.title,
-                                provider=hit.provider or self.search_provider.name,
-                                content_scope="snippet", credibility_prior=hit.credibility,
-                                publisher=hit.publisher or None,
-                            )
-                            retrieval.ingested += int(created)
-                        except Exception as exc:
-                            self.store.session.rollback()
-                            logger.debug("Skipped ingesting %s: %s", hit.url, exc)
-                    candidates = self._search_variants(variants)
-                except Exception as exc:
+        The live searches are the slow, network-bound part, so the ones that
+        are needed run concurrently. Everything that touches the database
+        (search, ingestion, rerank) stays sequential on the one session:
+        a SQLAlchemy session must not be shared across concurrent work.
+        """
+        import asyncio
+
+        retrievals: List[Retrieval] = []
+        candidates_by_claim: List[List[Candidate]] = []
+        for claim in claims:
+            variants = expand_query(claim)
+            retrieval = Retrieval(
+                claim=claim,
+                variants=variants,
+                embedding={"model": self.embedder.name, "kind": self.embedder.kind},
+                reranker=self.reranker.name,
+                filters=self.filters.as_dict(),
+            )
+            candidates = self._search_variants(variants)
+            retrieval.local_relevant_before = len(self._relevant(candidates))
+            retrievals.append(retrieval)
+            candidates_by_claim.append(candidates)
+
+        needs_live = [i for i, r in enumerate(retrievals) if r.local_relevant_before < self.min_local_hits]
+        if needs_live and not self.search_provider.available:
+            for i in needs_live:
+                retrievals[i].live_search = "unavailable"
+                retrievals[i].live_detail = getattr(self.search_provider, "reason", "No live search provider.")
+        elif needs_live:
+            results = await asyncio.gather(
+                *(self.search_provider.search(retrievals[i].claim, limit=15) for i in needs_live),
+                return_exceptions=True,
+            )
+            for i, hits in zip(needs_live, results):
+                retrieval = retrievals[i]
+                if isinstance(hits, BaseException):
                     # Never replaced with anything invented: the claim is
                     # assessed on whatever the store already held.
                     retrieval.live_search = "failed"
-                    retrieval.live_detail = f"Evidence unavailable from the search provider ({type(exc).__name__})."
-                    logger.warning("Live search failed: %s", exc)
+                    retrieval.live_detail = f"Evidence unavailable from the search provider ({type(hits).__name__})."
+                    logger.warning("Live search failed: %s", hits)
+                    continue
+                retrieval.live_search = "used"
+                retrieval.live_hits = len(hits)
+                self._ingest(retrieval, hits)
+                candidates_by_claim[i] = self._search_variants(retrieval.variants)
 
+        for retrieval, candidates in zip(retrievals, candidates_by_claim):
+            self._finish(retrieval, candidates)
+        return retrievals
+
+    def _ingest(self, retrieval: Retrieval, hits) -> None:
+        for hit in hits:
+            if not (hit.snippet or hit.title):
+                continue
+            try:
+                _, created = self.store.ingest(
+                    url=hit.url, title=hit.title, content=hit.snippet or hit.title,
+                    provider=hit.provider or self.search_provider.name,
+                    content_scope="snippet", credibility_prior=hit.credibility,
+                    publisher=hit.publisher or None,
+                )
+                retrieval.ingested += int(created)
+            except Exception as exc:
+                self.store.session.rollback()
+                logger.debug("Skipped ingesting %s: %s", hit.url, exc)
+
+    def _finish(self, retrieval: Retrieval, candidates: List[Candidate]) -> None:
+        claim = retrieval.claim
         relevant = self._relevant(candidates)
         retrieval.candidates = len(relevant)
         for ranked in self.reranker.rerank(claim, relevant)[: self.top_k]:
@@ -177,4 +208,3 @@ class RAGEngine:
                     "matched_by": sorted(set(c.matched_by)),
                 },
             })
-        return retrieval

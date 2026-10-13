@@ -147,7 +147,13 @@ class UrlEngine(Engine):
             ))
 
         if brand.exact_token and not brand.label_is_brand and "brand_outside_domain" not in codes:
-            risky_context = features.tld in CHEAP_TLDS or values["suspicious_keyword_score"] > 0
+            # "gov" inside a domain anyone can buy is a government lookalike:
+            # real government sites sit under gov.in / nic.in (or gov.<cc>),
+            # where the owned label never contains "gov" itself.
+            risky_context = (
+                features.tld in CHEAP_TLDS or values["suspicious_keyword_score"] > 0
+                or brand.exact_token == "gov"
+            )
             out.append(self._signal(
                 code="brand_in_unofficial_domain",
                 title="Domain mismatch",

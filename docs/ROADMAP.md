@@ -48,6 +48,20 @@ not a benchmark):
 | Table extraction from PDFs | ⬜ | moved to Phase 3 |
 | Retrieval evaluation (Recall@K, MRR, NDCG) of the store-first path | ⬜ | Phase 6 |
 
+## Performance and accuracy pass (13 October 2026)
+
+Measured on the dev machine; single runs, not a benchmark.
+
+| | Before | After |
+|---|---|---|
+| Investigation end to end (offline, SQLite, warm) | ~85 ms | ~20 ms (WAL) |
+| First investigation after start-up (engine loading) | +240–400 ms | paid at start-up (`warm_engines`, API and Celery workers) |
+| Evidence search, SQLite, 5,000 chunks, 4 query variants | 3.5 s | 0.95 s (cached corpus, BM25 postings) |
+| Live searches for N claims | sequential | concurrent |
+| Dashboard top-risk-factor query | ids fetched, sent back as `IN` (capped at 5,000) | one grouped join |
+| List and dashboard rows | full `result` JSON loaded | `result` deferred |
+| Scam detection, blind set (precision / recall / FPR) | 1.00 / 0.35 / 0.00 | 1.00 / 0.77 / 0.00 |
+
 ## Phases 3–8
 
 | Phase | Scope | Status |

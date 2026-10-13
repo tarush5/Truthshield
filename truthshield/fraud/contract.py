@@ -88,6 +88,7 @@ class FraudCategory(str, Enum):
     ROMANCE_SCAM = "ROMANCE_SCAM"
     SOCIAL_ENGINEERING = "SOCIAL_ENGINEERING"
     MALWARE_DELIVERY = "MALWARE_DELIVERY"
+    UTILITY_SCAM = "UTILITY_SCAM"        # electricity / gas / SIM disconnection threats
 
 
 class Severity(str, Enum):

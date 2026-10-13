@@ -99,6 +99,9 @@ Measured with `npm run build` (gzipped):
 - **Marquee** is a CSS transform animation (compositor only), not a GSAP tween.
 - **Fonts**: only the Inter weights used (400/500/600) are requested.
 - The landing intro plays once per tab session, including across reloads.
+- **Result polling** starts at 250 ms and backs off to 1.5 s: most text and URL
+  investigations finish in well under a second, so results appear almost
+  immediately, while long evidence runs are not polled harder than before.
 
 ## Testing in automated browsers
 

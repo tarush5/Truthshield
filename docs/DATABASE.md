@@ -66,7 +66,12 @@ investigation_counters                         (per-year public-id sequence)
 | `processing_ms` | int null | end-to-end pipeline time |
 | `started_at`, `completed_at` | timestamptz | |
 
-Indexes: (`user_id`, `created_at`), `status`, `risk_level`, `type`, `input_sha256`.
+Indexes: (`user_id`, `created_at`), `created_at` (administrator-wide dashboard and history,
+migration `c3f9a7d21e44`), `status`, `risk_level`, `type`, `input_sha256`.
+
+SQLite (development and tests only) runs in WAL mode with `synchronous=NORMAL`: the pipeline
+commits once per stage for live progress, and in the default journal mode each commit was a
+full disk sync that also blocked the progress poll.
 
 **`investigation_inputs`**: `kind`, `content` (original, preserved unmodified),
 `redacted_content`, `sha256`, `size_bytes`, `mime_type`, `filename`, `meta`

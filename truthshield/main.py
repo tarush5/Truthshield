@@ -81,7 +81,13 @@ async def lifespan(app: FastAPI):
                 from truthshield.infra.evidence.retriever import EvidenceRetriever
                 EvidenceRetriever._get_session()
                 EvidenceRetriever._rss_entries()
-                logger.info("Warmup complete")
+            except Exception as exc:
+                logger.warning("Warmup failed (non-fatal): %s", exc)
+            try:
+                # Without this the first investigation after a deploy paid
+                # ~1-4 s of imports and model loading on the request path.
+                from truthshield.investigations.engines import warm_engines
+                logger.info("Warmup complete (2.0 engines ready in %.0f ms)", warm_engines())
             except Exception as exc:
                 logger.warning("Warmup failed (non-fatal): %s", exc)
         await asyncio.to_thread(_load)

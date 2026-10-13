@@ -195,10 +195,17 @@ class EvidenceEngine(Engine):
         try:
             rag = RAGEngine(session)
             adjudicator = DeterministicAdjudicator()
+            # One batched retrieval: the live searches for every claim run
+            # concurrently instead of one after another.
+            try:
+                retrievals = await rag.retrieve_many([item["text"] for item in claims])
+            except Exception as exc:
+                logger.warning("Evidence retrieval failed: %s", exc, exc_info=True)
+                session.rollback()
+                return [exc for _ in claims]
             outcomes = []
-            for item in claims:
+            for item, retrieval in zip(claims, retrievals):
                 try:
-                    retrieval = await rag.retrieve(item["text"])
                     evidence = [
                         LegacyEvidence(title=p["title"] or p["publisher"], url=p["url"], snippet=p["passage"],
                                        source_score=p["credibility"], source_domain=p["publisher"])

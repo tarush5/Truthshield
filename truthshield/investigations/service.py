@@ -16,7 +16,7 @@ from typing import Optional, Tuple
 from urllib.parse import urlparse
 
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from truthshield.infra.models import Investigation, InvestigationInput, RiskFactor
 from truthshield.investigations import demo
@@ -199,7 +199,10 @@ def list_investigations(
     page = max(1, page)
     page_size = max(1, min(page_size, 100))
     rows = (
-        query.order_by(SORTS.get(sort, SORTS["-created_at"]), Investigation.created_at.desc())
+        # Summaries never read `result` (the full report, often tens of kB);
+        # leaving it out keeps a page of 100 rows from loading megabytes.
+        query.options(defer(Investigation.result))
+        .order_by(SORTS.get(sort, SORTS["-created_at"]), Investigation.created_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
@@ -388,19 +391,23 @@ def dashboard(session: Session, principal: Principal, *, days: int = 30) -> dict
     latencies = [r.processing_ms for r in completed if r.processing_ms is not None]
     scores = [r.risk_score for r in completed if r.risk_score is not None]
 
-    ids = [i for (i,) in scoped.filter(Investigation.created_at >= since).with_entities(Investigation.id).all()]
-    factor_rows = []
-    if ids:
-        factor_rows = (
-            session.query(RiskFactor.code, RiskFactor.title, func.count(RiskFactor.id))
-            .filter(RiskFactor.investigation_id.in_(ids[:5000]), RiskFactor.points > 0)
-            .group_by(RiskFactor.code, RiskFactor.title)
-            .order_by(func.count(RiskFactor.id).desc())
-            .limit(8)
-            .all()
-        )
+    # One grouped query over a join, instead of fetching every id in the
+    # window and sending them back as an IN list (capped, so it undercounted).
+    factor_query = (
+        session.query(RiskFactor.code, RiskFactor.title, func.count(RiskFactor.id))
+        .join(Investigation, RiskFactor.investigation_id == Investigation.id)
+        .filter(Investigation.created_at >= since, RiskFactor.points > 0)
+    )
+    if principal.role != "ADMIN":
+        factor_query = factor_query.filter(Investigation.user_id == principal.user_id)
+    factor_rows = (
+        factor_query.group_by(RiskFactor.code, RiskFactor.title)
+        .order_by(func.count(RiskFactor.id).desc())
+        .limit(8)
+        .all()
+    )
 
-    recent = scoped.order_by(Investigation.created_at.desc()).limit(8).all()
+    recent = scoped.options(defer(Investigation.result)).order_by(Investigation.created_at.desc()).limit(8).all()
 
     return {
         "window_days": days,

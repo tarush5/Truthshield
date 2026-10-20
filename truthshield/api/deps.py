@@ -1,4 +1,4 @@
-"""Request dependencies: identity, database session, rate-limit keys."""
+"""Request dependencies: identity and database session. Rate-limit keys: api/limits.py."""
 
 from __future__ import annotations
 
@@ -92,15 +92,3 @@ def require_role(*roles: str):
         return principal
 
     return dependency
-
-
-def rate_limit_key(
-    principal: Optional[Principal] = Depends(current_principal),
-) -> str:
-    """
-    Limit per account where we know one, per address otherwise.
-
-    Keying purely on IP punishes everyone behind a shared NAT for one abuser,
-    and lets an attacker with many addresses past the limit entirely.
-    """
-    return f"user:{principal.user_id}" if principal else "anon"

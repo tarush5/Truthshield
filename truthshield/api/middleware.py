@@ -156,3 +156,85 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             )
 
         return response
+
+
+class BodySizeLimitMiddleware:
+    """
+    Refuse oversized request bodies before they are read.
+
+    The upload handler already caps what it stores, but Starlette parses the
+    whole multipart body to a temporary file before any handler runs: a 40 MB
+    upload against a 25 MB limit was received in full (about 20 s) only to be
+    refused at the end. This answers 413 from `Content-Length` at once, and
+    for bodies without one, stops counting at the limit.
+
+    Pure ASGI (not BaseHTTPMiddleware) so the body is never buffered here.
+    """
+
+    def __init__(self, app: ASGIApp, *, max_upload_bytes: int, max_body_bytes: int):
+        self.app = app
+        self.max_upload_bytes = max_upload_bytes
+        self.max_body_bytes = max_body_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers") or [])
+        content_type = headers.get(b"content-type", b"").decode("latin-1").lower()
+        # Multipart carries files; everything else is JSON with a text cap.
+        limit = self.max_upload_bytes if content_type.startswith("multipart/") else self.max_body_bytes
+
+        declared = headers.get(b"content-length")
+        if declared is not None:
+            try:
+                too_big = int(declared) > limit
+            except ValueError:
+                too_big = False
+            if too_big:
+                await self._reject(scope, receive, send, limit)
+                return
+
+        received = 0
+        exceeded = False
+        started = False
+
+        async def guarded_receive():
+            nonlocal received, exceeded
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > limit:
+                    exceeded = True
+                    raise _BodyTooLarge()
+            return message
+
+        async def guarded_send(message):
+            nonlocal started
+            if exceeded:
+                return  # whatever the app says about a truncated body is replaced below
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, guarded_receive, guarded_send)
+        except Exception:
+            if not exceeded:
+                raise
+        if exceeded and not started:
+            await self._reject(scope, receive, send, limit)
+
+    @staticmethod
+    async def _reject(scope, receive, send, limit: int) -> None:
+        from truthshield.api.errors import envelope
+
+        mb = limit / (1024 * 1024)
+        response = envelope(413, f"Request body exceeds {mb:.0f} MB.", code="PAYLOAD_TOO_LARGE",
+                            headers={"Connection": "close"})
+        await response(scope, receive, send)
+
+
+class _BodyTooLarge(Exception):
+    pass

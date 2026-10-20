@@ -94,6 +94,33 @@ def performance(days: int = _DAYS, session: Session = Depends(get_session)):
     }
 
 
+def _report_visibility(session: Session, principal: Principal):
+    """
+    The same rule as `auth.can_read_report`, as a predicate on (user_id,
+    org_id): unowned reports, the caller's own, and their workspaces'.
+    Administrators see everything.
+
+    Before this, the index returned the input text of every user's reports
+    to any signed-in caller.
+    """
+    if principal.role == "ADMIN":
+        return None
+    from truthshield.infra.models import OrganizationMember
+
+    me = str(principal.user_id)
+    orgs = {str(o) for (o,) in session.query(OrganizationMember.org_id)
+            .filter(OrganizationMember.user_id == principal.user_id).all()}
+
+    def allow(user_id, org_id) -> bool:
+        if user_id is None and org_id is None:
+            return True
+        if user_id == me:
+            return True
+        return org_id is not None and org_id in orgs
+
+    return allow
+
+
 @claims_router.get("/similar")
 def similar(
     q: str = Query(..., min_length=8, max_length=500, description="Claim text."),
@@ -113,7 +140,7 @@ def similar(
 
     memory = get_claim_memory()
     memory.refresh(session)
-    matches = memory.search(q, top_k=limit)
+    matches = memory.search(q, top_k=limit, allow=_report_visibility(session, principal))
 
     return {
         "query": q,

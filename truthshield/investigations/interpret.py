@@ -13,8 +13,11 @@ get wrong:
 2. **It must cite.** Every statement cites S# or [n]. Citations that do not
    resolve are removed; an answer left with no valid citation is discarded.
 3. **It cannot overrule.** The risk score, level and claim assessments are
-   fixed before it runs. An answer stating a different score is discarded.
-4. **It is labelled.** Shown as "LLM interpretation", with model and token
+   fixed before it runs. An answer stating a different score or level is
+   discarded.
+4. **It is never shown cut off.** An answer that hit the length limit is
+   trimmed to its last complete sentence, or discarded if none remains.
+5. **It is labelled.** Shown as "LLM interpretation", with model and token
    usage, beside -- never instead of -- the deterministic explanation.
 """
 
@@ -48,7 +51,22 @@ SYSTEM = (
 _TAGLIKE = re.compile(r"</?\s*[a-zA-Z_][^>]{0,40}>")
 _SIGNAL_REF = re.compile(r"\(?\bS(\d{1,2})\b\)?")
 _SOURCE_REF = re.compile(r"\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]")
-_SCORE_CLAIM = re.compile(r"\b(\d{1,3})\s*/\s*100\b")
+# "85/100", "85 out of 100", "a score of 85", "risk score is 85".
+_SCORE_CLAIMS = (
+    re.compile(r"\b(\d{1,3})\s*/\s*100\b"),
+    re.compile(r"\b(\d{1,3})\s+out\s+of\s+100\b", re.IGNORECASE),
+    re.compile(r"\bscore\s+(?:of|is|was|at)\s+(\d{1,3})\b", re.IGNORECASE),
+)
+# "low risk", "high-risk"; "moderate" is how readers say MEDIUM.
+_LEVEL_CLAIM = re.compile(r"\b(low|medium|moderate|high|critical)[\s-]+risk\b", re.IGNORECASE)
+_LEVEL_WORDS = {"low": "LOW", "medium": "MEDIUM", "moderate": "MEDIUM", "high": "HIGH", "critical": "CRITICAL"}
+_SENTENCE_END = re.compile(r"[.!?][)\]\"']*(?=\s|$)")
+
+
+def _whole_sentences(text: str) -> str:
+    """`text` up to the end of its last complete sentence ("" if there is none)."""
+    ends = [m.end() for m in _SENTENCE_END.finditer(text)]
+    return text[: ends[-1]].strip() if ends else ""
 
 
 def _clean(value: Optional[str], limit: int = MAX_EXCERPT) -> str:
@@ -91,14 +109,21 @@ def build_prompt(assessment: RiskAssessment, claims: Sequence[dict], uncertainti
     return prompt, signal_ids, source_ids
 
 
-def validate(text: str, signal_ids: set, source_ids: set, score: int):
+def validate(text: str, signal_ids: set, source_ids: set, score: int, level: Optional[str] = None):
     """(cleaned text, citations) or (None, reason)."""
-    text = (text or "").strip()[:MAX_OUTPUT_CHARS]
+    text = (text or "").strip()
+    if len(text) > MAX_OUTPUT_CHARS:
+        text = _whole_sentences(text[:MAX_OUTPUT_CHARS])
     if not text:
         return None, "empty answer"
-    for claimed in _SCORE_CLAIM.findall(text):
-        if int(claimed) != score:
-            return None, "stated a risk score different from the computed one"
+    for pattern in _SCORE_CLAIMS:
+        for claimed in pattern.findall(text):
+            if int(claimed) != score:
+                return None, "stated a risk score different from the computed one"
+    if level:
+        for word in _LEVEL_CLAIM.findall(text):
+            if _LEVEL_WORDS[word.lower()] != level:
+                return None, "stated a risk level different from the computed one"
 
     cited_signals, cited_sources = set(), set()
 
@@ -154,7 +179,16 @@ def interpret(assessment: RiskAssessment, claims: Sequence[dict], uncertainties:
         return {**base, "status": "unavailable", "text": None,
                 "note": result.detail or "The language model returned nothing."}, record
 
-    text, outcome = validate(result.text, signal_ids, source_ids, assessment.score)
+    raw = result.text
+    if result.truncated:
+        # Stopped at the token limit: keep only what was finished.
+        raw = _whole_sentences(raw)
+        record.prediction["truncated"] = True
+        if not raw:
+            record.prediction["rejected"] = "cut off before a complete sentence"
+            return {**base, "status": "rejected", "text": None,
+                    "note": "An interpretation was generated and discarded: it was cut off."}, record
+    text, outcome = validate(raw, signal_ids, source_ids, assessment.score, assessment.level)
     if text is None:
         record.prediction["rejected"] = outcome
         return {**base, "status": "rejected", "text": None,

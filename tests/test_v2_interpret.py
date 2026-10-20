@@ -37,8 +37,8 @@ CLAIMS = [{"id": "C1", "text": "Lemon water cures cancer", "checked": True, "ass
 class FakeLLM(BaseLLMProvider):
     name = "fake"
 
-    def __init__(self, text=None, refused=False):
-        self.text, self.refused, self.prompts = text, refused, []
+    def __init__(self, text=None, refused=False, truncated=False):
+        self.text, self.refused, self.truncated, self.prompts = text, refused, truncated, []
 
     @property
     def available(self):
@@ -51,7 +51,7 @@ class FakeLLM(BaseLLMProvider):
     def complete(self, *, system, prompt, max_tokens=4000):
         self.prompts.append((system, prompt))
         return LLMResult(text=self.text, model="fake-model", provider="fake",
-                         input_tokens=100, output_tokens=40, refused=self.refused)
+                         input_tokens=100, output_tokens=40, refused=self.refused, truncated=self.truncated)
 
 
 @pytest.fixture
@@ -85,6 +85,23 @@ class TestValidation:
         text, reason = validate("This message is definitely a scam (S7).", {1}, set(), 60)
         assert text is None and reason == "no verifiable citations"
 
+    def test_other_ways_of_stating_a_different_score_are_discarded(self):
+        for text in ("It scores 20 out of 100 (S1).", "The risk score is 20 (S1).", "A score of 20 (S1)."):
+            assert validate(text, {1}, set(), 85)[0] is None, text
+        assert validate("The score of 85 reflects (S1).", {1}, set(), 85)[0] is not None
+
+    def test_a_different_risk_level_is_discarded(self):
+        text, reason = validate("This looks low risk (S1).", {1}, set(), 85, "CRITICAL")
+        assert text is None and "level" in reason
+        assert validate("This is high-risk (S1).", {1}, set(), 70, "HIGH")[0] is not None
+        # Words about confidence are not a level claim.
+        assert validate("Low confidence overall (S1).", {1}, set(), 85, "CRITICAL")[0] is not None
+
+    def test_an_overlong_answer_ends_on_a_whole_sentence(self):
+        long = "The domain imitates a brand (S1). " * 60
+        text, _ = validate(long, {1}, set(), 85)
+        assert text.endswith(".") and len(text) <= 1400
+
     def test_a_different_score_is_discarded(self):
         text, reason = validate("Risk is 20/100 (S1).", {1}, set(), 85)
         assert text is None and "different" in reason
@@ -105,6 +122,16 @@ class TestInterpret:
         assert block["input_tokens"] == 100 and "Interpretation, not evidence" in block["note"]
         assert record.model_kind is EngineKind.LLM and record.prediction["citations"]["signals"] == ["S1", "S2"]
         assert "share the otp" in provider.prompts[0][1]
+
+    def test_a_cut_off_answer_keeps_only_finished_sentences(self, llm):
+        llm(FakeLLM("The link imitates PayPal (S1). It also asks for a code (S2). And the", truncated=True))
+        block, record = interpret(assessment(), [], [], "sha")
+        assert block["status"] == "generated" and block["text"].endswith("(S2).")
+        assert record.prediction["truncated"] is True
+
+        llm(FakeLLM("The link imitates PayPal (S1) and", truncated=True))
+        block, _ = interpret(assessment(), [], [], "sha")
+        assert block["status"] == "rejected" and block["text"] is None
 
     def test_refusal_and_rejection_never_produce_text(self, llm):
         llm(FakeLLM(refused=True))

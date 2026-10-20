@@ -26,6 +26,8 @@ class LLMResult:
     output_tokens: int = 0
     refused: bool = False
     detail: Optional[str] = None
+    # The output hit the token limit and stopped mid-answer.
+    truncated: bool = False
 
     @property
     def ok(self) -> bool:

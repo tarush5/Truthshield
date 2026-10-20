@@ -32,7 +32,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import List, Optional, Sequence
+from typing import Callable, List, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +104,10 @@ def _jaccard(a: frozenset, b: frozenset) -> float:
 class _Entry:
     claim: PriorClaim
     tokens: frozenset = field(default_factory=frozenset)
+    # Who may see this claim's text. Kept out of PriorClaim so it never
+    # appears in a response; the API filters on it (see `search(allow=...)`).
+    user_id: Optional[str] = None
+    org_id: Optional[str] = None
 
 
 class ClaimMemory:
@@ -175,6 +179,8 @@ class ClaimMemory:
                 Report.verdict,
                 Report.trust_score,
                 Report.created_at,
+                Report.user_id,
+                Report.org_id,
             )
             .filter(Report.status == "complete")
             .filter(Report.input_text.isnot(None))
@@ -186,7 +192,7 @@ class ClaimMemory:
         )
 
         out: List[_Entry] = []
-        for report_id, text, verdict, trust, created in rows:
+        for report_id, text, verdict, trust, created, owner, org in rows:
             text = (text or "").strip()
             if len(text) < 12:  # too short to match on meaningfully
                 continue
@@ -200,6 +206,8 @@ class ClaimMemory:
                         created_at=created.isoformat() if created else None,
                     ),
                     tokens=_tokens(text),
+                    user_id=str(owner) if owner else None,
+                    org_id=str(org) if org else None,
                 )
             )
         return out
@@ -221,8 +229,15 @@ class ClaimMemory:
 
     # ──────────────────────────────────────────────────────────
 
-    def search(self, claim: str, *, top_k: int = 5, floor: float = RELATED) -> List[PriorClaim]:
-        """Prior adjudications resembling `claim`, most similar first."""
+    def search(self, claim: str, *, top_k: int = 5, floor: float = RELATED,
+               allow: Optional[Callable[[Optional[str], Optional[str]], bool]] = None) -> List[PriorClaim]:
+        """
+        Prior adjudications resembling `claim`, most similar first.
+
+        `allow(user_id, org_id)` decides which entries the caller may see; it
+        is applied before ranking, so another user's claim can neither be
+        returned nor push the caller's own matches out of the top k.
+        """
         if not claim or not self._entries:
             return []
 
@@ -232,7 +247,8 @@ class ClaimMemory:
             scores = [_jaccard(query, e.tokens) for e in self._entries]
 
         ranked = sorted(
-            ((score, entry) for score, entry in zip(scores, self._entries) if score >= floor),
+            ((score, entry) for score, entry in zip(scores, self._entries)
+             if score >= floor and (allow is None or allow(entry.user_id, entry.org_id))),
             key=lambda pair: pair[0],
             reverse=True,
         )

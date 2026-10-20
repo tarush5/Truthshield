@@ -4,7 +4,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 
 import { Logo } from '@/components/landing/Logo';
@@ -151,8 +151,33 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
 
   useEffect(() => setOpen(false), [location.pathname]);
+
+  // The drawer behaves as a modal dialog: Escape closes it, focus moves into
+  // it and back to the menu button, and the page behind does not scroll.
+  useEffect(() => {
+    if (!open) {
+      if (wasOpen.current) menuButton.current?.focus();
+      wasOpen.current = false;
+      return;
+    }
+    wasOpen.current = true;
+    closeButton.current?.focus();
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
 
   return (
     <div className="min-h-screen bg-bg">
@@ -165,7 +190,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Logo size="sm" />
           <span className="text-sm font-medium">TruthShield</span>
         </Link>
-        <button onClick={() => setOpen(true)} className="rounded-full p-2 text-muted hover:text-text-primary" aria-label="Open navigation">
+        <button
+          ref={menuButton}
+          onClick={() => setOpen(true)}
+          className="rounded-full p-2 text-muted hover:text-text-primary"
+          aria-label="Open navigation"
+          aria-expanded={open}
+          aria-controls="mobile-navigation"
+        >
           <Menu className="h-5 w-5" />
         </button>
       </header>
@@ -175,13 +207,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           <>
             <m.div className="fixed inset-0 z-40 bg-text-primary/40 lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpen(false)} />
             <m.aside
+              id="mobile-navigation"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Navigation"
               className="fixed inset-y-0 left-0 z-50 w-72 border-r border-stroke bg-bg lg:hidden"
               initial={{ x: -300 }}
               animate={{ x: 0 }}
               exit={{ x: -300 }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             >
-              <button onClick={() => setOpen(false)} className="absolute right-3 top-5 rounded-full p-2 text-muted hover:text-text-primary" aria-label="Close navigation">
+              <button ref={closeButton} onClick={() => setOpen(false)} className="absolute right-3 top-5 rounded-full p-2 text-muted hover:text-text-primary" aria-label="Close navigation">
                 <X className="h-5 w-5" />
               </button>
               <SidebarContent onNavigate={() => setOpen(false)} />

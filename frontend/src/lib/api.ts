@@ -54,20 +54,32 @@ export function describeError(status: number, body: ApiErrorBody | null): { code
 
 let refreshing: Promise<boolean> | null = null;
 
-/** Single-flight refresh: concurrent 401s share one exchange. */
+/**
+ * Single-flight refresh: concurrent 401s share one exchange.
+ *
+ * Refresh tokens rotate and a reused one revokes the whole session, so with
+ * several tabs open each must use the newest token. The session is re-read
+ * from storage first (another tab may have rotated it), and a refused
+ * refresh is double-checked the same way before signing out: losing a race
+ * to another tab is not a reason to end the session.
+ */
 export function refreshSession(): Promise<boolean> {
   if (refreshing) return refreshing;
-  const token = useAuth.getState().refreshToken;
-  if (!token) return Promise.resolve(false);
 
   refreshing = (async () => {
     try {
+      await useAuth.persist.rehydrate();
+      const token = useAuth.getState().refreshToken;
+      if (!token) return false;
       const response = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: token }),
       });
       if (!response.ok) {
+        await useAuth.persist.rehydrate();
+        const latest = useAuth.getState().refreshToken;
+        if (latest && latest !== token) return true; // another tab rotated it first
         useAuth.getState().clear();
         return false;
       }

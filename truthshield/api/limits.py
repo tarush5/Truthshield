@@ -17,11 +17,32 @@ from truthshield.settings import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+def client_key(request, fallback) -> str:
+    """
+    Who a request counts against: the account when it carries a valid access
+    token, otherwise the client address.
+
+    Keyed on the address alone, every user behind one proxy or office NAT
+    shared a single allowance: two accounts on one address got 20 analyses a
+    minute between them, not each. The token's signature is verified, so the
+    user id cannot be forged to spread one client across many keys.
+    """
+    header = request.headers.get("authorization") or ""
+    if header[:7].lower() == "bearer ":
+        from truthshield.services import auth
+
+        payload = auth.decode_token(header[7:].strip())
+        if payload and payload.get("sub"):
+            return f"user:{payload['sub']}"
+    return fallback(request)
+
+
 try:
     from slowapi import Limiter
     from slowapi.util import get_remote_address
 
-    limiter = Limiter(key_func=get_remote_address, default_limits=[settings.RATE_LIMIT])
+    limiter = Limiter(key_func=lambda request: client_key(request, get_remote_address),
+                      default_limits=[settings.RATE_LIMIT])
 except ImportError:  # pragma: no cover - slowapi is a hard requirement
     limiter = None
     logger.error("slowapi is not installed — the API is running WITHOUT rate limiting")

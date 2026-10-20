@@ -49,6 +49,46 @@ describe('request', () => {
     expect(useAuth.getState().accessToken).toBeNull();
   });
 
+  // Another tab writes the same storage key when it rotates the session.
+  const otherTabWrites = (accessToken: string, refreshToken: string) =>
+    localStorage.setItem('ts.session', JSON.stringify({ state: { accessToken, refreshToken, user }, version: 0 }));
+
+  it('refreshes with the token another tab rotated, not the stale one', async () => {
+    otherTabWrites('stale_access', 'tsr_from_other_tab');
+    const sent: string[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/auth/refresh')) {
+        const token = JSON.parse(String(init?.body)).refresh_token;
+        sent.push(token);
+        return token === 'tsr_from_other_tab'
+          ? json(200, { access_token: 'new', token_type: 'bearer', expires_in: 3600, refresh_token: 'tsr_next', user })
+          : json(401, { error: { code: 'INVALID_REFRESH_TOKEN', message: 'reused', request_id: 'r' } });
+      }
+      const auth = (init?.headers as Record<string, string>).Authorization;
+      return auth === 'Bearer new' ? json(200, { ok: true }) : json(401, { error: { code: 'UNAUTHENTICATED', message: 'x', request_id: 'r' } });
+    });
+
+    await expect(request('/a')).resolves.toEqual({ ok: true });
+    expect(sent).toEqual(['tsr_from_other_tab']);
+  });
+
+  it('stays signed in when another tab won the refresh race', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/auth/refresh')) {
+        // The other tab rotated first: ours is now a used token.
+        otherTabWrites('winner_access', 'tsr_winner');
+        return json(401, { error: { code: 'INVALID_REFRESH_TOKEN', message: 'reused', request_id: 'r' } });
+      }
+      const auth = (init?.headers as Record<string, string>).Authorization;
+      return auth === 'Bearer winner_access' ? json(200, { ok: true }) : json(401, { error: { code: 'UNAUTHENTICATED', message: 'x', request_id: 'r' } });
+    });
+
+    await expect(request('/a')).resolves.toEqual({ ok: true });
+    expect(useAuth.getState().accessToken).toBe('winner_access');
+  });
+
   it('reports an unreachable server as offline', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('network'));
     await expect(request('/a')).rejects.toMatchObject({ status: 0, code: 'OFFLINE' });

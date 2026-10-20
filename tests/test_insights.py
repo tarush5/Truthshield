@@ -162,6 +162,36 @@ class TestClaimSimilarity:
         assert isinstance(body["matches"], list)
 
 
+    def test_another_users_claims_are_never_returned(self, client, session):
+        """
+        The index spans every report; a caller sees only reports they could
+        open. This route used to return other users' full input text.
+        """
+        from truthshield.domain.rag import get_claim_memory
+        from truthshield.infra.models import Report
+
+        def signup():
+            email = f"sim{uuid.uuid4().hex[:10]}@example.com"
+            body = client.post("/api/v1/auth/signup", json={"email": email, "password": "correct-horse-42"}).json()
+            me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {body['access_token']}"}).json()
+            return {"Authorization": f"Bearer {body['access_token']}"}, me["id"]
+
+        alice, alice_id = signup()
+        bob, _ = signup()
+        marker = uuid.uuid4().hex[:8]
+        private = f"My private account number for {marker} zephyr bank is listed in the quarterly ledger"
+        session.add(Report(id=uuid.uuid4().hex, user_id=uuid.UUID(alice_id), status="complete",
+                           input_text=private, verdict="UNVERIFIED", trust_score=50, content_type="text"))
+        session.commit()
+        get_claim_memory().refresh(session, force=True)
+
+        query = f"/api/v1/claims/similar?q={marker} zephyr bank quarterly ledger account"
+        mine = client.get(query, headers=alice).json()["matches"]
+        theirs = client.get(query, headers=bob).json()["matches"]
+        assert any(marker in m["text"] for m in mine), "the owner should find their own claim"
+        assert not any(marker in m["text"] for m in theirs), "another user must not see it"
+
+
 # ══════════════════════════════════════════════════════════════
 # Claim memory
 # ══════════════════════════════════════════════════════════════

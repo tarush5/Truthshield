@@ -121,6 +121,7 @@ class AnthropicProvider(BaseLLMProvider):
             result.detail = "The model declined this request."
             return result
         result.text = "".join(b.text for b in response.content if getattr(b, "type", "") == "text").strip() or None
+        result.truncated = response.stop_reason == "max_tokens"
         return result
 
 
@@ -182,6 +183,7 @@ class GeminiProvider(BaseLLMProvider):
             provider=self.name,
             input_tokens=usage.get("promptTokenCount", 0),
             output_tokens=usage.get("candidatesTokenCount", 0),
+            truncated=bool(candidates) and candidates[0].get("finishReason") == "MAX_TOKENS",
         )
 
 

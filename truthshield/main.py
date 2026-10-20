@@ -26,7 +26,7 @@ from truthshield.api.investigations import (
 )
 from truthshield.api.insights import claims_router, insights_router
 from truthshield.api.middleware import (
-    RequestContextMiddleware, SecurityHeadersMiddleware, current_request_id,
+    BodySizeLimitMiddleware, RequestContextMiddleware, SecurityHeadersMiddleware, current_request_id,
 )
 from truthshield.api.sharing import sharing_router
 from truthshield.api.stream import stream_router
@@ -127,13 +127,24 @@ app.add_middleware(
     https_only=settings.APP_ENV.is_production,
     docs_paths=tuple(p for p in (_DOCS_URL, _REDOC_URL, _OPENAPI_URL) if p),
 )
+# Inside the request-id layer (so a 413 carries its id) and inside CORS (so
+# the browser can read it).
+app.add_middleware(
+    BodySizeLimitMiddleware,
+    # Multipart overhead (boundaries, part headers) on top of the file cap.
+    max_upload_bytes=settings.max_upload_bytes + 1024 * 1024,
+    # JSON bodies: MAX_TEXT_LENGTH characters, escaped, with room to spare.
+    max_body_bytes=max(1024 * 1024, settings.MAX_TEXT_LENGTH * 12),
+)
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,   # validated: never "*"
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    # PATCH: source curation and user management. Without it the browser
+    # refused the preflight and those admin actions failed cross-origin.
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-API-Key"],
 )
 

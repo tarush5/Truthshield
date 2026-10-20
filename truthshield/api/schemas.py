@@ -69,6 +69,13 @@ class RefreshRequest(BaseModel):
     refresh_token: str = Field(min_length=20, max_length=200)
 
 
+class AccountDeleteRequest(BaseModel):
+    # Typing the address is the confirmation; the password re-authenticates
+    # (required when the account has one; one-time-code accounts have none).
+    confirm_email: EmailStr
+    password: Optional[str] = Field(None, max_length=256)
+
+
 # ── Analysis ──────────────────────────────────────────────────
 
 class AnalyzeRequest(BaseModel):

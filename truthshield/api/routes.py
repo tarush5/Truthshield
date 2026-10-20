@@ -178,6 +178,49 @@ def me(principal: Principal = Depends(require_principal)):
     )
 
 
+@auth_router.delete("/me", status_code=204)
+@auth_limit
+def delete_me(
+    request: Request,
+    payload: schemas.AccountDeleteRequest,
+    principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
+):
+    """
+    Delete the caller's account and everything they own: investigations and
+    their files, 1.x reports, their personal workspace and sessions.
+
+    Re-authenticated: the email must be typed, and the password given when
+    the account has one. Not available to API keys.
+    """
+    from truthshield.services.account import AccountDeletionBlocked, delete_account
+
+    if principal.via_api_key:
+        raise ApiError(403, "FORBIDDEN", "Accounts can only be deleted from a signed-in session.")
+    user = session.get(auth.User, principal.user_id)
+    if user is None:
+        raise ApiError(404, "NOT_FOUND", "Account not found.")
+    if payload.confirm_email.lower() != user.email.lower():
+        raise ApiError(400, "CONFIRMATION_MISMATCH", "The email address does not match this account.")
+    if user.password_hash and not auth.verify_password(payload.password or "", user.password_hash):
+        # 403, not 401: the session is valid, the confirmation is not. A 401
+        # tells the client its session expired, and it would sign the user out.
+        raise ApiError(403, "INVALID_PASSWORD", "The password is incorrect.")
+
+    user_id = user.id
+    try:
+        counts = delete_account(session, user)
+    except AccountDeletionBlocked as exc:
+        session.rollback()
+        raise ApiError(409, "CONFLICT", str(exc))
+    # The workspace's audit trail is deleted with the workspace (audit_logs
+    # cascade from organizations), so the record of this deletion goes to the
+    # application log: the user id and counts, never the email address.
+    logger.info("Account %s deleted (%d investigations, %d reports, %d workspaces)",
+                user_id, counts["investigations"], counts["reports"], counts["workspaces"])
+    return Response(status_code=204)
+
+
 # ══════════════════════════════════════════════════════════════
 # Analysis
 # ══════════════════════════════════════════════════════════════

@@ -49,4 +49,15 @@ export const useAuth = create<AuthState>()(
   ),
 );
 
+// Keep every open tab on the same session. Without this a tab kept the
+// refresh token it loaded with: after another tab rotated it, this tab's next
+// refresh presented a used token, which the server treats as theft and
+// answers by revoking the session everywhere. Signing out in one tab now
+// signs out the others too.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'ts.session') void useAuth.persist.rehydrate();
+  });
+}
+
 export const isSignedIn = () => Boolean(useAuth.getState().accessToken);

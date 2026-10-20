@@ -225,10 +225,18 @@ def dispatch(inv: Investigation, *, background=None, mode: Optional[str] = None)
         from truthshield.infra.celery_app import broker_reachable
         from truthshield.investigations.tasks import run_investigation
 
+        unavailable = InvestigationError(503, "UNAVAILABLE",
+                                         "The analysis queue is unavailable. Please retry shortly.")
         if not broker_reachable():
-            raise InvestigationError(503, "UNAVAILABLE",
-                                     "The analysis queue is unavailable. Please retry shortly.")
-        run_investigation.delay(str(inv.id))
+            raise unavailable
+        try:
+            run_investigation.delay(str(inv.id))
+        except Exception as exc:
+            # The reachability answer is cached for a few seconds; a broker
+            # that went down inside that window fails here instead.
+            logger.warning("Could not enqueue investigation %s: %s", inv.public_id, type(exc).__name__)
+            broker_reachable(fresh=True)
+            raise unavailable from exc
         return "celery"
 
     if mode == "background" and background is not None:

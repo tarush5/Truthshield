@@ -313,6 +313,9 @@ class HealthResponse(BaseModel):
     database: bool
     cache: Dict[str, Any]
     broker: bool
+    # "eager": tasks run in-process and no broker is involved, so `broker`
+    # is true by definition; "broker": `broker` is a real connection check.
+    broker_mode: str = "broker"
     capabilities: Dict[str, Any]
 
     # Which evidence sources this deployment can actually reach. Reported

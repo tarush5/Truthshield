@@ -12,6 +12,8 @@ rejected with 503 and the caller can retry.
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from typing import Any, Dict, Optional
 
 from celery import Celery
@@ -68,18 +70,43 @@ def _configure_logging(**_kwargs):
     )
 
 
-def broker_reachable() -> bool:
+# The probe opens a broker connection, which takes 2-4 s to fail when the
+# broker is down. /health is public and polled by orchestrators (Docker's
+# check allows 3 s), so the answer is reused for a few seconds: a down broker
+# costs one probe per window, not one per caller.
+BROKER_PROBE_TTL_SECONDS = 15.0
+_probe_lock = threading.Lock()
+_probe: Optional[tuple] = None  # (monotonic time, reachable)
+
+
+def broker_mode() -> str:
+    """'eager' when tasks run in-process (no broker involved), else 'broker'."""
+    return "eager" if settings.CELERY_TASK_ALWAYS_EAGER else "broker"
+
+
+def broker_reachable(*, fresh: bool = False) -> bool:
     """Whether the broker is accepting connections. Used by /health and /analyze."""
+    global _probe
     if settings.CELERY_TASK_ALWAYS_EAGER:
         return True
-    try:
-        conn = celery_app.connection()
-        conn.ensure_connection(max_retries=0, timeout=2)
-        conn.release()
-        return True
-    except Exception as exc:
-        logger.warning("Celery broker unreachable: %s", exc)
-        return False
+    now = time.monotonic()
+    cached = _probe
+    if not fresh and cached and now - cached[0] < BROKER_PROBE_TTL_SECONDS:
+        return cached[1]
+    with _probe_lock:
+        cached = _probe
+        if not fresh and cached and time.monotonic() - cached[0] < BROKER_PROBE_TTL_SECONDS:
+            return cached[1]  # another thread probed while this one waited
+        try:
+            conn = celery_app.connection()
+            conn.ensure_connection(max_retries=0, timeout=2)
+            conn.release()
+            reachable = True
+        except Exception as exc:
+            logger.warning("Celery broker unreachable: %s", exc)
+            reachable = False
+        _probe = (time.monotonic(), reachable)
+        return reachable
 
 
 @celery_app.task(

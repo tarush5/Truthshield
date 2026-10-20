@@ -37,6 +37,9 @@ class Outcome:
     level: str
     classification: str
     top_signals: List[str]
+    type: str = ""
+    language: str = ""
+    length: str = ""
 
     @property
     def flagged(self) -> bool:
@@ -79,15 +82,19 @@ def assess(item: dict) -> Outcome:
             assessed |= families.get(engine.engine, set())
     assessment = RiskEngine().assess([s for e in engines for s in e.signals], engines, assessed)
     classification, _ = explain.classify(assessment, engines)
+    chars = len(content)
     return Outcome(
         id=item["id"], label=item["label"], kind=item.get("kind", ""),
         score=assessment.score, level=assessment.level, classification=classification,
         top_signals=[c.code for c in assessment.contributions if c.points > 0][:4],
+        type=item["type"],
+        # Detected, not labelled: the breakdown shows how the engine saw it.
+        language=item.get("lang") or (text.artifacts.get("language", {}).get("detected") or "-"),
+        length="short (<80)" if chars < 80 else "medium (80-199)" if chars < 200 else "long (200+)",
     )
 
 
-def evaluate(items: Iterable[dict]) -> dict:
-    outcomes = [assess(item) for item in items]
+def _scores(outcomes: List[Outcome]) -> dict:
     tp = sum(1 for o in outcomes if o.label == "fraud" and o.flagged)
     fn = sum(1 for o in outcomes if o.label == "fraud" and not o.flagged)
     fp = sum(1 for o in outcomes if o.label == "benign" and o.flagged)
@@ -101,16 +108,45 @@ def evaluate(items: Iterable[dict]) -> dict:
         "recall": round(recall, 3),
         "f1": round(2 * precision * recall / (precision + recall), 3) if precision + recall else 0.0,
         "false_positive_rate": round(fp / (fp + tn), 3) if fp + tn else 0.0,
+        "false_negative_rate": round(fn / (fn + tp), 3) if fn + tp else 0.0,
+    }
+
+
+def evaluate(items: Iterable[dict]) -> dict:
+    outcomes = [assess(item) for item in items]
+    groups = {
+        dim: sorted({getattr(o, dim) for o in outcomes})
+        for dim in ("type", "language", "length")
+    }
+    return {
+        **_scores(outcomes),
+        # Per slice: where the rules are strong or weak. Slices are small;
+        # read them as pointers to look at, not as rates.
+        "by": {
+            dim: {value: _scores([o for o in outcomes if getattr(o, dim) == value]) for value in values}
+            for dim, values in groups.items()
+        },
+        "recall_by_kind": {
+            kind: _scores([o for o in outcomes if o.kind == kind])["recall"]
+            for kind in sorted({o.kind for o in outcomes if o.label == "fraud"})
+        },
         "errors": [o for o in outcomes if not o.correct],
         "outcomes": outcomes,
     }
 
 
 def main(argv: List[str]) -> int:
-    report = evaluate(load(Path(argv[1]) if len(argv) > 1 else None))
+    paths = [a for a in argv[1:] if not a.startswith("--")]
+    report = evaluate(load(Path(paths[0]) if paths else None))
     print(f"{report['items']} items  precision {report['precision']:.3f}  recall {report['recall']:.3f}  "
-          f"F1 {report['f1']:.3f}  FPR {report['false_positive_rate']:.3f}  "
-          f"(tp {report['tp']} fn {report['fn']} fp {report['fp']} tn {report['tn']})")
+          f"F1 {report['f1']:.3f}  FPR {report['false_positive_rate']:.3f}  FNR {report['false_negative_rate']:.3f}")
+    print(f"  confusion matrix (rows = label):  fraud -> flagged {report['tp']:>3}  not flagged {report['fn']:>3}")
+    print(f"                                    benign -> flagged {report['fp']:>3}  not flagged {report['tn']:>3}")
+    if "--by" in argv:
+        for dim, slices in report["by"].items():
+            for value, m in slices.items():
+                print(f"  {dim:<9} {value:<16} n={m['items']:>3}  P {m['precision']:.2f}  R {m['recall']:.2f}  "
+                      f"FPR {m['false_positive_rate']:.2f}")
     for o in report["errors"]:
         miss = "MISSED" if o.label == "fraud" else "FALSE ALARM"
         print(f"  {miss:<11} {o.id:<14} {o.score:>3} {o.level:<8} {o.classification:<26} {', '.join(o.top_signals)}")

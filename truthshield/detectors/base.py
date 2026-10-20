@@ -94,6 +94,25 @@ class OptionalDependency:
         return self._value is not None
 
     @property
+    def installed(self) -> bool:
+        """
+        Whether the package is present, without importing it.
+
+        For status reports. Importing torch and transformers only to say
+        they exist took 14 s and kept about 190 MB in the API process even
+        with the ML detectors switched off. Once the module has really been
+        loaded (a detector needed it), the real outcome is reported instead,
+        so a package that is present but broken still shows as unavailable.
+        """
+        if self._attempted:
+            return self._value is not None
+        try:
+            import importlib.util
+            return importlib.util.find_spec(self._module_path) is not None
+        except (ImportError, ValueError):
+            return False
+
+    @property
     def error(self) -> Optional[str]:
         self._load()
         return self._error

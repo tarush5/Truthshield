@@ -123,3 +123,46 @@ class TestRedelivery:
         assert len(events) == 12 and sorted(e.seq for e in events) == list(range(1, 13))
         assert session.query(RiskFactor).filter_by(investigation_id=inv.id).count() == clean_factors
         assert session.get(Investigation, inv.id).status == "COMPLETED"
+
+
+class TestHealthReporting:
+    def test_the_broker_probe_is_cached_between_calls(self, monkeypatch):
+        from truthshield.infra import celery_app as module
+
+        calls = []
+
+        class DeadConnection:
+            def ensure_connection(self, **_):
+                calls.append(1)
+                raise ConnectionError("down")
+
+            def release(self):
+                pass
+
+        monkeypatch.setattr(module.settings, "CELERY_TASK_ALWAYS_EAGER", False)
+        monkeypatch.setattr(module.celery_app, "connection", lambda: DeadConnection())
+        monkeypatch.setattr(module, "_probe", None)
+        assert module.broker_reachable() is False
+        assert module.broker_reachable() is False
+        assert len(calls) == 1, "a down broker must cost one probe per window, not one per caller"
+        assert module.broker_reachable(fresh=True) is False and len(calls) == 2
+
+    def test_a_down_queue_makes_health_degraded_when_investigations_use_it(self, client, monkeypatch):
+        from truthshield.infra import celery_app as module
+        from truthshield.settings import get_settings
+
+        monkeypatch.setattr(module, "broker_reachable", lambda **_: False)
+        monkeypatch.setattr(get_settings(), "INVESTIGATION_EXECUTOR", "celery")
+        body = client.get("/api/v1/health").json()
+        assert body["status"] == "degraded" and body["broker"] is False
+        assert body["broker_mode"] in ("eager", "broker")
+
+    def test_capability_reports_do_not_import_heavy_packages(self):
+        import sys
+
+        from truthshield.detectors.base import OptionalDependency
+
+        sys.modules.pop("this", None)
+        dep = OptionalDependency("this")  # stdlib, prints on import
+        assert dep.installed is True and "this" not in sys.modules
+        assert OptionalDependency("definitely_not_a_module_xyz").installed is False

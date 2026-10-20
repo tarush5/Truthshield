@@ -36,6 +36,17 @@ def test_eval_set_holds(name):
     assert report["false_positive_rate"] <= 0.04, errors
 
 
+def test_final_blind_set_holds_its_measured_level():
+    """
+    The final blind set is never tuned on (see tests/eval/README.md), so it
+    is held at the level first measured, not at perfection: precision 0.971,
+    recall 0.943, false-positive rate 0.033 (65 items, 20 October 2026).
+    """
+    report = evaluate(load(EVAL / "fraud_final_blind.jsonl"))
+    assert report["recall"] >= 0.94 and report["precision"] >= 0.97
+    assert report["false_positive_rate"] <= 0.034
+
+
 def _item(content, type="message"):
     return {"id": "t", "type": type, "label": "benign", "content": content}
 

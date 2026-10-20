@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import math
 import re
+import time
 from collections import Counter
 from typing import List
 
@@ -284,6 +285,10 @@ def run_all(packet: ContentPacket) -> List[DetectorResult]:
     return [d.analyze(packet) for d in _DETECTORS]
 
 
+_TESSERACT_RECHECK_SECONDS = 300.0
+_tesseract_checked = None  # (monotonic time, present)
+
+
 def _tesseract_binary_present() -> bool:
     """
     Whether OCR can actually run.
@@ -294,13 +299,21 @@ def _tesseract_binary_present() -> bool:
     the import alone would claim a capability the deployment does not have —
     exactly the kind of false assurance this file exists to avoid.
     """
-    if not pytesseract.available:
-        return False
-    try:
-        pytesseract.get().get_tesseract_version()
-        return True
-    except Exception:
-        return False
+    global _tesseract_checked
+    now = time.monotonic()
+    if _tesseract_checked and now - _tesseract_checked[0] < _TESSERACT_RECHECK_SECONDS:
+        return _tesseract_checked[1]
+    present = False
+    if pytesseract.available:
+        try:
+            pytesseract.get().get_tesseract_version()
+            present = True
+        except Exception:
+            present = False
+    # The check runs `tesseract --version` as a subprocess (about 250 ms);
+    # /health is polled, and the binary does not come and go between calls.
+    _tesseract_checked = (now, present)
+    return present
 
 
 def availability() -> dict:
@@ -311,11 +324,13 @@ def availability() -> dict:
     the deployment genuinely has, instead of discovering from a suspiciously
     clean report that a model never loaded.
     """
+    # `installed`, not `available`: a status report must not import torch and
+    # transformers into the API process just to say they exist.
     return {
-        "torch": torch.available,
-        "opencv": cv2.available,
-        "transformers": transformers.available,
+        "torch": torch.installed,
+        "opencv": cv2.installed,
+        "transformers": transformers.installed,
         "tesseract_ocr": _tesseract_binary_present(),
-        "librosa": librosa.available,
+        "librosa": librosa.installed,
         "ml_detectors_enabled": get_settings().ENABLE_ML_DETECTORS,
     }

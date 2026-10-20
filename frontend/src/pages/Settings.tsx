@@ -22,7 +22,7 @@ export default function Settings() {
 
   return (
     <>
-      <PageHeader eyebrow="Settings" title={<>Account & <span className="font-display italic">platform</span></>} />
+      <PageHeader eyebrow="Settings" title={<>Account & <span className="font-display">platform</span></>} />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader eyebrow="Account" title={user?.email ?? '—'} />

@@ -69,15 +69,15 @@ export function FileDropzone({ accept = Object.keys(ACCEPT), hint }: { accept?: 
         onDrop={onDrop}
         className={cn(
           'relative flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed px-6 py-12 text-center transition-colors',
-          dragging ? 'border-[#4E85BF] bg-[#4E85BF]/10' : 'border-stroke hover:border-muted/60 hover:bg-stroke/20',
+          dragging ? 'border-accent bg-accent/10' : 'border-stroke hover:border-muted/60 hover:bg-stroke/20',
         )}
       >
         {upload.isPending ? (
-          <Loader2 className="h-8 w-8 animate-spin text-[#89AACC]" aria-hidden />
+          <Loader2 className="h-8 w-8 animate-spin text-accent" aria-hidden />
         ) : (
           <FileUp className="h-8 w-8 text-muted" aria-hidden />
         )}
-        <p className="mt-4 font-display text-2xl italic text-text-primary">
+        <p className="mt-4 font-display text-2xl text-text-primary">
           {upload.isPending ? 'Uploading…' : 'Drop a file, or click to choose'}
         </p>
         <p className="mt-2 max-w-sm text-xs text-muted">

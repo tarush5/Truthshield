@@ -23,7 +23,7 @@ const ICON: Record<StageState, ReactElement> = {
   done: <CheckCircle2 className="h-4 w-4 text-risk-low" aria-hidden />,
   skipped: <MinusCircle className="h-4 w-4 text-muted" aria-hidden />,
   failed: <XCircle className="h-4 w-4 text-risk-critical" aria-hidden />,
-  running: <Loader2 className="h-4 w-4 animate-spin text-[#89AACC]" aria-hidden />,
+  running: <Loader2 className="h-4 w-4 animate-spin text-accent" aria-hidden />,
   pending: <CircleDashed className="h-4 w-4 text-stroke" aria-hidden />,
 };
 
@@ -38,12 +38,12 @@ export function ProcessingStatus({ inv }: { inv: InvestigationDetail }) {
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-[11px] uppercase tracking-[0.25em] text-muted">Status</p>
-          <p className="mt-1 font-display text-3xl italic text-text-primary">{STATUS_LABEL[inv.status] ?? inv.status}</p>
+          <p className="mt-1 font-display text-3xl text-text-primary">{STATUS_LABEL[inv.status] ?? inv.status}</p>
         </div>
         <span className="font-display text-5xl tabular-nums text-text-primary">{String(pct).padStart(3, '0')}</span>
       </div>
       <div className="mt-4 h-[3px] overflow-hidden rounded-full bg-stroke/60">
-        <div className="accent-gradient h-full origin-left transition-transform duration-500" style={{ transform: `scaleX(${pct / 100})`, boxShadow: '0 0 8px rgba(137,170,204,0.35)' }} />
+        <div className="accent-gradient h-full origin-left transition-transform duration-500" style={{ transform: `scaleX(${pct / 100})`, boxShadow: '0 0 8px rgba(232,86,47,0.35)' }} />
       </div>
       <ol className="mt-6 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {PIPELINE_STAGES.map((stage) => (

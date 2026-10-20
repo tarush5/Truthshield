@@ -1,27 +1,18 @@
 /**
- * Smooth in-page navigation.
- *
- * GSAP's ScrollToPlugin rather than CSS `scroll-behavior: smooth`, which
- * fights ScrollTrigger's own scroll restoration during refresh.
+ * Smooth in-page navigation, native: no animation library on the landing
+ * page's critical path. Reduced-motion visitors jump straight there.
  */
-import gsap from 'gsap';
-import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
-
-gsap.registerPlugin(ScrollToPlugin);
-
 const reduced = () =>
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-export function scrollToSection(target: string | number, offset = 80) {
-  if (typeof target === 'string' && !document.querySelector(target)) return;
-  if (reduced()) {
-    if (typeof target === 'number') window.scrollTo(0, target);
-    else document.querySelector(target)?.scrollIntoView();
-    return;
+export function scrollToSection(target: string | number, offset = 88) {
+  let top: number;
+  if (typeof target === 'number') {
+    top = target;
+  } else {
+    const el = document.querySelector(target);
+    if (!el) return;
+    top = el.getBoundingClientRect().top + window.scrollY - offset;
   }
-  gsap.to(window, {
-    duration: 1.1,
-    ease: 'power3.inOut',
-    scrollTo: typeof target === 'number' ? { y: target } : { y: target, offsetY: offset },
-  });
+  window.scrollTo({ top, behavior: reduced() ? 'auto' : 'smooth' });
 }

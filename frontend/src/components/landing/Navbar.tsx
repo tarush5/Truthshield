@@ -1,85 +1,57 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
-import { Logo } from '@/components/landing/Logo';
-import { cn } from '@/lib/format';
+import { Wordmark } from '@/components/landing/Logo';
 import { scrollToSection } from '@/lib/scroll';
 import { useAuth } from '@/stores/auth';
 
 const LINKS = [
-  { label: 'Home', target: '#home' },
-  { label: 'Capabilities', target: '#capabilities' },
-  { label: 'Pipeline', target: '#pipeline' },
+  { label: 'Threats', target: '#catches' },
+  { label: 'Why us', target: '#why' },
+  { label: 'Engines', target: '#engines' },
+  { label: 'FAQ', target: '#faq' },
 ];
 
 export function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [active, setActive] = useState('#home');
   const signedIn = useAuth((s) => Boolean(s.accessToken));
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 100);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-
-    // Active link follows whichever section crosses the middle of the viewport.
-    const observer = new IntersectionObserver(
-      (entries) => entries.forEach((e) => e.isIntersecting && setActive(`#${e.target.id}`)),
-      { rootMargin: '-50% 0px -50% 0px' },
-    );
-    LINKS.forEach(({ target }) => {
-      const el = document.querySelector(target);
-      if (el) observer.observe(el);
-    });
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      observer.disconnect();
-    };
-  }, []);
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 flex justify-center px-4 pt-4 md:pt-6">
+    <header className="fixed inset-x-3 top-3 z-50 sm:inset-x-4 sm:top-4">
       <nav
         aria-label="Primary"
-        className={cn(
-          'inline-flex items-center rounded-full border border-white/10 bg-surface px-2 py-2 transition-shadow',
-          scrolled && 'shadow-md shadow-black/10',
-        )}
+        className="relative mx-auto flex h-14 max-w-[1400px] items-center justify-between rounded-full bg-[#FBF5EA] px-3 text-[#1D1A16] shadow-[0_8px_30px_-12px_rgba(29,26,22,0.25)] sm:px-4"
       >
-        <button onClick={() => scrollToSection(0)} aria-label="TruthShield — back to top" className="rounded-full">
-          <Logo />
-        </button>
-        <span className="mx-1 hidden h-5 w-px bg-stroke sm:block" aria-hidden />
-        {LINKS.map(({ label, target }) => (
-          <button
-            key={target}
-            onClick={() => (target === '#home' ? scrollToSection(0) : scrollToSection(target))}
-            aria-current={active === target ? 'true' : undefined}
-            className={cn(
-              'rounded-full px-3 py-1.5 text-xs transition-colors sm:px-4 sm:py-2 sm:text-sm',
-              active === target ? 'bg-stroke/50 text-text-primary' : 'text-muted hover:bg-stroke/50 hover:text-text-primary',
-            )}
-          >
-            {label}
-          </button>
-        ))}
-        <span className="mx-1 hidden h-5 w-px bg-stroke sm:block" aria-hidden />
-        {signedIn ? (
-          <button onClick={() => navigate('/app')} className="group relative inline-flex rounded-full">
-            <span aria-hidden className="accent-gradient absolute -inset-[2px] rounded-full opacity-0 transition-opacity group-hover:opacity-100" />
-            <span className="relative rounded-full bg-surface px-3 py-1.5 text-xs text-text-primary sm:px-4 sm:py-2 sm:text-sm">
-              Open app ↗
-            </span>
-          </button>
-        ) : (
-          <Link to="/login" className="group relative inline-flex rounded-full">
-            <span aria-hidden className="accent-gradient absolute -inset-[2px] rounded-full opacity-0 transition-opacity group-hover:opacity-100" />
-            <span className="relative rounded-full bg-surface px-3 py-1.5 text-xs text-text-primary sm:px-4 sm:py-2 sm:text-sm">
-              Sign in ↗
-            </span>
-          </Link>
-        )}
+        <ul className="hidden items-center gap-1 md:flex">
+          {LINKS.map((link) => (
+            <li key={link.target}>
+              <a
+                href={link.target}
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToSection(link.target);
+                }}
+                className="rounded-full px-3 py-2 text-sm font-semibold transition-colors hover:bg-[#1D1A16]/5"
+              >
+                {link.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+
+        <Link
+          to="/"
+          onClick={() => scrollToSection(0)}
+          aria-label="TruthShield, back to top"
+          className="pl-2 text-2xl md:absolute md:left-1/2 md:-translate-x-1/2 md:pl-0"
+        >
+          <Wordmark />
+        </Link>
+
+        <Link
+          to={signedIn ? '/app' : '/login'}
+          className="rounded-full bg-[#1D1A16] px-5 py-2.5 text-sm font-semibold text-[#FBF5EA] transition-transform duration-300 hover:-translate-y-0.5"
+        >
+          {signedIn ? 'Open the app' : 'Sign in'}
+        </Link>
       </nav>
     </header>
   );

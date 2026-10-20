@@ -17,6 +17,14 @@ export default {
         muted: hsl('--muted'),
         stroke: hsl('--stroke'),
         accent: hsl('--accent'),
+        brand: {
+          orange: hsl('--c-orange'),
+          amber: hsl('--c-amber'),
+          green: hsl('--c-green'),
+          pink: hsl('--c-pink'),
+          blue: hsl('--c-blue'),
+          yellow: hsl('--c-yellow'),
+        },
         // Risk semantics are a separate scale from the accent, so the brand
         // colour never reads as danger. Always paired with a text label.
         risk: {

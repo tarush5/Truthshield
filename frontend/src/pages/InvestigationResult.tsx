@@ -307,9 +307,9 @@ function LlmInterpretation({ explanation }: { explanation: Result['explanation']
       ? [...meta.citations.signals, ...meta.citations.sources.map((n) => `[${n}]`)].join(', ')
       : '';
     return (
-      <Card className="border-[#4E85BF]/30 p-6">
+      <Card className="border-accent/30 p-6">
         <div className="flex flex-wrap items-center gap-2">
-          <Sparkles className="h-4 w-4 text-[#89AACC]" aria-hidden />
+          <Sparkles className="h-4 w-4 text-accent" aria-hidden />
           <p className="text-[11px] uppercase tracking-[0.25em] text-muted">LLM interpretation</p>
           <Badge tone="warn" title="Written by a language model from the findings. It decided nothing above.">
             Interpretation, not evidence

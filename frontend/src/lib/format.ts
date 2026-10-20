@@ -5,10 +5,10 @@ export function cn(...parts: (string | false | null | undefined)[]) {
 }
 
 export const RISK_STYLE: Record<RiskLevel, { text: string; bg: string; ring: string; hex: string; label: string }> = {
-  LOW: { text: 'text-risk-low', bg: 'bg-risk-low', ring: 'ring-risk-low/40', hex: '#7fb59a', label: 'Low' },
-  MEDIUM: { text: 'text-risk-medium', bg: 'bg-risk-medium', ring: 'ring-risk-medium/40', hex: '#d9b45a', label: 'Medium' },
-  HIGH: { text: 'text-risk-high', bg: 'bg-risk-high', ring: 'ring-risk-high/40', hex: '#d9824e', label: 'High' },
-  CRITICAL: { text: 'text-risk-critical', bg: 'bg-risk-critical', ring: 'ring-risk-critical/40', hex: '#b8474f', label: 'Critical' },
+  LOW: { text: 'text-risk-low', bg: 'bg-risk-low', ring: 'ring-risk-low/40', hex: '#2c7230', label: 'Low' },
+  MEDIUM: { text: 'text-risk-medium', bg: 'bg-risk-medium', ring: 'ring-risk-medium/40', hex: '#9a5c00', label: 'Medium' },
+  HIGH: { text: 'text-risk-high', bg: 'bg-risk-high', ring: 'ring-risk-high/40', hex: '#c2410c', label: 'High' },
+  CRITICAL: { text: 'text-risk-critical', bg: 'bg-risk-critical', ring: 'ring-risk-critical/40', hex: '#b3261e', label: 'Critical' },
 };
 
 export const PROVENANCE_LABEL: Record<Provenance, { label: string; hint: string }> = {

@@ -48,7 +48,7 @@ export default function Dashboard() {
     <>
       <PageHeader
         eyebrow="Dashboard"
-        title={<>Trust <span className="font-display italic">overview</span></>}
+        title={<>Trust <span className="font-display">overview</span></>}
         description={data?.scope === 'all' ? 'All investigations on this deployment (administrator view).' : 'Your investigations. Every figure is computed from stored results.'}
         actions={<>{windowPicker}<ButtonLink to="/app/investigate" size="sm">New investigation</ButtonLink></>}
       />
@@ -82,7 +82,7 @@ export default function Dashboard() {
                   formatX={(d) => d.slice(5)}
                   label={`Investigations per day, last ${days} days`}
                   series={[
-                    { key: 'total', label: 'All', color: '#89AACC', fill: true },
+                    { key: 'total', label: 'All', color: '#E8562F', fill: true },
                     { key: 'high_or_critical', label: 'High / critical', color: RISK_STYLE.CRITICAL.hex },
                   ]}
                 />

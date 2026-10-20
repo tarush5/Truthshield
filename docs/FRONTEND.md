@@ -1,32 +1,60 @@
 # Frontend
 
 `frontend/`: React 19 · TypeScript · Vite · Tailwind CSS 3 · Motion
-(Framer Motion) · GSAP · hls.js · React Query · Zustand · react-router 7.
+(Framer Motion) · React Query · Zustand · react-router 7. No GSAP and no
+video player: since the October 2026 redesign every effect is native CSS,
+Motion, or a few lines of scroll handling.
 
 The 1.x JSX app was retired in the 2.0 fresh start; 1.x report and share links
 are rendered by the read-only `LegacyReport` page (see [MIGRATION](MIGRATION.md)).
 
 ## Design system
 
-A single dark theme. There is no light-mode toggle.
+A warm light theme: cream paper, near-black ink, and a saturated palette used
+for whole surfaces (the landing hero, the pinned section, engine cards) rather
+than as accents. Inspired by the layout and interaction patterns of
+playful product sites; the content, cases and copy are TruthShield's own.
 
-| Token | HSL | Use |
+| Token | Value | Use |
 |---|---|---|
-| `--bg` | `0 0% 4%` | page |
-| `--surface` | `0 0% 8%` | cards, nav pill |
-| `--text` | `0 0% 96%` | primary text |
-| `--muted` | `0 0% 53%` | secondary text |
-| `--stroke` | `0 0% 12%` | borders, dividers |
-| `--accent` | `0 0% 96%` | |
+| `--bg` | `#FBF5EA` cream | page |
+| `--surface` | `#FFFDF8` paper | cards, panels |
+| `--text` | `#1D1A16` ink | primary text, solid buttons |
+| `--muted` | `hsl(33 10% 38%)` | secondary text (5.6:1 on cream) |
+| `--stroke` | `hsl(38 33% 84%)` | borders, dividers |
+| `--accent` | `#E8562F` orange | focus rings, active states |
+| palette | orange `#E8562F` · amber `#F7A41D` · green `#5DB35A` · pink `#F07C8E` · blue `#4F5FC4` · yellow `#F4D23C` | `bg-brand-*`; landing surfaces |
 
-- **Accent gradient** `linear-gradient(90deg, #89AACC, #4E85BF)` (`.accent-gradient`) is used for the logo ring, hover rings, progress bars and focus.
-- **Risk semantics** use a separate scale, so the accent never signals danger: LOW `#7FB59A`, MEDIUM `#D9B45A`, HIGH `#D9824E`, CRITICAL `#B8474F` (wine red). A risk colour always appears with its text label.
-- **Type**: Inter (300–700) for UI; Instrument Serif italic for display moments.
-- **Motion**: `scroll-down`, `role-fade-in`, `gradient-shift` keyframes. Everything respects `prefers-reduced-motion`.
+- **Type:** Bricolage Grotesque throughout (400–800, loaded asynchronously).
+  `.font-display` is weight 800 with tight tracking and is never italic;
+  large headings are lowercase on the landing page.
+- **Shapes:** pill buttons (solid ink, outlined ink, paper), 24–32 px card
+  radii, pill chips with a 2 px border.
+- **Risk semantics** keep their own scale, readable on cream (each ≥ 4.5:1):
+  LOW `#2C7230`, MEDIUM `#9A5C00`, HIGH `#C2410C`, CRITICAL `#B3261E`, always
+  with a text label.
+- **Motion:** spring transitions for cards, colour cross-fades for surfaces;
+  everything respects `prefers-reduced-motion`.
 
-Tokens are defined as bare HSL triplets and consumed as
-`hsl(var(--token) / <alpha-value>)`, so Tailwind opacity modifiers
-(`bg-stroke/50`) work.
+## Landing page
+
+| Section | File | What it does |
+|---|---|---|
+| Navbar | `Navbar.tsx` | Cream pill, centred wordmark, section links, ink "Sign in / Open the app" |
+| Hero | `Hero.tsx` | Carousel of six example investigations; the whole hero takes each case's colour; cards fan out; arrows, dots, keyboard, autoplay (paused on hover/focus) |
+| What it catches | `Catches.tsx` | Pinned (sticky) section, one screen per case: giant lowercase title, chips, message card with evidence highlighted, risk breakdown, dot navigation, scroll progress |
+| Why TruthShield | `Why.tsx` | Split panel: four design facts (12 stages, 0 LLM verdicts, 99 max, 100% of points explained) with "instead of" chips and tabbed controls |
+| Big type | `BigType.tsx` | "just evidence & sources." on ink |
+| Engines | `Engines.tsx` | Coloured cards for every capability with its real availability |
+| FAQ | `Faq.tsx` | Native `<details>` accordion; answers match the docs |
+| Call to action | `CtaBand.tsx` | Paste text, a URL or an email; it opens Investigate prefilled (handed over in session storage, never the URL) |
+| Footer | `Footer.tsx` | Live system status from `/system/health`, links, giant wordmark |
+
+**The example cases are generated, not typed.** `cases.json` comes from
+`scripts/landing_cases.py`, which runs the synthetic demo samples offline
+through the real engines; `tests/test_v2_landing_cases.py` fails if the
+file drifts from what the engines produce. Only the one-line blurbs are
+hand-written.
 
 ## Structure
 
@@ -40,8 +68,8 @@ src/
   hooks/                       React Query hooks
   types/                       API types mirroring docs/API.md
   components/
-    landing/                   LoadingScreen, Navbar, Hero, HlsVideo, Pipeline,
-                               Capabilities, Principles, Explainability, Stats, Contact
+    landing/                   Navbar, Hero, Catches, Why, BigType, Engines, Faq,
+                               CtaBand, Footer, CaseCards; cases.json (generated)
     shell/                     AppShell, Sidebar, Topbar
     investigation/             RiskScoreCard, ConfidenceBadge, RiskBreakdown, SignalCard,
                                ProcessingStatus, InvestigationTimeline, AgentActivityPanel,
@@ -84,7 +112,7 @@ Measured with `npm run build` (gzipped):
 |---|---|---|
 | Initial payload (React, entry, data, CSS) | ~149 kB | ~124 kB (CI budget 140 kB) |
 | Dashboard route | 110.7 kB | 4.9 kB |
-| Footer video (hls.js + stream) | on page load | only when scrolled within a screen of it |
+| Landing route, hero chunk + below-the-fold chunk | 56 kB + hls.js 114 kB | 5 kB + 7 kB, no video |
 
 - **Motion** uses `LazyMotion` + `m.*` components; the animation engine
   (`lib/motion-features.ts`, ~15 kB) loads asynchronously after first paint.
@@ -92,16 +120,16 @@ Measured with `npm run build` (gzipped):
 - **Charts** are hand-written SVG (`components/charts.tsx`) instead of
   Recharts, which brought D3, Redux Toolkit and Immer for two charts. Each
   chart renders its data as a visually hidden table for screen readers.
-- **Video**: `HlsVideo` fetches nothing until the element is within one
-  viewport height, and pauses when off-screen or when the tab is hidden.
-- **Images**: Unsplash `srcset`/`sizes` per card width; 80 px thumbnails
-  ask for 80/160 px images rather than 300 px.
-- **Marquee** is a CSS transform animation (compositor only), not a GSAP tween.
-- **Fonts**: only the Inter weights used (400/500/600) are requested.
-- The landing intro plays once per tab session, including across reloads.
-- **Landing split:** the hero, navbar and loader are one chunk (33 kB gz); every
-  section below the fold and GSAP's ScrollTrigger are another (`BelowFold.tsx`),
-  requested in parallel as soon as the landing module runs.
+- **No media on the landing page:** the cases are drawn in HTML and CSS, so
+  there are no photos or video streams to download.
+- **Fonts:** one variable family (Bricolage Grotesque), loaded asynchronously.
+- **Pinned section:** CSS `position: sticky` plus one passive scroll listener
+  (at most one update per animation frame); no scroll library.
+- **Landing split:** the hero and navbar are one chunk (5 kB gz since the
+  redesign; 33 kB before, 56 kB before that); every section below the fold is
+  another (`BelowFold.tsx`, 7 kB gz), requested in parallel as soon as the
+  landing module runs. GSAP (~45 kB gz) and hls.js (114 kB gz) are no longer
+  dependencies.
 - **First paint:** `index.html` paints a dark boot mark before any script, and
   loads Google Fonts asynchronously (`display=swap`).
 - **Idle prefetch:** sign-in for visitors; shell, dashboard and investigate page

@@ -6,16 +6,16 @@ import { Link, type LinkProps } from 'react-router-dom';
 import { cn } from '@/lib/format';
 
 /* ── Buttons ──────────────────────────────────────────────────
-   The portfolio pattern: a gradient ring sits behind the button at -2px
-   and fades in on hover, so the border animates without layout shift. */
+   Pills: solid ink, outlined ink, or paper. Hover is a lift and a shade,
+   never a layout change. */
 
 type Variant = 'solid' | 'outline' | 'pill';
 type Size = 'sm' | 'md';
 
 const inner: Record<Variant, string> = {
-  solid: 'bg-text-primary text-bg group-hover:bg-bg group-hover:text-text-primary',
-  outline: 'border-2 border-stroke bg-bg text-text-primary group-hover:border-transparent',
-  pill: 'bg-surface text-text-primary',
+  solid: 'bg-text-primary text-bg group-hover:bg-text-primary/85',
+  outline: 'border-2 border-text-primary bg-transparent text-text-primary group-hover:bg-text-primary group-hover:text-bg',
+  pill: 'border border-stroke bg-surface text-text-primary group-hover:border-text-primary/40',
 };
 
 const sizes: Record<Size, string> = {
@@ -25,16 +25,13 @@ const sizes: Record<Size, string> = {
 
 function RingContent({ variant, size, children, className }: { variant: Variant; size: Size; children: ReactNode; className?: string }) {
   return (
-    <>
-      <span aria-hidden className="accent-gradient absolute -inset-[2px] rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100" />
-      <span className={cn('relative inline-flex items-center gap-2 rounded-full font-medium transition-colors duration-300', inner[variant], sizes[size], className)}>
-        {children}
-      </span>
-    </>
+    <span className={cn('relative inline-flex items-center gap-2 rounded-full font-semibold transition-colors duration-300 group-focus-visible:ring-2 group-focus-visible:ring-accent group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-bg', inner[variant], sizes[size], className)}>
+      {children}
+    </span>
   );
 }
 
-const outer = 'group relative inline-flex rounded-full transition-transform duration-300 hover:scale-105 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none';
+const outer = 'group relative inline-flex rounded-full transition-transform duration-300 hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -84,7 +81,9 @@ export function IconButton({ className, children, ...rest }: ButtonHTMLAttribute
 /* ── Surfaces ─────────────────────────────────────────────── */
 
 export function Card({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('rounded-3xl border border-stroke bg-surface/60', className)} {...rest} />;
+  // min-w-0: as a grid or flex item a card must be allowed to shrink, or a
+  // truncated line inside it (a long excerpt) sets its minimum width.
+  return <div className={cn('min-w-0 rounded-3xl border border-stroke bg-surface', className)} {...rest} />;
 }
 
 export function CardHeader({ title, eyebrow, action, className }: { title: ReactNode; eyebrow?: string; action?: ReactNode; className?: string }) {
@@ -92,7 +91,7 @@ export function CardHeader({ title, eyebrow, action, className }: { title: React
     <div className={cn('flex items-start justify-between gap-4 px-5 pt-5 sm:px-6 sm:pt-6', className)}>
       <div className="min-w-0">
         {eyebrow && <p className="mb-1 text-[11px] uppercase tracking-[0.25em] text-muted">{eyebrow}</p>}
-        <h2 className="text-base font-medium text-text-primary">{title}</h2>
+        <h2 className="text-lg font-bold tracking-tight text-text-primary">{title}</h2>
       </div>
       {action}
     </div>
@@ -111,10 +110,10 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
 export function Badge({ children, className, tone = 'neutral', title }: { children: ReactNode; className?: string; tone?: 'neutral' | 'accent' | 'good' | 'warn' | 'bad'; title?: string }) {
   const tones = {
     neutral: 'border-stroke bg-stroke/40 text-muted',
-    accent: 'border-[#4E85BF]/40 bg-[#4E85BF]/10 text-[#9fbcdb]',
+    accent: 'border-accent/40 bg-accent/10 text-risk-high',
     good: 'border-risk-low/40 bg-risk-low/10 text-risk-low',
     warn: 'border-risk-medium/40 bg-risk-medium/10 text-risk-medium',
-    bad: 'border-risk-critical/50 bg-risk-critical/10 text-[#e08a90]',
+    bad: 'border-risk-critical/50 bg-risk-critical/10 text-risk-critical',
   } as const;
   return (
     <span title={title} className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-medium', tones[tone], className)}>
@@ -135,7 +134,7 @@ export function EmptyState({ title, body, action, icon }: { title: string; body?
   return (
     <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-stroke px-6 py-14 text-center">
       {icon && <div className="mb-4 text-muted">{icon}</div>}
-      <p className="font-display text-2xl italic text-text-primary">{title}</p>
+      <p className="font-display text-2xl text-text-primary">{title}</p>
       {body && <div className="mt-2 max-w-md text-sm text-muted">{body}</div>}
       {action && <div className="mt-6">{action}</div>}
     </div>
@@ -146,7 +145,7 @@ export function ErrorNotice({ error, className }: { error: unknown; className?: 
   const message = error instanceof Error ? error.message : 'Something went wrong.';
   const requestId = (error as { requestId?: string | null })?.requestId;
   return (
-    <div role="alert" className={cn('rounded-2xl border border-risk-critical/40 bg-risk-critical/10 px-4 py-3 text-sm text-[#e8a2a7]', className)}>
+    <div role="alert" className={cn('rounded-2xl border border-risk-critical/40 bg-risk-critical/10 px-4 py-3 text-sm text-risk-critical', className)}>
       {message}
       {requestId && <span className="mt-1 block font-mono text-[11px] text-muted">Request ID {requestId}</span>}
     </div>
@@ -155,7 +154,7 @@ export function ErrorNotice({ error, className }: { error: unknown; className?: 
 
 /* ── Form fields ──────────────────────────────────────────── */
 
-const field = 'w-full rounded-2xl border border-stroke bg-bg px-4 py-3 text-sm text-text-primary placeholder:text-muted/70 transition-colors focus:border-[#4E85BF]/60 focus:outline-none focus:ring-2 focus:ring-[#4E85BF]/25';
+const field = 'w-full rounded-2xl border border-stroke bg-bg px-4 py-3 text-sm text-text-primary placeholder:text-muted/70 transition-colors focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/25';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
   return <input ref={ref} className={cn(field, className)} {...rest} />;
@@ -197,11 +196,11 @@ export function Tabs<T extends string>({ tabs, value, onChange, label }: { tabs:
             onClick={() => onChange(tab.id)}
             className={cn(
               'whitespace-nowrap rounded-full px-4 py-2 text-sm transition-colors',
-              active ? 'bg-stroke/70 text-text-primary' : 'text-muted hover:bg-stroke/40 hover:text-text-primary',
+              active ? 'bg-text-primary text-bg' : 'text-muted hover:bg-stroke/60 hover:text-text-primary',
             )}
           >
             {tab.label}
-            {tab.count !== undefined && <span className="ml-1.5 text-xs text-muted tabular">{tab.count}</span>}
+            {tab.count !== undefined && <span className={cn('ml-1.5 text-xs tabular', active ? 'text-bg/70' : 'text-muted')}>{tab.count}</span>}
           </button>
         );
       })}
@@ -214,7 +213,7 @@ export function PageHeader({ eyebrow, title, description, actions }: { eyebrow: 
     <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
         <Eyebrow className="mb-4">{eyebrow}</Eyebrow>
-        <h1 className="text-3xl font-medium tracking-tight text-text-primary sm:text-4xl">{title}</h1>
+        <h1 className="font-display text-4xl leading-[0.95] text-text-primary sm:text-5xl">{title}</h1>
         {description && <p className="mt-3 max-w-2xl text-sm text-muted sm:text-base">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap gap-3">{actions}</div>}

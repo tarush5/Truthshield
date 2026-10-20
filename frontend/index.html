@@ -1,38 +1,35 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="theme-color" content="#FBF5EA" />
     <meta name="description" content="TruthShield — multimodal AI intelligence for detecting fraud, misinformation, manipulated media and suspicious digital content." />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="light" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="TruthShield" />
     <meta property="og:title" content="TruthShield — Verify before you trust" />
     <meta property="og:description" content="Evidence-backed, explainable investigations of suspicious messages, links, documents and images." />
     <meta name="twitter:card" content="summary" />
     <link rel="icon" type="image/svg+xml" href="/shield.svg" />
-    <!-- Landing imagery and the hero stream; connecting early saves a round trip each. -->
-    <link rel="preconnect" href="https://images.unsplash.com" />
-    <link rel="dns-prefetch" href="https://stream.mux.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Fonts load without blocking the first paint: text shows in the
          fallback face at once and swaps when the web fonts arrive. -->
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" /></noscript>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap" /></noscript>
     <title>TruthShield — Verify before you trust</title>
     <!-- Painted before any script or stylesheet arrives, so the first frame
-         is the app's own dark background rather than a white flash. React
-         replaces the boot mark when it renders. -->
+         is already the app's cream and ink. React replaces the boot mark when
+         it renders. -->
     <style>
-      html, body { margin: 0; background: hsl(0 0% 4%); color: hsl(0 0% 96%); }
+      html, body { margin: 0; background: #FBF5EA; color: #1D1A16; }
       .boot { position: fixed; inset: 0; display: grid; place-items: center; }
-      .boot span { font: 500 11px/1 system-ui, sans-serif; letter-spacing: .3em; text-transform: uppercase; color: hsl(0 0% 53%); }
+      .boot span { font: 800 28px/1 system-ui, sans-serif; letter-spacing: -.04em; color: #1D1A16; }
     </style>
   </head>
   <body class="bg-bg text-text-primary font-body antialiased">
-    <div id="root"><div class="boot" aria-hidden="true"><span>TruthShield</span></div></div>
+    <div id="root"><div class="boot" aria-hidden="true"><span>truthshield</span></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

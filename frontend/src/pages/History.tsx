@@ -51,7 +51,7 @@ export default function History() {
     <>
       <PageHeader
         eyebrow="Investigation history"
-        title={<>Every <span className="font-display italic">case</span></>}
+        title={<>Every <span className="font-display">case</span></>}
         description="Search by investigation ID, a phrase from the (masked) excerpt, a classification or an input SHA-256."
         actions={<ButtonLink to="/app/investigate" size="sm">New investigation</ButtonLink>}
       />

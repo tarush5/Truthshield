@@ -45,7 +45,7 @@ export default function LegacyReport({ shared = false }: { shared?: boolean }) {
           <Badge tone="accent">TruthShield 1.x fact-check</Badge>
           <Badge>{humanize(data.confidence_band)} confidence</Badge>
         </div>
-        <p className="mt-4 font-display text-4xl italic text-text-primary">{humanize(data.verdict)}</p>
+        <p className="mt-4 font-display text-4xl text-text-primary">{humanize(data.verdict)}</p>
         <p className="mt-1 text-sm text-muted">Trust score {data.trust_score}/100</p>
         <p className="mt-4 text-sm leading-relaxed text-text-primary/85">{data.summary}</p>
         {data.original_text && <blockquote className="mt-4 border-l-2 border-stroke pl-4 text-sm text-muted">{data.original_text}</blockquote>}

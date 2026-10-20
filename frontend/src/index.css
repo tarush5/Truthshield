@@ -3,28 +3,38 @@
 @tailwind utilities;
 
 /* ── Tokens ────────────────────────────────────────────────────
-   Forced dark theme. Bare HSL triplets: Tailwind wraps them in hsl()
-   with an alpha channel. */
+   Warm light theme: cream paper, near-black ink, and a saturated palette
+   used for whole surfaces rather than accents. Bare HSL triplets: Tailwind
+   wraps them in hsl() with an alpha channel. */
 :root {
-  --bg: 0 0% 4%;
-  --surface: 0 0% 8%;
-  --text: 0 0% 96%;
-  --muted: 0 0% 53%;
-  --stroke: 0 0% 12%;
-  --accent: 0 0% 96%;
+  --bg: 39 68% 95%;          /* cream  #FBF5EA */
+  --surface: 43 100% 99%;    /* paper  #FFFDF8 */
+  --text: 34 14% 10%;        /* ink    #1D1A16 */
+  --muted: 33 10% 38%;       /* 5.6:1 on cream */
+  --stroke: 38 33% 84%;
+  --accent: 13 80% 55%;      /* orange #E8562F */
 
-  --risk-low: 150 24% 60%;
-  --risk-medium: 42 62% 60%;
-  --risk-high: 22 64% 58%;
-  --risk-critical: 355 44% 50%;
+  /* Readable on cream (each >= 4.5:1), always paired with a text label. */
+  --risk-low: 123 46% 30%;
+  --risk-medium: 33 100% 30%;
+  --risk-high: 17 87% 40%;
+  --risk-critical: 4 71% 40%;
 
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-display: 'Instrument Serif', Georgia, serif;
+  /* Surface palette (landing sections, module cards). */
+  --c-orange: 13 80% 55%;
+  --c-amber: 37 93% 54%;
+  --c-green: 117 37% 53%;
+  --c-pink: 351 80% 71%;
+  --c-blue: 232 49% 54%;
+  --c-yellow: 49 89% 60%;
 
-  --accent-from: #89aacc;
-  --accent-to: #4e85bf;
+  --font-body: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
 
-  color-scheme: dark;
+  --accent-from: #e8562f;
+  --accent-to: #f7a41d;
+
+  color-scheme: light;
 }
 
 @layer base {
@@ -38,7 +48,13 @@
   }
 
   ::selection {
-    background: rgba(137, 170, 204, 0.35);
+    background: rgba(232, 86, 47, 0.25);
+  }
+
+  /* Display type: heavy and tight, never italic. */
+  .font-display {
+    font-weight: 800;
+    letter-spacing: -0.035em;
   }
 
   :focus-visible {
@@ -76,7 +92,7 @@
   }
 
   .glass {
-    @apply border border-white/10 bg-surface/70 backdrop-blur-md;
+    @apply border border-stroke bg-surface;
   }
 
   .scrollbar-none {

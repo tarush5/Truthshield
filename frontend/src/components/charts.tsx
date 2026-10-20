@@ -9,8 +9,8 @@
 import { useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 
 const M = { top: 10, right: 8, bottom: 22, left: 30 };
-const GRID = 'hsl(0 0% 12%)';
-const AXIS = 'hsl(0 0% 40%)';
+const GRID = 'hsl(var(--stroke))';
+const AXIS = 'hsl(var(--muted))';
 
 function useSize<T extends HTMLElement>() {
   const ref = useRef<T>(null);
@@ -81,7 +81,7 @@ function Tooltip({ x, y, width, children }: { x: number; y: number; width: numbe
   const flip = x > width / 2;
   return (
     <div
-      className="pointer-events-none absolute z-10 whitespace-nowrap rounded-xl border border-stroke bg-[hsl(0_0%_8%)] px-3 py-2 text-xs shadow-lg"
+      className="pointer-events-none absolute z-10 whitespace-nowrap rounded-xl border border-stroke bg-surface px-3 py-2 text-xs shadow-lg"
       style={{ left: x, top: y, transform: `translate(${flip ? 'calc(-100% - 12px)' : '12px'}, -50%)` }}
     >
       {children}
@@ -144,8 +144,8 @@ export function AreaChart<T extends Record<string, number | string>>({
         <svg width={width} height={height} aria-hidden onPointerMove={onMove} onPointerLeave={() => setHover(null)} className="touch-pan-y">
           <defs>
             <linearGradient id="area-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#89AACC" stopOpacity={0.45} />
-              <stop offset="100%" stopColor="#4E85BF" stopOpacity={0} />
+              <stop offset="0%" stopColor="var(--accent-from)" stopOpacity={0.45} />
+              <stop offset="100%" stopColor="var(--accent-to)" stopOpacity={0} />
             </linearGradient>
           </defs>
           <YGrid ticks={ticks} y={y} width={width} />
@@ -172,7 +172,7 @@ export function AreaChart<T extends Record<string, number | string>>({
             <g>
               <line x1={x(hover)} x2={x(hover)} y1={M.top} y2={M.top + innerH} stroke={AXIS} strokeDasharray="3 3" />
               {series.map((s) => (
-                <circle key={s.key} cx={x(hover)} cy={y(Number(data[hover][s.key]) || 0)} r={3.5} fill={s.color} stroke="hsl(0 0% 4%)" strokeWidth={1.5} />
+                <circle key={s.key} cx={x(hover)} cy={y(Number(data[hover][s.key]) || 0)} r={3.5} fill={s.color} stroke="hsl(var(--surface))" strokeWidth={1.5} />
               ))}
             </g>
           )}
@@ -180,7 +180,7 @@ export function AreaChart<T extends Record<string, number | string>>({
       )}
       {hover !== null && data[hover] && (
         <Tooltip x={x(hover)} y={M.top + innerH / 2} width={width}>
-          <p className="mb-1 text-[#aaa]">{String(data[hover][xKey])}</p>
+          <p className="mb-1 text-muted">{String(data[hover][xKey])}</p>
           {series.map((s) => (
             <p key={s.key} style={{ color: s.color }}>
               {s.label}: {String(data[hover][s.key])}
@@ -233,7 +233,7 @@ export function BarChart({ data, label }: { data: { label: string; value: number
             const r = Math.min(8, barW / 2, h);
             return (
               <g key={d.label} onPointerEnter={() => setHover(i)}>
-                <rect x={M.left + band * i} y={M.top} width={band} height={innerH} fill={hover === i ? 'hsl(0 0% 12% / 0.5)' : 'transparent'} />
+                <rect x={M.left + band * i} y={M.top} width={band} height={innerH} fill={hover === i ? 'hsl(var(--stroke) / 0.5)' : 'transparent'} />
                 {h > 0 && (
                   <path
                     d={`M${bx},${by + h}V${by + r}Q${bx},${by} ${bx + r},${by}H${bx + barW - r}Q${bx + barW},${by} ${bx + barW},${by + r}V${by + h}Z`}
@@ -250,7 +250,7 @@ export function BarChart({ data, label }: { data: { label: string; value: number
       )}
       {hover !== null && data[hover] && (
         <Tooltip x={M.left + band * hover + band / 2} y={y(data[hover].value) - 8} width={width}>
-          <p className="text-[#aaa]">{data[hover].label}</p>
+          <p className="text-muted">{data[hover].label}</p>
           <p style={{ color: data[hover].color }}>count: {data[hover].value}</p>
         </Tooltip>
       )}

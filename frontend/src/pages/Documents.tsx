@@ -18,7 +18,7 @@ export default function Documents() {
     <>
       <PageHeader
         eyebrow="Document forensics"
-        title={<>Is this document <span className="font-display italic">what it says</span>?</>}
+        title={<>Is this document <span className="font-display">what it says</span>?</>}
         description="Upload an invoice, statement, certificate or a screenshot. Findings are potential manipulation indicators — reasons to confirm with the issuer, never a verdict of forgery."
       />
       <div className="grid gap-6 xl:grid-cols-3">

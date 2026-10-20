@@ -81,7 +81,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <Link to="/" className="flex items-center gap-3 px-5 pb-6 pt-6" onClick={onNavigate}>
         <Logo size="sm" />
         <span className="text-[15px] font-medium tracking-tight text-text-primary">
-          TruthShield <span className="font-display italic text-muted">2.0</span>
+          TruthShield <span className="font-display text-muted">2.0</span>
         </span>
       </Link>
 
@@ -173,7 +173,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <AnimatePresence>
         {open && (
           <>
-            <m.div className="fixed inset-0 z-40 bg-black/70 lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpen(false)} />
+            <m.div className="fixed inset-0 z-40 bg-text-primary/40 lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpen(false)} />
             <m.aside
               className="fixed inset-y-0 left-0 z-50 w-72 border-r border-stroke bg-bg lg:hidden"
               initial={{ x: -300 }}

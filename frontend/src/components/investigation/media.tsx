@@ -134,7 +134,7 @@ export function ImagePanel({ inv, image }: { inv: InvestigationDetail; image: Im
                       key={i}
                       x={w.bbox[0]} y={w.bbox[1]} width={w.bbox[2]} height={w.bbox[3]}
                       fill="none"
-                      stroke={w.confidence >= 80 ? '#7fb59a' : w.confidence >= 50 ? '#d9b45a' : '#b8474f'}
+                      stroke={w.confidence >= 80 ? '#2c7230' : w.confidence >= 50 ? '#9a5c00' : '#b3261e'}
                       strokeWidth={Math.max(1, image.width / 500)}
                     />
                   ))}

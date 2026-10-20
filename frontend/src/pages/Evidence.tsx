@@ -241,7 +241,7 @@ export default function Evidence() {
     <>
       <PageHeader
         eyebrow="Evidence"
-        title={<>The evidence <span className="font-display italic">store</span></>}
+        title={<>The evidence <span className="font-display">store</span></>}
         description="Every passage an investigation cites lives here with its publisher, retrieval time and the scores that ranked it. Search it, inspect the sources, and — as an analyst — add trusted documents."
       />
       <div className="space-y-6">

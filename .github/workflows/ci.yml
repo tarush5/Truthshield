@@ -121,8 +121,8 @@ jobs:
         # 2.0 budget: React 19 + router 7 (~80 kB), the app entry with the
         # lightweight Motion components (~24 kB; the animation engine loads
         # async), React Query + Zustand (~14 kB) and CSS (~8 kB): ~126 kB today.
-        # Heavy, page-specific code -- GSAP, hls.js -- is split per route and
-        # deliberately excluded from the initial payload.
+        # Page-specific code is split per route and deliberately excluded
+        # from the initial payload.
         run: |
           BYTES=$(gzip -c dist/assets/react-*.js dist/assets/index-*.js dist/assets/data-*.js dist/assets/index-*.css | wc -c)
           echo "initial payload: $BYTES bytes gzipped"

@@ -21,11 +21,24 @@ const TYPES: { id: Mode; label: string; icon: typeof Globe; placeholder: string;
 
 const MAX_CHARS = 20_000;
 
+/** Text pasted on the landing page, handed over once through session storage. */
+function takeDraft(): { type?: Mode; content?: string } {
+  try {
+    const raw = sessionStorage.getItem('ts.draft');
+    if (!raw) return {};
+    sessionStorage.removeItem('ts.draft');
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
 export default function Investigate() {
   const [params] = useSearchParams();
-  const initial = (params.get('type') as Mode) || 'message';
+  const [draft] = useState(takeDraft);
+  const initial = draft.type || (params.get('type') as Mode) || 'message';
   const [type, setType] = useState<Mode>(TYPES.some((t) => t.id === initial) ? initial : 'message');
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState(draft.content ?? '');
   const create = useCreateInvestigation();
   const demos = useDemos();
   const navigate = useNavigate();
@@ -49,7 +62,7 @@ export default function Investigate() {
     <>
       <PageHeader
         eyebrow="Investigate"
-        title={<>What looks <span className="font-display italic">suspicious</span>?</>}
+        title={<>What looks <span className="font-display">suspicious</span>?</>}
         description="Submit content and TruthShield runs it through the full pipeline: extraction, detectors, evidence, risk and explanation. Your original input is stored unmodified and hashed; lists and exports use a masked copy."
       />
 

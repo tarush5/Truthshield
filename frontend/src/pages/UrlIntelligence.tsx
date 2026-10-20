@@ -28,7 +28,7 @@ export default function UrlIntelligence() {
     <>
       <PageHeader
         eyebrow="URL intelligence"
-        title={<>Where does it <span className="font-display italic">really</span> go?</>}
+        title={<>Where does it <span className="font-display">really</span> go?</>}
         description="Paste a link. It is analysed server-side and never opened in your browser."
       />
       <Card className="mb-6 p-5 sm:p-6">

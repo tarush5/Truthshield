@@ -11,7 +11,6 @@ export interface Capability {
   id: string;
   title: string;
   route: string;
-  image: string;
   availability: Availability;
   phase: number;
   summary: string;
@@ -19,18 +18,11 @@ export interface Capability {
   planned: string[];
 }
 
-const img = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=1200&q=70`;
-
-/** A `srcset` for an Unsplash URL, so phones are not sent desktop-sized images. */
-export const unsplashSrcSet = (src: string, widths: number[]) =>
-  widths.map((w) => `${src.replace(/([?&])w=\d+/, `$1w=${w}`)} ${w}w`).join(', ');
-
 export const CAPABILITIES: Capability[] = [
   {
     id: 'multimodal',
     title: 'Multimodal Intelligence',
     route: '/app/investigate',
-    image: img('1618005182384-a83a8bd57fbe'),
     availability: 'partial',
     phase: 3,
     summary: 'One investigation pipeline for every kind of input, with engines that declare what they handle.',
@@ -42,7 +34,6 @@ export const CAPABILITIES: Capability[] = [
     id: 'fraud',
     title: 'Fraud Detection',
     route: '/app/m/fraud',
-    image: img('1563986768609-322da13575f3'),
     availability: 'partial',
     phase: 4,
     summary: 'Scam categories, social-engineering tactics and impersonation — including Hinglish.',
@@ -53,7 +44,6 @@ export const CAPABILITIES: Capability[] = [
     id: 'misinformation',
     title: 'Misinformation Analysis',
     route: '/app/m/misinformation',
-    image: img('1504711434969-e33886168f5c'),
     availability: 'partial',
     phase: 2,
     summary: 'Claims extracted and checked against retrieved sources — with INSUFFICIENT_EVIDENCE as a real answer.',
@@ -66,7 +56,6 @@ export const CAPABILITIES: Capability[] = [
     id: 'deepfake',
     title: 'Deepfake Detection',
     route: '/app/m/deepfake',
-    image: img('1500648767791-00dcc994a43e'),
     availability: 'planned',
     phase: 3,
     summary: 'Synthetic-media signals for faces, voices and video — reported as signals with a model version, never as proof.',
@@ -77,7 +66,6 @@ export const CAPABILITIES: Capability[] = [
     id: 'documents',
     title: 'Document Forensics',
     route: '/app/documents',
-    image: img('1455390582262-044cdead277a'),
     availability: 'partial',
     phase: 3,
     summary: 'Invoices, statements and certificates checked for numerical and metadata inconsistencies.',
@@ -90,7 +78,6 @@ export const CAPABILITIES: Capability[] = [
     id: 'url',
     title: 'URL Intelligence',
     route: '/app/url-intelligence',
-    image: img('1558494949-ef010cbdcc31'),
     availability: 'live',
     phase: 1,
     summary: 'Lookalike domains, structural phishing signals, a model-ready feature vector and sandboxed page inspection.',
@@ -101,7 +88,6 @@ export const CAPABILITIES: Capability[] = [
     id: 'rag',
     title: 'Evidence-Based RAG',
     route: '/app/evidence',
-    image: img('1507842217343-583bb7270b66'),
     availability: 'live',
     phase: 2,
     summary: 'Every factual statement traceable to a retrieved passage, with publisher, stance and retrieval time.',
@@ -114,7 +100,6 @@ export const CAPABILITIES: Capability[] = [
     id: 'xai',
     title: 'Explainable AI',
     route: '/app/investigate',
-    image: img('1620712943543-bcc4688e7485'),
     availability: 'live',
     phase: 1,
     summary: 'A score you can take apart: every point attributed to a signal, with provenance and uncertainty.',
@@ -125,7 +110,6 @@ export const CAPABILITIES: Capability[] = [
     id: 'security',
     title: 'Enterprise Security',
     route: '/app/m/security',
-    image: img('1550751827-4bd374c3f58b'),
     availability: 'partial',
     phase: 7,
     summary: 'Built like it will be attacked: RBAC, rotating sessions, SSRF guards and audit trails.',
@@ -154,31 +138,31 @@ export const AVAILABILITY_LABEL: Record<Availability, string> = {
 /** Sidebar modules that are not landing-page capabilities. */
 export const EXTRA_MODULES: Capability[] = [
   {
-    id: 'threat-intel', title: 'Threat Intelligence', route: '/app/m/threat-intel', image: '', availability: 'planned', phase: 5,
+    id: 'threat-intel', title: 'Threat Intelligence', route: '/app/m/threat-intel', availability: 'planned', phase: 5,
     summary: 'Suspicious domains, URLs and indicators aggregated across investigations and external feeds.',
     today: ['Every investigated URL is stored with its feature vector and signals, ready to aggregate'],
     planned: ['Indicator views with search, filter and sort (Phase 5)', 'External threat-intelligence feeds behind a provider interface (Phase 7)'],
   },
   {
-    id: 'transactions', title: 'Transaction Analysis', route: '/app/m/transactions', image: '', availability: 'planned', phase: 4,
+    id: 'transactions', title: 'Transaction Analysis', route: '/app/m/transactions', availability: 'planned', phase: 4,
     summary: 'Unsupervised anomaly detection and relationship graphs over transaction exports.',
     today: [],
     planned: ['Reusable feature pipeline: velocity, deviation, rolling statistics', 'Isolation Forest anomaly scores with per-feature explanations', 'Customer–account–merchant–device graph'],
   },
   {
-    id: 'reports', title: 'Reports', route: '/app/m/reports', image: '', availability: 'partial', phase: 6,
+    id: 'reports', title: 'Reports', route: '/app/m/reports', availability: 'partial', phase: 6,
     summary: 'Exportable investigation reports for case files.',
     today: ['JSON and CSV export from any investigation, with redacted input and formula-safe cells'],
     planned: ['Branded PDF reports (Phase 6)'],
   },
   {
-    id: 'analytics', title: 'Analytics', route: '/app/m/analytics', image: '', availability: 'partial', phase: 6,
+    id: 'analytics', title: 'Analytics', route: '/app/m/analytics', availability: 'partial', phase: 6,
     summary: 'Trends, risk distribution, latency percentiles and feedback quality.',
     today: ['Dashboard aggregates over real investigations: volume, levels, top factors, p50/p95/p99 latency'],
     planned: ['False-positive and false-negative tracking from analyst feedback (Phase 6)', 'Per-model performance over time (Phase 6)'],
   },
   {
-    id: 'models', title: 'Model Intelligence', route: '/app/m/models', image: '', availability: 'partial', phase: 6,
+    id: 'models', title: 'Model Intelligence', route: '/app/m/models', availability: 'partial', phase: 6,
     summary: 'Which engines produced each result, at which version — and measured metrics once they exist.',
     today: ['Engine registry with versions; every prediction stored with model name, version and input hash'],
     planned: ['MLflow-backed registry (Phase 6)', 'Metrics only from named evaluation datasets — none are shown until measured'],

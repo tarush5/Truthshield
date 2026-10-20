@@ -52,7 +52,7 @@ export function UncertaintyList({ items }: { items: string[] }) {
     <ul className="space-y-2">
       {items.map((item) => (
         <li key={item} className="flex gap-3 text-sm leading-relaxed text-muted">
-          <HelpCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#89AACC]" aria-hidden />
+          <HelpCircle className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
           <span>{item}</span>
         </li>
       ))}
@@ -64,7 +64,7 @@ export function GuidanceCard({ guidance }: { guidance: Guidance }) {
   return (
     <div className="space-y-4">
       <p className="flex items-start gap-3 text-base font-medium text-text-primary">
-        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-[#89AACC]" aria-hidden />
+        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
         {guidance.headline}
       </p>
       <div className="grid gap-4 sm:grid-cols-2">

@@ -44,7 +44,7 @@ export default function Login() {
       <div className="relative w-full max-w-md">
         <div className="mb-10 flex flex-col items-center text-center">
           <Logo />
-          <h1 className="mt-6 font-display text-5xl italic text-text-primary">{mode === 'signin' ? 'Welcome back' : 'Create an account'}</h1>
+          <h1 className="mt-6 font-display text-5xl text-text-primary">{mode === 'signin' ? 'Welcome back' : 'Create an account'}</h1>
           <p className="mt-3 text-sm text-muted">
             {mode === 'signin' ? 'Sign in to open your investigations.' : 'Investigations are private to your account.'}
           </p>

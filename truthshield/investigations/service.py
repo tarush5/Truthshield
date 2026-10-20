@@ -362,34 +362,66 @@ def dashboard(session: Session, principal: Principal, *, days: int = 30) -> dict
     since = datetime.now(timezone.utc) - timedelta(days=days)
     scoped = _scoped(session, principal)
 
-    rows = (
+    # Aggregated in SQL, one row per (day, status, level, type, class):
+    # tens of rows instead of one per investigation, read entirely from the
+    # covering index ix_investigations_dashboard. Days are UTC dates.
+    created = Investigation.created_at
+    if session.get_bind().dialect.name == "postgresql":
+        created = func.timezone("UTC", created)
+    day_col = func.date(created).label("day")
+    groups = (
         scoped.filter(Investigation.created_at >= since)
         .with_entities(
-            Investigation.created_at, Investigation.status, Investigation.risk_level,
-            Investigation.risk_score, Investigation.type, Investigation.classification,
-            Investigation.processing_ms,
+            day_col, Investigation.status, Investigation.risk_level, Investigation.type,
+            Investigation.classification, func.count().label("n"),
+            func.sum(Investigation.risk_score).label("score_sum"),
+            func.count(Investigation.risk_score).label("scored"),
         )
-        .limit(20_000)
+        .group_by(day_col, Investigation.status, Investigation.risk_level, Investigation.type,
+                  Investigation.classification)
         .all()
     )
 
-    completed = [r for r in rows if r.status == InvestigationStatus.COMPLETED.value]
-    levels = Counter(r.risk_level for r in completed)
+    completed_value = InvestigationStatus.COMPLETED.value
+    terminal = {s.value for s in InvestigationStatus if s.is_terminal}
+    total = completed = failed = in_progress = scored = 0
+    score_sum = 0.0
+    levels: Counter = Counter()
+    by_type: Counter = Counter()
+    by_classification: Counter = Counter()
     per_day = defaultdict(lambda: {"total": 0, "high_or_critical": 0})
-    for r in rows:
-        created = r.created_at if r.created_at.tzinfo else r.created_at.replace(tzinfo=timezone.utc)
-        key = created.date().isoformat()
-        per_day[key]["total"] += 1
-        if r.risk_level in ("HIGH", "CRITICAL"):
-            per_day[key]["high_or_critical"] += 1
+    for g in groups:
+        total += g.n
+        by_type[g.type] += g.n
+        key = str(g.day)[:10]
+        per_day[key]["total"] += g.n
+        if g.risk_level in ("HIGH", "CRITICAL"):
+            per_day[key]["high_or_critical"] += g.n
+        if g.status == completed_value:
+            completed += g.n
+            levels[g.risk_level] += g.n
+            if g.classification:
+                by_classification[g.classification] += g.n
+            score_sum += float(g.score_sum or 0)
+            scored += g.scored
+        elif g.status == InvestigationStatus.FAILED.value:
+            failed += g.n
+        if g.status not in terminal:
+            in_progress += g.n
 
     volume = []
     for offset in range(days - 1, -1, -1):
         day = (datetime.now(timezone.utc) - timedelta(days=offset)).date().isoformat()
         volume.append({"date": day, **per_day.get(day, {"total": 0, "high_or_critical": 0})})
 
-    latencies = [r.processing_ms for r in completed if r.processing_ms is not None]
-    scores = [r.risk_score for r in completed if r.risk_score is not None]
+    # Percentiles need the values themselves. Filtered on the date range
+    # only, so the covering index serves it; a status condition here makes
+    # SQLite pick the status index and read every full row instead.
+    latencies = [
+        ms for status, ms in scoped.filter(Investigation.created_at >= since)
+        .with_entities(Investigation.status, Investigation.processing_ms).all()
+        if status == completed_value and ms is not None
+    ]
 
     # One grouped query over a join, instead of fetching every id in the
     # window and sending them back as an IN list (capped, so it undercounted).
@@ -413,16 +445,16 @@ def dashboard(session: Session, principal: Principal, *, days: int = 30) -> dict
         "window_days": days,
         "scope": "all" if principal.role == "ADMIN" else "own",
         "totals": {
-            "investigations": len(rows),
-            "completed": len(completed),
-            "failed": sum(1 for r in rows if r.status == InvestigationStatus.FAILED.value),
-            "in_progress": sum(1 for r in rows if not InvestigationStatus(r.status).is_terminal),
+            "investigations": total,
+            "completed": completed,
+            "failed": failed,
+            "in_progress": in_progress,
             "all_time": scoped.count(),
         },
         "risk_levels": {lvl: levels.get(lvl, 0) for lvl in ("LOW", "MEDIUM", "HIGH", "CRITICAL")},
-        "by_type": dict(Counter(r.type for r in rows)),
-        "by_classification": dict(Counter(r.classification for r in completed if r.classification)),
-        "average_risk": round(sum(scores) / len(scores), 1) if scores else None,
+        "by_type": dict(by_type),
+        "by_classification": dict(by_classification),
+        "average_risk": round(score_sum / scored, 1) if scored else None,
         "latency_ms": {
             "p50": _percentile(latencies, 0.50),
             "p95": _percentile(latencies, 0.95),

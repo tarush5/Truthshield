@@ -15,12 +15,13 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from typing import Dict, List
 from urllib.parse import urljoin, urlparse
 
 from truthshield.fraud.contract import Severity
 from truthshield.fraud.detectors.url import (
-    CHEAP_TLDS, HARVEST_PATHS, WATCHED_BRANDS, _registrable, inspect_url,
+    CHEAP_TLDS, HARVEST_PATHS, SHORTENERS, WATCHED_BRANDS, _registrable, inspect_url,
 )
 from truthshield.investigations.engines.base import Engine
 from truthshield.investigations.types import (
@@ -157,7 +158,13 @@ class UrlEngine(Engine):
             out.append(self._signal(
                 code="brand_in_unofficial_domain",
                 title="Domain mismatch",
-                severity=Severity.MEDIUM if risky_context else Severity.LOW,
+                # A government lookalike on a cheap suffix or a sign-in path is
+                # the classic scheme-registration / tax-refund phish.
+                severity=(
+                    Severity.HIGH if brand.exact_token == "gov" and (
+                        features.tld in CHEAP_TLDS or values["suspicious_keyword_score"] > 0)
+                    else Severity.MEDIUM if risky_context else Severity.LOW
+                ),
                 explanation=(
                     f"'{brand.exact_token}' is part of the domain '{features.registrable}', but "
                     "this is not that organisation's own domain name. Anyone can register a "
@@ -166,6 +173,25 @@ class UrlEngine(Engine):
                 evidence=features.registrable,
                 confidence=0.6 if risky_context else 0.45,
             ))
+
+        # A shortener hides the destination; a short link whose own path names
+        # a bank or a sign-in step is borrowing that name for credibility.
+        if features.registrable in SHORTENERS or features.host in SHORTENERS:
+            path = urlparse(features.url if "://" in features.url else f"http://{features.url}").path.lower()
+            words = set(re.split(r"[^a-z0-9]+", path))
+            named = sorted((words & set(WATCHED_BRANDS)) | (words & set(HARVEST_PATHS)))
+            if named:
+                out.append(self._signal(
+                    code="shortener_names_brand", title="Short link dressed as a bank or sign-in page",
+                    severity=Severity.MEDIUM,
+                    explanation=(
+                        "The real destination of a shortened link is hidden, yet its visible path names "
+                        f"{', '.join(named[:3])}. Anyone can choose that wording; it says nothing about "
+                        "where the link leads."
+                    ),
+                    evidence=features.url[:120],
+                    confidence=0.6,
+                ))
 
         if values["entropy"] >= 4.0 and values["domain_length"] >= 20:
             out.append(self._signal(

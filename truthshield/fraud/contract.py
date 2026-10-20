@@ -89,6 +89,7 @@ class FraudCategory(str, Enum):
     SOCIAL_ENGINEERING = "SOCIAL_ENGINEERING"
     MALWARE_DELIVERY = "MALWARE_DELIVERY"
     UTILITY_SCAM = "UTILITY_SCAM"        # electricity / gas / SIM disconnection threats
+    EXTORTION = "EXTORTION"              # "pay or I publish": sextortion, threats to leak
 
 
 class Severity(str, Enum):

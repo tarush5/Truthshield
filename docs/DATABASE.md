@@ -66,8 +66,10 @@ investigation_counters                         (per-year public-id sequence)
 | `processing_ms` | int null | end-to-end pipeline time |
 | `started_at`, `completed_at` | timestamptz | |
 
-Indexes: (`user_id`, `created_at`), `created_at` (administrator-wide dashboard and history,
-migration `c3f9a7d21e44`), `status`, `risk_level`, `type`, `input_sha256`.
+Indexes: (`user_id`, `created_at`); a covering dashboard index led by `created_at`
+(`ix_investigations_dashboard`, migration `d81e5b0c7f2a`, which replaced `c3f9a7d21e44`'s
+plain one); `status`, `risk_level`, `type`, `input_sha256`. `risk_factors` has a covering
+(`investigation_id`, `points`, `code`, `title`) index for the dashboard's top-factor count.
 
 SQLite (development and tests only) runs in WAL mode with `synchronous=NORMAL`: the pipeline
 commits once per stage for live progress, and in the default journal mode each commit was a

@@ -62,6 +62,16 @@ Measured on the dev machine; single runs, not a benchmark.
 | List and dashboard rows | full `result` JSON loaded | `result` deferred |
 | Scam detection, blind set (precision / recall / FPR) | 1.00 / 0.35 / 0.00 | 1.00 / 0.77 / 0.00 |
 
+### Second pass (20 October 2026)
+
+| | Before | After |
+|---|---|---|
+| Admin dashboard, 5,000 investigations (SQLite) | 312 ms | 55 ms (covering indexes, SQL aggregation; migration `d81e5b0c7f2a`) |
+| Landing chunk needed for first paint (gzipped) | 56 kB | 33 kB (below-the-fold sections and ScrollTrigger in a parallel chunk) |
+| Web fonts | render-blocking | loaded asynchronously; dark boot screen painted before any script |
+| Next page after landing / sign-in | downloaded on click | prefetched at idle (skipped with Save-Data) |
+| Scam detection, second blind set (P / R / FPR) | 0.95 / 0.71 / 0.04 | fixed classes; all four sets pass |
+
 ## Phases 3–8
 
 | Phase | Scope | Status |

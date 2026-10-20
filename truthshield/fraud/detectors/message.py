@@ -130,6 +130,9 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"\blucky\s*(?:draw|winner)\b",
             r"\bclaim\b.{0,25}\b(?:prize|reward|amount|money)\b",
             r"\binaam\b|\blottery\s*jeet",
+            r"\blottery\b.{0,60}\b(?:credited|won|winner|prize)|\b(?:credited|won)\b.{0,60}\blottery\b",
+            r"(?:इनाम|लॉटरी).{0,60}(?:जीत|जीता|जीते)|(?:जीत|जीता|जीते).{0,60}(?:इनाम|लॉटरी)",
+            r"பரிசு.{0,60}வென்ற|வென்ற.{0,60}பரிசு",
             r"\byou\s*(?:are|have\s*been|'ve\s*been)\s*(?:selected|chosen)\b.{0,40}\b(?:winner|prize|reward|gift)",
             r"\b(?:winner|won)\b.{0,40}\b(?:iphone|car|bike|gift|voucher|laptop)",
             r"\bgiveaway\b.{0,60}\bclaim",
@@ -210,6 +213,9 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"\binstall\b.{0,30}\bapp\b.{0,30}\b(?:resolve|fix|verify|refund)\b",
             # Fake renewal: an invented charge, and a number to call to "cancel" it.
             r"\b(?:subscription|membership|plan)\b.{0,40}\brenewed\b.{0,160}\b(?:call|contact)\b",
+            r"\b(?:auto[\s-]?renewal|renewal|subscription)\b.{0,60}\b(?:processed|charged|debited)\b.{0,160}"
+            r"\b(?:call|contact)\b",
+            r"\b(?:cancellation|refund)\s*(?:desk|department|team|helpline|centre|center)\b",
             r"\b(?:did\s*not|didn'?t)\s*(?:authori[sz]e|make|place|request)\b.{0,80}\b(?:call|contact)\b",
         ),
     ),
@@ -234,6 +240,8 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"\bseized\b.{0,40}\b(?:customs|police|cbi|ncb)",
             r"\b(?:parcel|package|courier)\b.{0,80}\b(?:drugs|narcotics|mdma|passports|contraband)",
             r"\bnarcotics\s*(?:officer|department|bureau)",
+            r"(?:सीबीआई|पुलिस|ईडी|क्राइम\s*ब्रांच|साइबर\s*सेल).{0,80}(?:केस|गिरफ्तार|वारंट|एफआईआर)",
+            r"मनी\s*लॉन्ड्रिंग|डिजिटल\s*अरेस्ट",
             r"\bmoney\s*laundering\b",
             r"\b(?:cbi|ncb|cyber\s*crime|crime\s*branch)\s*(?:officer|department|police|cell)",
             r"\bsim\b.{0,40}\b(?:deactivat|block|suspend|disconnect)",
@@ -268,6 +276,10 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"(?:rs\.?|inr|₹|\$|\d|pay|today|first|to\s*(?:get|receive|release))",
             r"\bto\s*(?:release|receive|get|claim|activate)\b.{0,50}\bpay\b",
             r"\b(?:refundable\s*)?security\s*deposit\b",
+            r"\b(?:deposit|pay)\b.{0,40}\b(?:gst|tax|tds|fees?|charges?)\b.{0,40}\bfirst\b",
+            r"\bto\s*transfer\s*the\s*(?:amount|money|prize)\b.{0,60}\b(?:pay|deposit)\b",
+            r"(?:शुल्क|फीस|जीएसटी|टैक्स).{0,40}(?:जमा|भुगतान)",
+            r"கட்டணம்.{0,40}செலுத்த",
             r"\bpay\b.{0,40}\b(?:fees?|charges?|tax)\b.{0,40}\b(?:receive|release|claim|get|deliver)",
             r"\b(?:inheritance|unclaimed\s*(?:funds?|estate|money|deposits?)|next\s*of\s*kin)\b",
             r"\bbeneficiary\b.{0,40}\b(?:funds?|estate|million|transfer)",
@@ -339,6 +351,19 @@ PATTERNS: Tuple[Pattern, ...] = (
         ),
         code="scam_billing_pretext",
     ),
+    Pattern(
+        FraudCategory.EXTORTION, "Threat to publish unless paid", Severity.HIGH,
+        "The sender claims to hold a video, photos or data about you and threatens to send "
+        "it to your contacts or post it unless you pay. Paying rarely ends the demands.",
+        "Do not pay or reply. Keep the messages and report them (1930 or cybercrime.gov.in in India).",
+        (
+            r"\b(?:recorded|have|got)\b.{0,30}\b(?:your\s*)?(?:video|videos|photos?|pictures?|images?)\b.{0,160}"
+            r"\b(?:pay|send\s*(?:rs|₹|money|\d))",
+            r"\bpay\b.{0,80}\bor\s*(?:else\s*)?(?:i|we)\s*will\s*(?:send|post|share|leak|upload|publish)",
+            r"\b(?:send|post|share|leak|upload|publish)\b.{0,30}\b(?:it|them|the\s*video|your\s*(?:video|photos?))\b"
+            r".{0,40}\b(?:contacts|family|friends|online|social\s*media)\b",
+        ),
+    ),
 )
 
 # Urgency is not a category on its own -- plenty of honest messages are
@@ -369,7 +394,7 @@ _FEE_RE = re.compile(r"\b(?:fees?|charges?|cost|deposit)\b")
 _NEGATION_INSIDE = re.compile(r"\b(?:do\s*not|don'?t|never|not\s*to)\b")
 # Awareness messages describe the scam: "beware of digital arrest scams".
 _AWARENESS_BEFORE = re.compile(r"\b(?:beware\s*of|be\s*aware\s*of|alert\s*about|warn(?:s|ing)?\s*(?:about|of)|"
-                               r"scams?\s*(?:like|such\s*as)|report)\b[^.!?]*$")
+                               r"scams?\s*(?:like|such\s*as)|report|scammers|fraudsters|fake|fraudulent|bogus)\b[^.!?]*$")
 # A delivery OTP is meant to be shown to the courier at the door.
 _ROUTINE_AFTER = re.compile(r"^.{0,40}\b(?:delivery\s*(?:agent|partner|executive|boy|person)|at\s*the\s*time\s*of\s*delivery)")
 _SECRECY_CODES = ("don't", "do not", "can't", "cannot", "dont")

@@ -50,10 +50,16 @@ def _similarity(a: str, b: str) -> float:
 _HOMOGLYPHS = str.maketrans({"0": "o", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b", "@": "a", "$": "s"})
 
 
+def _collapse(token: str) -> str:
+    """Runs of one letter read as one: "flipkarrt", "gooogle" -> "flipkart", "gogle"."""
+    return re.sub(r"(.)\1+", r"\1", token)
+
+
 def deglyph(token: str) -> set:
-    """Readings of a token with common digit/letter swaps undone."""
+    """Readings of a token with common digit/letter swaps and doubled letters undone."""
     base = token.translate(_HOMOGLYPHS).replace("rn", "m").replace("vv", "w")
-    return {base.replace("1", "l"), base.replace("1", "i")}
+    readings = {base.replace("1", "l"), base.replace("1", "i")}
+    return readings | {_collapse(r) for r in readings}
 
 
 @dataclass(frozen=True)
@@ -85,7 +91,8 @@ def brand_similarity(registrable: str) -> BrandMatch:
     for part in parts:
         if part in WATCHED_BRANDS:
             continue
-        hit = next((b for b in WATCHED_BRANDS if b in deglyph(part)), None)
+        readings = deglyph(part)
+        hit = next((b for b in WATCHED_BRANDS if b in readings or _collapse(b) in readings), None)
         if hit:
             best, closest = 0.95, hit
             break

@@ -99,6 +99,14 @@ Measured with `npm run build` (gzipped):
 - **Marquee** is a CSS transform animation (compositor only), not a GSAP tween.
 - **Fonts**: only the Inter weights used (400/500/600) are requested.
 - The landing intro plays once per tab session, including across reloads.
+- **Landing split:** the hero, navbar and loader are one chunk (33 kB gz); every
+  section below the fold and GSAP's ScrollTrigger are another (`BelowFold.tsx`),
+  requested in parallel as soon as the landing module runs.
+- **First paint:** `index.html` paints a dark boot mark before any script, and
+  loads Google Fonts asynchronously (`display=swap`).
+- **Idle prefetch:** sign-in for visitors; shell, dashboard and investigate page
+  for signed-in users (`usePrefetchNext` in `App.tsx`; skipped with Save-Data).
+- **Paint cost:** no backdrop blur behind opaque surfaces or on hidden overlays.
 - **Result polling** starts at 250 ms and backs off to 1.5 s: most text and URL
   investigations finish in well under a second, so results appear almost
   immediately, while long evidence runs are not polled harder than before.

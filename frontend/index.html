@@ -17,11 +17,22 @@
     <link rel="dns-prefetch" href="https://stream.mux.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+    <!-- Fonts load without blocking the first paint: text shows in the
+         fallback face at once and swaps when the web fonts arrive. -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" /></noscript>
     <title>TruthShield — Verify before you trust</title>
+    <!-- Painted before any script or stylesheet arrives, so the first frame
+         is the app's own dark background rather than a white flash. React
+         replaces the boot mark when it renders. -->
+    <style>
+      html, body { margin: 0; background: hsl(0 0% 4%); color: hsl(0 0% 96%); }
+      .boot { position: fixed; inset: 0; display: grid; place-items: center; }
+      .boot span { font: 500 11px/1 system-ui, sans-serif; letter-spacing: .3em; text-transform: uppercase; color: hsl(0 0% 53%); }
+    </style>
   </head>
   <body class="bg-bg text-text-primary font-body antialiased">
-    <div id="root"></div>
+    <div id="root"><div class="boot" aria-hidden="true"><span>TruthShield</span></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

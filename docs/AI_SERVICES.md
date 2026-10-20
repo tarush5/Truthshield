@@ -82,9 +82,13 @@ figures and must not be presented as such.**
 | `fraud_eval` | 81 | developing the rules | 0.96 / 0.55 / 0.03 | 1.00 / 1.00 / 0.00 (tuned on it) |
 | `fraud_holdout` | 56 | first unseen set | 0.67 / 0.37 / 0.17 | 0.84 / 0.78 / 0.14 on first sight; then used to fix error classes |
 | `fraud_blind` | 52 | second unseen set | 1.00 / 0.35 / 0.00 | **1.00 / 0.77 / 0.00** on first sight |
+| `fraud_blind2` | 54 | third unseen set (20 Oct 2026) | not measured | **0.95 / 0.71 / 0.04** on first sight, with the rules as they stood after `fraud_blind` |
 
-The blind row is the honest estimate of how the rules generalise. Its six misses were then
-fixed, so all three sets now pass and serve as a regression guard (`tests/test_v2_accuracy.py`
+The two blind rows are the honest estimates of how the rules generalise. `fraud_blind2`
+exposed sextortion (now `EXTORTION`), Hindi and Tamil police and prize-fee wording, "deposit
+the GST first" lottery fees, fake auto-renewal refund calls, doubled-letter lookalikes
+(`flipkarrt`), shortened links named after a bank, and one awareness false alarm. The blind
+sets' misses were then fixed, so all three sets now pass and serve as a regression guard (`tests/test_v2_accuracy.py`
 requires recall ≥ 0.95 and a false-positive rate ≤ 0.04 on each). New patterns should be
 checked against a fresh set written before tuning.
 

@@ -70,7 +70,7 @@ export function Capabilities() {
                 </div>
 
                 {/* Hover: blur overlay and the gradient-ringed label. */}
-                <div className="absolute inset-0 flex items-center justify-center bg-bg/70 opacity-0 backdrop-blur-lg transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100">
+                <div className="absolute inset-0 flex items-center justify-center bg-bg/70 opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-hover:backdrop-blur-lg group-focus-visible:opacity-100 group-focus-visible:backdrop-blur-lg">
                   <span className="accent-gradient-animated rounded-full p-[2px]">
                     <span className="flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm text-black">
                       Explore — <span className="font-display text-base italic">{cap.title}</span>

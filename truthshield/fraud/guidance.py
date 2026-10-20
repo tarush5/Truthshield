@@ -281,6 +281,23 @@ GUIDANCE: Dict[FraudCategory, Guidance] = {
             *_UNIVERSAL_AFTER,
         ],
     ),
+    FraudCategory.EXTORTION: Guidance(
+        headline="Do not pay. Paying rarely ends the demands, and you are not alone in this.",
+        do_now=[
+            "Stop replying, but keep every message, username and payment detail as evidence.",
+            "Lock down your social media privacy settings and contact lists.",
+            "Report it: in India, call 1930 or file at cybercrime.gov.in; tell someone you trust.",
+        ],
+        do_not=[
+            "Do not send money or more images. Payment usually leads to a larger demand.",
+            "Do not delete the conversation before it is reported.",
+        ],
+        if_already_acted=[
+            "Stop further payments and report the ones made to your bank and the police.",
+            "Ask the platform to remove any posted content; most have urgent reporting routes for this.",
+            *_UNIVERSAL_AFTER,
+        ],
+    ),
     FraudCategory.UTILITY_SCAM: Guidance(
         headline="Utilities and telecom operators do not disconnect you through a text from a mobile number.",
         do_now=[

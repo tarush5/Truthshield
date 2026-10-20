@@ -43,7 +43,7 @@ export function Navbar() {
       <nav
         aria-label="Primary"
         className={cn(
-          'inline-flex items-center rounded-full border border-white/10 bg-surface px-2 py-2 backdrop-blur-md transition-shadow',
+          'inline-flex items-center rounded-full border border-white/10 bg-surface px-2 py-2 transition-shadow',
           scrolled && 'shadow-md shadow-black/10',
         )}
       >
@@ -68,14 +68,14 @@ export function Navbar() {
         {signedIn ? (
           <button onClick={() => navigate('/app')} className="group relative inline-flex rounded-full">
             <span aria-hidden className="accent-gradient absolute -inset-[2px] rounded-full opacity-0 transition-opacity group-hover:opacity-100" />
-            <span className="relative rounded-full bg-surface px-3 py-1.5 text-xs text-text-primary backdrop-blur-md sm:px-4 sm:py-2 sm:text-sm">
+            <span className="relative rounded-full bg-surface px-3 py-1.5 text-xs text-text-primary sm:px-4 sm:py-2 sm:text-sm">
               Open app ↗
             </span>
           </button>
         ) : (
           <Link to="/login" className="group relative inline-flex rounded-full">
             <span aria-hidden className="accent-gradient absolute -inset-[2px] rounded-full opacity-0 transition-opacity group-hover:opacity-100" />
-            <span className="relative rounded-full bg-surface px-3 py-1.5 text-xs text-text-primary backdrop-blur-md sm:px-4 sm:py-2 sm:text-sm">
+            <span className="relative rounded-full bg-surface px-3 py-1.5 text-xs text-text-primary sm:px-4 sm:py-2 sm:text-sm">
               Sign in ↗
             </span>
           </Link>

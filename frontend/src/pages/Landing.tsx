@@ -1,17 +1,17 @@
 import { AnimatePresence } from 'motion/react';
-import { useCallback, useEffect, useState } from 'react';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 
-import { Capabilities } from '@/components/landing/Capabilities';
-import { Contact } from '@/components/landing/Contact';
-import { Explainability } from '@/components/landing/Explainability';
 import { Hero } from '@/components/landing/Hero';
 import { LoadingScreen } from '@/components/landing/LoadingScreen';
 import { Navbar } from '@/components/landing/Navbar';
-import { Pipeline } from '@/components/landing/Pipeline';
-import { Principles } from '@/components/landing/Principles';
-import { Stats } from '@/components/landing/Stats';
 import { SKIP_MOTION } from '@/lib/env';
+
+// Below the fold is its own chunk, requested the moment this module runs so
+// it downloads alongside the hero rather than after it.
+const loadBelowFold = () => import('@/components/landing/BelowFold');
+void loadBelowFold();
+const BelowFold = lazy(loadBelowFold);
+const Footer = lazy(() => loadBelowFold().then((m) => ({ default: m.Footer })));
 
 // Once per tab session (surviving reloads): the intro is a welcome, not a
 // toll on every visit. Storage can throw in private modes; then it shows once
@@ -42,10 +42,6 @@ export default function Landing() {
 
   useEffect(() => {
     document.body.style.overflow = loading ? 'hidden' : '';
-    if (!loading) {
-      // Scroll locking changed the layout; pinned sections need fresh offsets.
-      requestAnimationFrame(() => ScrollTrigger.refresh());
-    }
     return () => {
       document.body.style.overflow = '';
     };
@@ -57,13 +53,13 @@ export default function Landing() {
       <Navbar />
       <main>
         <Hero ready={!loading} />
-        <Pipeline />
-        <Capabilities />
-        <Principles />
-        <Explainability />
-        <Stats />
+        <Suspense fallback={null}>
+          <BelowFold ready={!loading} />
+        </Suspense>
       </main>
-      <Contact />
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
     </>
   );
 }

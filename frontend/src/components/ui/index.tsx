@@ -15,7 +15,7 @@ type Size = 'sm' | 'md';
 const inner: Record<Variant, string> = {
   solid: 'bg-text-primary text-bg group-hover:bg-bg group-hover:text-text-primary',
   outline: 'border-2 border-stroke bg-bg text-text-primary group-hover:border-transparent',
-  pill: 'bg-surface text-text-primary backdrop-blur-md',
+  pill: 'bg-surface text-text-primary',
 };
 
 const sizes: Record<Size, string> = {

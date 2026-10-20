@@ -10,6 +10,9 @@ regressions in the rules; they are not a measure of real-world accuracy.
 - fraud_blind.jsonl    second unseen set. Measured before any change was made
                        for it: precision 1.00, recall 0.77, false-positive
                        rate 0.00 (the 1.x rules: 1.00 / 0.35 / 0.00)
+- fraud_blind2.jsonl   third unseen set, written after the blind set was used.
+                       Measured before any change for it: precision 0.95,
+                       recall 0.71, false-positive rate 0.04
 """
 
 from pathlib import Path
@@ -22,7 +25,7 @@ from truthshield.investigations.url_features import brand_similarity
 EVAL = Path(__file__).parent / "eval"
 
 
-@pytest.mark.parametrize("name", ["fraud_eval", "fraud_holdout", "fraud_blind"])
+@pytest.mark.parametrize("name", ["fraud_eval", "fraud_holdout", "fraud_blind", "fraud_blind2"])
 def test_eval_set_holds(name):
     report = evaluate(load(EVAL / f"{name}.jsonl"))
     errors = "\n".join(
@@ -53,6 +56,10 @@ class TestContext:
         o = assess(_item("Your order arrives today. Share OTP 4417 with the delivery agent at the time of delivery."))
         assert not o.flagged
 
+    def test_a_warning_about_fake_messages_is_not_the_scam(self):
+        o = assess(_item("Scammers are sending fake electricity disconnection messages. Never call personal numbers."))
+        assert not o.flagged
+
     def test_no_fee_is_a_negation_but_no_next_of_kin_is_not(self):
         assert not assess(_item("Shop the festive sale with no processing fee on EMI at our stores.")).flagged
         o = assess(_item("A deceased client left an unclaimed deposit and has no next of kin. Send your bank details."))
@@ -66,6 +73,8 @@ class TestPatterns:
         "I need you to buy 5 Google Play gift cards and send me the codes, I am in a meeting.",
         "Earn 3000 daily from home by liking YouTube videos. Contact HR on Telegram.",
         "Your loan of Rs 3,00,000 is approved! To release the amount, pay the file charge of Rs 3,499 today.",
+        "I have recorded your video call. Pay Rs 50,000 within 24 hours or I will send the video to all your contacts.",
+        "मैं सीबीआई अधिकारी बोल रहा हूँ। आपके आधार से मनी लॉन्ड्रिंग का केस दर्ज हुआ है। तुरंत पैसे ट्रांसफर करें।",
     ])
     def test_common_scripts_are_flagged(self, text):
         assert assess(_item(text)).flagged
@@ -80,6 +89,13 @@ class TestLookalikes:
     def test_digit_and_letter_swaps_are_read_as_the_brand(self, label, brand):
         match = brand_similarity(label)
         assert match.closest == brand and match.similarity >= 0.9
+
+    def test_doubled_letters_are_read_as_the_brand(self):
+        assert brand_similarity("flipkarrt-offers.com").closest == "flipkart"
+
+    def test_a_short_link_named_after_a_bank_is_flagged(self):
+        o = assess({"id": "t", "type": "url", "label": "fraud", "content": "https://tinyurl.com/sbi-kyc-update"})
+        assert "shortener_names_brand" in o.top_signals
 
     def test_new_brands_do_not_fuzzy_match_ordinary_words(self):
         # "mantra" is one letter from "myntra"; an edit-distance match would

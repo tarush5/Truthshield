@@ -1,17 +1,25 @@
 import { AnimatePresence, m } from 'motion/react';
-import { Suspense, lazy, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useOutlet } from 'react-router-dom';
 
 import { Spinner } from '@/components/ui';
 import { SKIP_MOTION } from '@/lib/env';
 import { useAuth } from '@/stores/auth';
 
+// Route loaders, shared by the lazy routes and the idle prefetch below.
+const load = {
+  shell: () => import('@/components/shell/AppShell'),
+  login: () => import('@/pages/Login'),
+  dashboard: () => import('@/pages/Dashboard'),
+  investigate: () => import('@/pages/Investigate'),
+};
+
 // The shell is only needed once signed in, so landing visitors never download it.
-const AppShell = lazy(() => import('@/components/shell/AppShell').then((mod) => ({ default: mod.AppShell })));
+const AppShell = lazy(() => load.shell().then((mod) => ({ default: mod.AppShell })));
 const Landing = lazy(() => import('@/pages/Landing'));
-const Login = lazy(() => import('@/pages/Login'));
-const Dashboard = lazy(() => import('@/pages/Dashboard'));
-const Investigate = lazy(() => import('@/pages/Investigate'));
+const Login = lazy(load.login);
+const Dashboard = lazy(load.dashboard);
+const Investigate = lazy(load.investigate);
 const InvestigationResult = lazy(() => import('@/pages/InvestigationResult'));
 const History = lazy(() => import('@/pages/History'));
 const UrlIntelligence = lazy(() => import('@/pages/UrlIntelligence'));
@@ -118,7 +126,31 @@ function AnimatedRoutes() {
   );
 }
 
+/**
+ * Once the current page is idle, fetch the pages a visitor most likely opens
+ * next, so that click renders without waiting on the network: sign-in for
+ * visitors; the shell, dashboard and investigate page for signed-in users.
+ * Nothing runs if the browser says to save data.
+ */
+function usePrefetchNext() {
+  const signedIn = useAuth((s) => Boolean(s.accessToken));
+  useEffect(() => {
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+    if (connection?.saveData) return;
+    const next = signedIn ? [load.shell, load.dashboard, load.investigate] : [load.login];
+    const run = () => next.forEach((fetch) => void fetch().catch(() => undefined));
+    const idle = window.requestIdleCallback;
+    if (idle) {
+      const handle = idle(run, { timeout: 4000 });
+      return () => window.cancelIdleCallback(handle);
+    }
+    const timer = window.setTimeout(run, 2500);
+    return () => window.clearTimeout(timer);
+  }, [signedIn]);
+}
+
 export default function App() {
+  usePrefetchNext();
   return (
     <BrowserRouter>
       <AnimatedRoutes />

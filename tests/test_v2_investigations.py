@@ -315,6 +315,10 @@ class TestDashboard:
         assert len(body["volume"]) == 7 and body["volume"][-1]["total"] == 2
         assert body["latency_ms"]["samples"] == 2 and body["latency_ms"]["p50"] is not None
         assert body["top_risk_factors"] and len(body["recent"]) == 2
+        # Aggregated in SQL now: the average must still be the stored scores' mean.
+        scores = [i["risk_score"] for i in body["recent"]]
+        assert body["average_risk"] == round(sum(scores) / len(scores), 1)
+        assert body["totals"]["failed"] == 0 and body["totals"]["in_progress"] == 0
 
 
 class TestPlatform:

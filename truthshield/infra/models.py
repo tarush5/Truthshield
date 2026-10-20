@@ -229,8 +229,11 @@ class Investigation(Base, TimestampMixin):
     __table_args__ = (
         Index("ix_investigations_user_created", "user_id", "created_at"),
         # Administrators see every investigation: their dashboard window and
-        # history sort have no user_id to lead with.
-        Index("ix_investigations_created", "created_at"),
+        # history sort have no user_id to lead with. The extra columns make it
+        # covering for the dashboard, which then never touches the rows -- on
+        # SQLite those carry the large `result` JSON in overflow pages.
+        Index("ix_investigations_dashboard", "created_at", "status", "risk_level", "risk_score",
+              "type", "classification", "processing_ms", "id"),
     )
 
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
@@ -322,6 +325,8 @@ class RiskFactor(Base, TimestampMixin):
     """One signal's share of the final risk score."""
 
     __tablename__ = "risk_factors"
+    # Covering index for the dashboard's "most common risk factors" count.
+    __table_args__ = (Index("ix_risk_factors_dashboard", "investigation_id", "points", "code", "title"),)
 
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
     investigation_id = Column(GUID, ForeignKey("investigations.id", ondelete="CASCADE"),

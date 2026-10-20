@@ -73,7 +73,7 @@ The synthetic demos work either way.
 ## Test
 
 ```bash
-pytest tests/ -q            # backend: 498 tests, offline and deterministic
+pytest tests/ -q            # backend: 504 tests, offline and deterministic
 python -m truthshield.investigations.evaluation tests/eval/fraud_blind.jsonl   # detector accuracy
 ruff check truthshield tests
 cd frontend && npm run typecheck && npm test && npm run build

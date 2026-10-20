@@ -103,6 +103,14 @@ RULES: Tuple[PiiRule, ...] = (
         re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
         reason="A personal address invites further targeting.",
     ),
+    # A UPI handle (name@bank, no dotted domain) usually carries a person's
+    # name and is enough to request money from them. The email rule above
+    # needs a dotted domain, so it never matched these.
+    PiiRule(
+        "upi", "UPI ID",
+        re.compile(r"(?<![\w.@])[A-Za-z0-9._-]{2,64}@[A-Za-z]{2,32}(?![\w.@-])"),
+        reason="A UPI ID identifies a person's account and can be sent payment requests.",
+    ),
     # An account number must be introduced as one, and then it wins the span.
     #
     # A bare run of digits is ambiguous. Matching 9-18 digits unqualified

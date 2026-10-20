@@ -92,6 +92,17 @@ async def lifespan(app: FastAPI):
                 logger.warning("Warmup failed (non-fatal): %s", exc)
         await asyncio.to_thread(_load)
 
+    try:
+        # Runs left unfinished by a previous process (a restart under the
+        # background executor kills them) are failed now, not on first view.
+        from truthshield.infra.database import SessionLocal
+        from truthshield.investigations.service import expire_stale
+
+        with SessionLocal() as recovery:
+            expire_stale(recovery)
+    except Exception as exc:  # never block start-up on housekeeping
+        logger.warning("Stale-investigation sweep failed (non-fatal): %s", exc)
+
     asyncio.create_task(warm())
     yield
     logger.info("Shutting down")

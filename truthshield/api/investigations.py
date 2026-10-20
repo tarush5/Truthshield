@@ -200,6 +200,37 @@ def _csv_cell(value) -> str:
     return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
 
 
+# Identifiers, hashes and timestamps are left exactly as they are: a public id
+# such as TS-2026-000001 has ten digits and would otherwise read as a phone.
+_KEEP_AS_IS = {"id", "public_id", "url", "href", "final_url", "type", "status", "kind"}
+
+
+def _keep(key: str) -> bool:
+    return key in _KEEP_AS_IS or key.endswith(("_id", "_at", "sha256", "_url"))
+
+
+def _redact_text(value):
+    from truthshield.fraud.privacy import redact
+
+    return redact(value)[0] if isinstance(value, str) else value
+
+
+def _redact_deep(value, key: str = ""):
+    """
+    Mask personal data in every free-text field of an export.
+
+    The export already dropped the original input, but the result kept it in
+    other places: extracted entities (phone numbers, UPI IDs, account
+    numbers), quoted evidence ("your OTP is 482913") and claim text. An
+    exported file travels further than the account it came from.
+    """
+    if isinstance(value, dict):
+        return {k: v if _keep(k) else _redact_deep(v, k) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_redact_deep(v, key) for v in value]
+    return _redact_text(value)
+
+
 @investigations_router.get("/{ident}/export")
 def export(
     ident: str,
@@ -208,8 +239,9 @@ def export(
     session: Session = Depends(get_session),
 ):
     """
-    Download the investigation. The export carries the redacted input only --
-    an exported file travels further than the account it came from.
+    Download the investigation with personal data masked throughout: the
+    original input is dropped, and phone numbers, UPI IDs, account and card
+    numbers and one-time codes are masked wherever they appear in the result.
     """
     inv = _find(session, principal, ident)
     filename = f"{inv.public_id}.{format}"
@@ -218,7 +250,7 @@ def export(
     if format == "json":
         body = service.detail(inv, principal)
         body["input"]["content"] = None
-        return JSONResponse(body, headers=headers)
+        return JSONResponse(_redact_deep(body), headers=headers)
 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
@@ -227,7 +259,7 @@ def export(
     for f in sorted(inv.risk_factors, key=lambda f: -f.points):
         writer.writerow([_csv_cell(v) for v in (
             inv.public_id, f.code, f.title, f.family, f.severity, f.provenance,
-            f.engine, f.engine_version, f.points, f.confidence, f.evidence,
+            f.engine, f.engine_version, f.points, f.confidence, _redact_text(f.evidence),
         )])
     return Response(buffer.getvalue(), media_type="text/csv", headers=headers)
 

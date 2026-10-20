@@ -144,6 +144,16 @@ class Settings(BaseSettings):
     # pool is the default; heavy media always goes to Celery regardless.
     INVESTIGATION_EXECUTOR: str = "background"
     INVESTIGATION_RETENTION_DAYS: int = 90
+    # A run that started this long ago and never finished is dead (a killed
+    # worker, a restarted API): it is marked FAILED so nothing polls it forever.
+    # Celery's hard limit is 3 minutes, so 10 leaves a wide margin.
+    INVESTIGATION_STALE_MINUTES: int = 10
+    # A run still QUEUED after this long is failed too. Generous, so a busy
+    # Celery queue is never cut off: a failed run is never picked up later.
+    INVESTIGATION_QUEUE_TIMEOUT_MINUTES: int = 60
+    # The same user submitting the same content within this window gets the
+    # existing investigation back instead of a second run (double clicks).
+    INVESTIGATION_DEDUP_SECONDS: int = 15
 
     # No outbound network from the analysis engines: no evidence search, no
     # page fetches. What was skipped is reported as uncertainty, so a demo run

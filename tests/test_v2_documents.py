@@ -211,12 +211,20 @@ class TestFileAccess:
         assert not get_storage().exists(key)
 
     def test_identical_uploads_share_storage_until_the_last_is_deleted(self, client, auth):
+        # Two users: the same user re-uploading within seconds now gets the
+        # first investigation back (duplicate-submission guard), so sharing
+        # is exercised across accounts -- where it also matters that one
+        # user's deletion cannot remove a file someone else still needs.
         from truthshield.storage import get_storage
+        email = f"share{uuid.uuid4().hex[:10]}@example.com"
+        other = {"Authorization": "Bearer " + client.post(
+            "/api/v1/auth/signup", json={"email": email, "password": "correct-horse-42"}).json()["access_token"]}
         data = invoice(number=f"S-{uuid.uuid4().hex[:6]}")
-        a, b = run(client, auth, "a.pdf", data), run(client, auth, "b.pdf", data)
+        a, b = run(client, auth, "a.pdf", data), run(client, other, "b.pdf", data)
+        assert a["id"] != b["id"] and a["input"]["sha256"] == b["input"]["sha256"]
         client.delete(f"/api/v1/investigations/{a['id']}", headers=auth)
         assert get_storage().exists(b["input"]["sha256"])
-        client.delete(f"/api/v1/investigations/{b['id']}", headers=auth)
+        client.delete(f"/api/v1/investigations/{b['id']}", headers=other)
         assert not get_storage().exists(b["input"]["sha256"])
 
 

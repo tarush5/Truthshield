@@ -94,6 +94,9 @@ def create_investigation(
         content = _normalise_url(content)
 
     digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    existing = recent_duplicate(session, principal, digest, kind.value)
+    if existing is not None:
+        return existing
     redacted, redactions = redact(content)
 
     inv = Investigation(
@@ -127,11 +130,95 @@ def create_investigation(
     return inv
 
 
+def recent_duplicate(session: Session, principal: Principal, digest: str, kind: str) -> Optional[Investigation]:
+    """
+    The caller's own investigation of identical content from the last few
+    seconds, if any.
+
+    A double click or a client retry used to open a second investigation and
+    run the whole pipeline twice. The match is the caller's, same type, same
+    SHA-256, so two people submitting the same scam still get separate runs.
+    The returned object is marked `deduplicated` so the caller does not
+    dispatch it again.
+    """
+    from truthshield.settings import get_settings
+
+    window = get_settings().INVESTIGATION_DEDUP_SECONDS
+    if window <= 0:
+        return None
+    since = datetime.now(timezone.utc) - timedelta(seconds=window)
+    inv = (
+        session.query(Investigation)
+        .filter(Investigation.user_id == principal.user_id, Investigation.input_sha256 == digest,
+                Investigation.type == kind, Investigation.created_at >= since,
+                # A retry after a failure must run again, not get the failure back.
+                Investigation.status != InvestigationStatus.FAILED.value)
+        .order_by(Investigation.created_at.desc())
+        .first()
+    )
+    if inv is not None:
+        inv.deduplicated = True
+    return inv
+
+
+def expire_stale(session: Session, *, ids=None) -> int:
+    """
+    Mark investigations that can no longer finish as FAILED.
+
+    A run whose worker died (a killed Celery process, an API restart under the
+    background executor) stayed PROCESSING forever, and the result page polled
+    it forever. Runs that started more than INVESTIGATION_STALE_MINUTES ago,
+    or are still QUEUED after INVESTIGATION_QUEUE_TIMEOUT_MINUTES, are failed
+    with a message saying where they stopped. Pass `ids` to limit the check to
+    the rows about to be shown. Returns how many were marked.
+    """
+    from sqlalchemy import and_
+
+    from truthshield.settings import get_settings
+
+    settings = get_settings()
+    now = datetime.now(timezone.utc)
+    running_since = now - timedelta(minutes=settings.INVESTIGATION_STALE_MINUTES)
+    queued_since = now - timedelta(minutes=settings.INVESTIGATION_QUEUE_TIMEOUT_MINUTES)
+    queued = InvestigationStatus.QUEUED.value
+    running = [s.value for s in InvestigationStatus if not s.is_terminal and s is not InvestigationStatus.QUEUED]
+
+    query = session.query(Investigation).filter(or_(
+        and_(Investigation.status.in_(running),
+             func.coalesce(Investigation.started_at, Investigation.created_at) < running_since),
+        and_(Investigation.status == queued, Investigation.created_at < queued_since),
+    ))
+    if ids is not None:
+        ids = list(ids)
+        if not ids:
+            return 0
+        query = query.filter(Investigation.id.in_(ids))
+
+    stale = query.all()
+    for inv in stale:
+        where = (inv.current_stage or "").replace("_", " ").lower()
+        inv.error = (
+            f"The analysis stopped{' during ' + where if where else ''} and did not finish "
+            "(the worker was interrupted). Please submit it again."
+            if inv.status != queued else
+            "The analysis was queued but never started (no worker picked it up). Please submit it again."
+        )
+        inv.status = InvestigationStatus.FAILED.value
+        inv.current_stage = None
+        inv.completed_at = now
+    if stale:
+        session.commit()
+        logger.warning("Marked %d stale investigation(s) as failed", len(stale))
+    return len(stale)
+
+
 def dispatch(inv: Investigation, *, background=None, mode: Optional[str] = None) -> str:
     """Hand the investigation to its executor. Returns the executor used."""
     from truthshield.investigations.pipeline import InvestigationRunner
     from truthshield.settings import get_settings
 
+    if getattr(inv, "deduplicated", False):
+        return "existing"  # already dispatched by the first of the duplicate requests
     mode = mode or get_settings().INVESTIGATION_EXECUTOR
 
     if mode == "celery":
@@ -171,6 +258,9 @@ def find(session: Session, principal: Principal, ident: str) -> Investigation:
     if inv is None:
         # Same answer for "does not exist" and "not yours".
         raise InvestigationError(404, "NOT_FOUND", "Investigation not found.")
+    if not InvestigationStatus(inv.status).is_terminal:
+        # The result page polls this: a dead run must end, not spin forever.
+        expire_stale(session, ids=[inv.id])
     return inv
 
 
@@ -207,11 +297,17 @@ def list_investigations(
         .limit(page_size)
         .all()
     )
+    unfinished = [r.id for r in rows if not InvestigationStatus(r.status).is_terminal]
+    if unfinished:
+        expire_stale(session, ids=unfinished)
     return rows, total
 
 
 def create_file_investigation(session: Session, principal: Principal, stored) -> Investigation:
     """An investigation over an uploaded file already validated and stored by `files.receive`."""
+    existing = recent_duplicate(session, principal, stored.sha256, stored.investigation_type)
+    if existing is not None:
+        return existing  # the stored copy is content-addressed: nothing extra was kept
     inv = Investigation(
         public_id=next_public_id(session),
         user_id=principal.user_id,
@@ -360,6 +456,7 @@ def _percentile(values, fraction: float) -> Optional[int]:
 def dashboard(session: Session, principal: Principal, *, days: int = 30) -> dict:
     days = max(1, min(days, 365))
     since = datetime.now(timezone.utc) - timedelta(days=days)
+    expire_stale(session)  # "in progress" must not count runs that died
     scoped = _scoped(session, principal)
 
     # Aggregated in SQL, one row per (day, status, level, type, class):

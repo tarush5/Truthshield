@@ -130,7 +130,27 @@ class InvestigationRunner:
 
     # ──────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _clear_partial_attempt(session: Session, inv: Investigation) -> None:
+        """
+        Remove what an interrupted earlier attempt left behind.
+
+        Celery acknowledges late, so a worker that dies mid-run has its task
+        redelivered. Without this the second attempt wrote a second set of
+        stage events (the counter restarts at 1) and, if the first had reached
+        storage, duplicate risk factors, predictions and claim records.
+        """
+        if not session.query(InvestigationEvent).filter(InvestigationEvent.investigation_id == inv.id).count():
+            return
+        logger.warning("Investigation %s: discarding an interrupted earlier attempt", inv.public_id)
+        for model in (InvestigationEvent, RiskFactor, PredictionRow, ClaimRecord):
+            session.query(model).filter(model.investigation_id == inv.id).delete(synchronize_session=False)
+        inv.result = None
+        session.commit()
+        session.refresh(inv)
+
     def _run(self, session: Session, inv: Investigation) -> None:
+        self._clear_partial_attempt(session, inv)
         started = time.perf_counter()
         inv.started_at = _now()
         recorder = EventRecorder(session, inv)

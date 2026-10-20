@@ -1,0 +1,20 @@
+{"id": "q01", "claim": "The MMR vaccine causes autism in children.", "relevant": ["d01", "d03"]}
+{"id": "q02", "claim": "Getting vaccinated against measles gives kids autism.", "relevant": ["d01", "d03"]}
+{"id": "q03", "claim": "Drinking hot lemon water kills cancer cells.", "relevant": ["d04", "d05"]}
+{"id": "q04", "claim": "A glass of warm citrus water every morning cures tumours.", "relevant": ["d04", "d05"]}
+{"id": "q05", "claim": "5G towers are spreading the coronavirus.", "relevant": ["d06"]}
+{"id": "q06", "claim": "Covid travels through mobile phone radio waves from new networks.", "relevant": ["d06"]}
+{"id": "q07", "claim": "The Reserve Bank of India will call you to verify your OTP.", "relevant": ["d08"]}
+{"id": "q08", "claim": "Banks ask customers to update KYC by clicking a link in an SMS.", "relevant": ["d09", "d08"]}
+{"id": "q09", "claim": "The government is giving free laptops to every student.", "relevant": ["d10"]}
+{"id": "q10", "claim": "Rs 2000 notes are no longer valid and cannot be used at all.", "relevant": ["d11"]}
+{"id": "q11", "claim": "India landed near the south pole of the Moon.", "relevant": ["d12"]}
+{"id": "q12", "claim": "The 1969 Moon landing was faked in a film studio.", "relevant": ["d14", "d13"]}
+{"id": "q13", "claim": "You can see the Great Wall of China from space with the naked eye.", "relevant": ["d16"]}
+{"id": "q14", "claim": "Humans only use ten percent of their brain.", "relevant": ["d18"]}
+{"id": "q15", "claim": "Antibiotics will cure the common cold.", "relevant": ["d19"]}
+{"id": "q16", "claim": "This stock group guarantees 40 percent monthly returns, approved by SEBI.", "relevant": ["d21"]}
+{"id": "q17", "claim": "UIDAI officials phone people to collect their Aadhaar OTP.", "relevant": ["d22"]}
+{"id": "q18", "claim": "Voting machines can be hacked remotely over wifi.", "relevant": ["d23"]}
+{"id": "q19", "claim": "Plastic rice is being sold in Indian markets.", "relevant": ["d24"]}
+{"id": "q20", "claim": "Ships disappear in the Bermuda Triangle more than anywhere else.", "relevant": ["d25"]}

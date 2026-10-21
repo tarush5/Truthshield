@@ -108,3 +108,12 @@ class TestDetector:
         finding = _email(analyze(LOOKALIKE_PASS.split("\n", 3)[3]))
         assert finding["extra"]["authentication"] == {"checked": False}
         assert any("not checked" in x and "SPF" in x for x in finding["limitations"])
+
+
+def test_email_investigation_exposes_the_authentication_block(client, auth):
+    r = client.post("/api/v1/investigations", json={"type": "email", "content": FORGED}, headers=auth)
+    assert r.status_code == 202, r.text
+    inv = client.get(f"/api/v1/investigations/{r.json()['id']}", headers=auth).json()
+    block = inv["result"]["email_authentication"]
+    assert block["checked"] and block["dmarc"] == "fail" and block["authserv_id"] == "mx.google.com"
+    assert "email_dmarc_fail" in {f["code"] for f in inv["risk_factors"]}

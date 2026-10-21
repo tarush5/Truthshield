@@ -62,6 +62,18 @@ class UrlBody(BaseModel):
     url: str = Field(..., min_length=3, max_length=2048)
 
 
+class FeedbackBody(BaseModel):
+    label: Literal["fraud", "legitimate", "unsure"] = Field(
+        ..., description="What you believe the content is.")
+    comment: Optional[str] = Field(None, max_length=2000, description="Optional; redacted before storage.")
+    appeal: bool = Field(False, description="Ask a reviewer to look at this result.")
+
+
+class ReviewDecision(BaseModel):
+    label: Literal["fraud", "legitimate", "inconclusive"]
+    note: Optional[str] = Field(None, max_length=2000)
+
+
 class CreatedResponse(BaseModel):
     id: str
     public_id: str
@@ -299,6 +311,63 @@ def delete_investigation(
     return Response(status_code=204)
 
 
+@investigations_router.post("/{ident}/reanalyze", status_code=202, response_model=CreatedResponse)
+@expensive_limit
+def reanalyze_investigation(
+    request: Request,
+    ident: str,
+    background: BackgroundTasks,
+    principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
+):
+    """
+    Run the current pipeline again over the stored input.
+
+    Creates a new investigation linked to this one (`reanalysis_of` in its
+    detail); the earlier result is left untouched for comparison.
+    """
+    try:
+        inv = service.reanalyze(session, principal, _find(session, principal, ident))
+    except InvestigationError as exc:
+        _raise(exc)
+    return _dispatch_or_fail(session, inv, background)
+
+
+@investigations_router.post("/{ident}/feedback", status_code=201)
+def investigation_feedback(
+    ident: str,
+    body: FeedbackBody,
+    principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
+):
+    """
+    Tell us whether the result was right, or appeal it for human review.
+
+    Recorded beside the automated result; it does not change the score.
+    """
+    from truthshield.investigations import reviews
+
+    try:
+        review = reviews.submit(session, principal, _find(session, principal, ident),
+                                label=body.label, comment=body.comment, appeal=body.appeal)
+    except InvestigationError as exc:
+        _raise(exc)
+    return reviews.out(review)
+
+
+@investigations_router.get("/{ident}/reviews")
+def investigation_reviews(
+    ident: str,
+    principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
+):
+    """Feedback, appeals and reviewer decisions on this investigation."""
+    from truthshield.investigations import reviews
+
+    inv = _find(session, principal, ident)
+    return {"items": [reviews.out(r) for r in inv.reviews]}
+
+
 # ── Synchronous analysis ──────────────────────────────────────
 
 def _analyze_inline(session, principal, kind: str, content: str):
@@ -500,3 +569,72 @@ def admin_audit_logs(
          "detail": r.detail, "created_at": service.iso(r.created_at)}
         for r in rows
     ]}
+
+
+# ── Human review ──────────────────────────────────────────────
+
+_REVIEWER = require_role("ANALYST", "ADMIN")
+
+
+@admin_router.get("/reviews")
+def admin_review_queue(
+    status: Literal["open", "recorded", "resolved", "all"] = Query("open"),
+    kind: Optional[Literal["feedback", "appeal"]] = Query(None),
+    page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200),
+    principal: Principal = Depends(_REVIEWER),
+    session: Session = Depends(get_session),
+):
+    """The review queue, oldest first. Appeals are `open`; plain feedback is `recorded`."""
+    from truthshield.investigations import reviews
+
+    return reviews.queue(session, status=status, kind=kind, page=page, page_size=page_size)
+
+
+@admin_router.get("/reviews/accuracy")
+def admin_review_accuracy(
+    days: int = Query(90, ge=1, le=365),
+    principal: Principal = Depends(_REVIEWER),
+    session: Session = Depends(get_session),
+):
+    """
+    The automated result measured against reviewer decisions, with counts.
+
+    Reviewed cases are self-selected (disputed or commented on); read the
+    caveats in the response before treating any rate as overall accuracy.
+    """
+    from truthshield.investigations import reviews
+
+    return reviews.accuracy(session, days=days)
+
+
+@admin_router.get("/reviews/{review_id}")
+def admin_review_detail(
+    review_id: str,
+    principal: Principal = Depends(_REVIEWER),
+    session: Session = Depends(get_session),
+):
+    """One review with the investigation's redacted input and result."""
+    from truthshield.investigations import reviews
+
+    try:
+        return reviews.out(reviews.find(session, review_id), with_investigation=True)
+    except InvestigationError as exc:
+        _raise(exc)
+
+
+@admin_router.patch("/reviews/{review_id}")
+def admin_resolve_review(
+    review_id: str,
+    body: ReviewDecision,
+    principal: Principal = Depends(_REVIEWER),
+    session: Session = Depends(get_session),
+):
+    """Record a reviewer decision. The automated result is not changed."""
+    from truthshield.investigations import reviews
+
+    try:
+        review = reviews.resolve(session, principal, reviews.find(session, review_id),
+                                 label=body.label, note=body.note)
+    except InvestigationError as exc:
+        _raise(exc)
+    return reviews.out(review)

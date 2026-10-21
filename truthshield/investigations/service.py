@@ -348,6 +348,97 @@ def create_file_investigation(session: Session, principal: Principal, stored) ->
     return inv
 
 
+def reanalyze(session: Session, principal: Principal, inv: Investigation) -> Investigation:
+    """
+    Run the current pipeline again over the input already stored for `inv`.
+
+    A new investigation, never an overwrite: the earlier result stays as it
+    was, and the new one records which investigation it re-ran, so the two
+    can be compared (engine and config versions are in each result). The
+    duplicate-submission guard does not apply -- re-running is the point.
+    """
+    if not InvestigationStatus(inv.status).is_terminal:
+        raise InvestigationError(409, "NOT_READY", "This investigation is still running.")
+    source = inv.inputs[0] if inv.inputs else None
+    if source is None or (source.content is None and not source.storage_key):
+        raise InvestigationError(409, "INPUT_UNAVAILABLE", "The original input is no longer stored.")
+    if source.storage_key:
+        from truthshield.storage import get_storage
+        if not get_storage().exists(source.storage_key):
+            raise InvestigationError(409, "INPUT_UNAVAILABLE", "The original file is no longer stored.")
+
+    new = Investigation(
+        public_id=next_public_id(session),
+        # It stays in the owner's history even when an administrator re-runs it.
+        user_id=inv.user_id,
+        org_id=inv.org_id,
+        type=inv.type,
+        status=InvestigationStatus.QUEUED.value,
+        input_sha256=inv.input_sha256,
+        excerpt=inv.excerpt,
+        is_demo=inv.is_demo,
+    )
+    session.add(new)
+    session.flush()
+    session.add(InvestigationInput(
+        investigation_id=new.id,
+        kind=source.kind,
+        content=source.content,
+        redacted_content=source.redacted_content,
+        sha256=source.sha256,
+        size_bytes=source.size_bytes,
+        mime_type=source.mime_type,
+        filename=source.filename,
+        storage_key=source.storage_key,
+        meta={**(source.meta or {}), "reanalysis_of": str(inv.id), "reanalysis_of_public_id": inv.public_id},
+    ))
+    session.commit()
+    session.refresh(new)
+
+    from truthshield.services.audit import record
+    record(session, principal, "investigation.reanalyze", f"investigation:{new.public_id}",
+           {"of": inv.public_id})
+    return new
+
+
+def _previous_run(inv: Investigation, source) -> Optional[dict]:
+    meta = (source.meta or {}) if source else {}
+    if not meta.get("reanalysis_of"):
+        return None
+    from sqlalchemy.orm import object_session
+
+    prev = None
+    session = object_session(inv)
+    if session is not None:
+        try:
+            prev = session.get(Investigation, uuid.UUID(meta["reanalysis_of"]))
+        except ValueError:
+            prev = None
+    if prev is None:
+        return {"public_id": meta.get("reanalysis_of_public_id"), "available": False}
+    risk = (prev.result or {}).get("risk") or {}
+    return {
+        "id": str(prev.id), "public_id": prev.public_id, "available": True,
+        "status": prev.status, "risk_score": prev.risk_score, "risk_level": prev.risk_level,
+        "confidence": prev.confidence, "classification": prev.classification,
+        "config_version": (risk.get("config") or {}).get("version"),
+        "schema_version": (prev.result or {}).get("schema_version"),
+        "completed_at": iso(prev.completed_at),
+    }
+
+
+def _review_state(inv: Investigation) -> dict:
+    reviews = list(inv.reviews)
+    resolved = [r for r in reviews if r.status == "resolved"]
+    latest = max(resolved, key=lambda r: r.resolved_at) if resolved else None
+    return {
+        "count": len(reviews),
+        "open_appeal": any(r.kind == "appeal" and r.status == "open" for r in reviews),
+        "reviewer_label": latest.reviewer_label if latest else None,
+        "reviewed_at": iso(latest.resolved_at) if latest else None,
+    }
+
+
 def delete(session: Session, principal: Principal, inv: Investigation) -> None:
     public_id = inv.public_id
     keys = {i.storage_key for i in inv.inputs if i.storage_key}
@@ -448,6 +539,8 @@ def detail(inv: Investigation, principal: Principal) -> dict:
             "has_file": bool(source and source.storage_key and owner),
         },
         "result": inv.result,
+        "reanalysis_of": _previous_run(inv, source),
+        "review": _review_state(inv),
     }
 
 

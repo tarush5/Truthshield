@@ -275,6 +275,46 @@ class Investigation(Base, TimestampMixin):
                                 cascade="all, delete-orphan", passive_deletes=True)
     predictions = relationship("ModelPrediction", back_populates="investigation",
                                cascade="all, delete-orphan", passive_deletes=True)
+    reviews = relationship("InvestigationReview", back_populates="investigation",
+                           cascade="all, delete-orphan", passive_deletes=True,
+                           order_by="InvestigationReview.created_at")
+
+
+class InvestigationReview(Base, TimestampMixin):
+    """
+    A person's view of an investigation: the submitter's feedback or appeal,
+    and a reviewer's decision on it.
+
+    Stored beside the deterministic result, never written into it: a
+    reviewer's label does not change the score, level or claim assessments.
+    The system's answer at the time is snapshotted here so accuracy can be
+    measured against reviewed cases even after reanalysis or a config change.
+    """
+
+    __tablename__ = "investigation_reviews"
+    __table_args__ = (Index("ix_investigation_reviews_queue", "status", "kind", "created_at"),)
+
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    investigation_id = Column(GUID, ForeignKey("investigations.id", ondelete="CASCADE"),
+                              nullable=False, index=True)
+    author_id = Column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    kind = Column(String(16), nullable=False)          # feedback | appeal
+    user_label = Column(String(16), nullable=False)    # fraud | legitimate | unsure
+    comment = Column(Text, nullable=True)              # redacted before storage
+    status = Column(String(16), nullable=False)        # recorded | open | resolved
+
+    system_score = Column(Integer, nullable=True)
+    system_level = Column(String(12), nullable=True)
+    system_confidence = Column(Float, nullable=True)
+    system_classification = Column(String(48), nullable=True)
+    system_config_version = Column(String(32), nullable=True)
+
+    reviewer_id = Column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewer_label = Column(String(16), nullable=True)  # fraud | legitimate | inconclusive
+    reviewer_note = Column(Text, nullable=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+
+    investigation = relationship("Investigation", back_populates="reviews")
 
 
 class InvestigationInput(Base, TimestampMixin):

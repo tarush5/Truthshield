@@ -17,6 +17,8 @@ longer exists.
 
 from __future__ import annotations
 
+import concurrent.futures
+import contextvars
 import hashlib
 import logging
 import time
@@ -278,34 +280,46 @@ class InvestigationRunner:
                 )
                 st.detail = {"input_kinds": kinds, "fraud_categories": cats}
 
-        with recorder.stage(Stage.FEATURE_EXTRACTION, url_engine.name) as st:
-            url_result = url_engine.run(ctx)
-            engines.append(url_result)
-            if url_result.status is EngineStatus.NOT_APPLICABLE:
-                raise StageSkipped("No URLs in the input.")
-            st.message = f"URL features computed for {url_result.features.get('urls_examined', 0)} link(s)"
-
-        with recorder.stage(Stage.MODEL_ANALYSIS, "detectors") as st:
-            predictions = [p for e in engines for p in e.predictions]
-            signals = [s for e in engines for s in e.signals]
-            st.message = (
-                f"{len(predictions)} detector outputs, {len(signals)} signals. "
-                "Phase 1 detectors are rule-based; no trained model is configured for this input type."
-            )
-            st.detail = {"detectors": sorted({p.model_name for p in predictions})}
-
+        # Evidence retrieval and the URL engine's page fetch are both network
+        # waits, and neither reads the other's output: evidence needs only the
+        # claims extracted above and opens its own DB session and event loop.
+        # So retrieval starts now and is collected at its own stage; stage
+        # order and the timeline are unchanged.
         evidence_engine = evidence_engines()[0]
-        with recorder.stage(Stage.EVIDENCE_RETRIEVAL, evidence_engine.name) as st:
-            evidence_result = evidence_engine.run(ctx)
-            engines.append(evidence_result)
-            if evidence_result.status is EngineStatus.NOT_APPLICABLE:
-                raise StageSkipped("No checkable factual claims were extracted.")
-            if evidence_result.status is not EngineStatus.OK:
-                raise StageSkipped(evidence_result.detail or "Evidence retrieval unavailable.")
-            st.message = (
-                f"{evidence_result.features.get('claims_checked', 0)} claim(s) checked, "
-                f"{evidence_result.features.get('sources_retrieved', 0)} sources retrieved"
-            )
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="evidence")
+        evidence_future = pool.submit(contextvars.copy_context().run, evidence_engine.run, ctx)
+        try:
+            with recorder.stage(Stage.FEATURE_EXTRACTION, url_engine.name) as st:
+                url_result = url_engine.run(ctx)
+                engines.append(url_result)
+                if url_result.status is EngineStatus.NOT_APPLICABLE:
+                    raise StageSkipped("No URLs in the input.")
+                st.message = f"URL features computed for {url_result.features.get('urls_examined', 0)} link(s)"
+
+            with recorder.stage(Stage.MODEL_ANALYSIS, "detectors") as st:
+                predictions = [p for e in engines for p in e.predictions]
+                signals = [s for e in engines for s in e.signals]
+                st.message = (
+                    f"{len(predictions)} detector outputs, {len(signals)} signals. "
+                    "Phase 1 detectors are rule-based; no trained model is configured for this input type."
+                )
+                st.detail = {"detectors": sorted({p.model_name for p in predictions})}
+
+            with recorder.stage(Stage.EVIDENCE_RETRIEVAL, evidence_engine.name) as st:
+                evidence_result = evidence_future.result()
+                engines.append(evidence_result)
+                st.detail = {"engine_ms": evidence_result.duration_ms, "concurrent_with": "url"}
+                if evidence_result.status is EngineStatus.NOT_APPLICABLE:
+                    raise StageSkipped("No checkable factual claims were extracted.")
+                if evidence_result.status is not EngineStatus.OK:
+                    raise StageSkipped(evidence_result.detail or "Evidence retrieval unavailable.")
+                st.message = (
+                    f"{evidence_result.features.get('claims_checked', 0)} claim(s) checked, "
+                    f"{evidence_result.features.get('sources_retrieved', 0)} sources retrieved"
+                )
+        finally:
+            # On a failure above, do not hold the error back for a slow search.
+            pool.shutdown(wait=False, cancel_futures=True)
 
         with recorder.stage(Stage.CROSS_MODAL_ANALYSIS, "risk") as st:
             contributing = [e.engine for e in engines if e.signals]

@@ -86,7 +86,7 @@ PATTERNS: Tuple[Pattern, ...] = (
         (
             r"\b(?:otp|one[\s-]?time\s*(?:password|code)|verification\s*code)\b.{0,40}"
             r"\b(?:share|send|tell|provide|forward|batao|bhejo|do)\b",
-            r"\b(?:share|send|tell|provide|forward)\b.{0,30}\b(?:otp|pin|cvv)\b",
+            r"\b(?:share|send|tell|provide|forward|read\s*out)\b.{0,30}\b(?:otp|pin|cvv)\b",
             r"\bcollect\s*request\b",
             r"\b(?:tell|give|read|share)\s*(?:me|us)\b.{0,25}\b(?:code|otp|pin)\b",
             r"\bto\s*(?:get|receive)\b.{0,60}\b(?:scan|qr\s*code|upi\s*pin|enter\s*(?:your\s*)?pin)",
@@ -148,7 +148,7 @@ PATTERNS: Tuple[Pattern, ...] = (
         (
             r"\b(?:work from home|part[\s-]?time job|daily (?:income|earning|payout))\b",
             r"\bearn\b.{0,25}(?:rs\.?|inr|₹|\$)\s*\d[\d,]*.{0,20}\b(?:daily|per day|day)\b",
-            r"\b(?:registration|security|training)\s*(?:fee|deposit|amount)\b",
+            r"\b(?:security|training)\s*(?:fee|deposit|amount)\b",
             r"\b(?:like|rate|review)\b.{0,25}\b(?:task|video|product|hotel)\b.{0,25}\bearn",
             r"\bjob\s*offer\b.{0,40}\bno\s*(?:interview|experience)\b",
         ),
@@ -262,8 +262,28 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"posts?|tasks?)\b.{0,60}\b(?:earn|salary|income|paid)",
             r"\b(?:hr|recruiter|recruitment|hiring)\b.{0,40}\b(?:telegram|whatsapp)\b",
             r"\b(?:salary|income)\b.{0,30}\d[\d,]*\s*(?:weekly|daily|per\s*day)",
+            # Hinglish: "roz 2000 kamao", "3000 rupaye roz kamao", "ghar baithe kamao".
+            r"\b(?:roz|rozana|har\s*din|daily)\b.{0,20}\d[\d,]*.{0,20}\bkama(?:o|ye|iye|en)\b",
+            r"\d[\d,]*.{0,20}\b(?:roz|rozana|per\s*day|daily)\b.{0,15}\bkama(?:o|ye|iye|en)\b",
+            r"\bghar\s*baithe\b.{0,40}\bkama(?:o|ye|iye|en|i)\b",
         ),
         code="scam_paid_task_job",
+    ),
+    Pattern(
+        FraudCategory.JOB_SCAM, "Fee to get hired", Severity.HIGH,
+        "A job, selection or offer letter that depends on paying a fee or deposit first "
+        "(training, onboarding, joining kit, uniform). Real employers do not charge "
+        "candidates to hire them.",
+        "Do not pay. Confirm the offer with the company through its official careers page "
+        "or an HR contact you find yourself.",
+        (
+            r"\b(?:selected|selection|shortlisted|offer\s*letter|joining|appointment|interview|vacancy)\b"
+            r".{0,140}\b(?:fees?|charges?|deposit|jama)\b",
+            r"\b(?:fees?|charges?|deposit)\b.{0,100}\b(?:offer\s*letter|joining|appointment|first\s*day)\b",
+            r"\b(?:earn|kamao|kamaye|income|salary)\b.{0,160}\bregistration\s*(?:fees?|charges?|amount)\b",
+            r"\bregistration\s*(?:fees?|charges?|amount)\b.{0,100}\b(?:earn|kamao|kamaye|income|salary)\b",
+        ),
+        code="scam_job_fee",
     ),
     Pattern(
         FraudCategory.ADVANCE_FEE, "Fee to release money", Severity.HIGH,
@@ -271,7 +291,10 @@ PATTERNS: Tuple[Pattern, ...] = (
         "released. Genuine payouts are never conditional on an upfront payment.",
         "Do not pay. Contact the organisation named through details you find yourself.",
         (
-            r"\b(?:processing|clearance|release|insurance|activation|registration|handling|"
+            # Not "registration": exam, school and event registration fees
+            # are routine; a registration fee to claim a prize or a job is
+            # caught by those patterns, with their context.
+            r"\b(?:processing|clearance|release|insurance|activation|handling|"
             r"transfer|verification|file|delivery)\s*(?:fees?|charges?|amount)\b.{0,60}"
             r"(?:rs\.?|inr|₹|\$|\d|pay|today|first|to\s*(?:get|receive|release))",
             r"\bto\s*(?:release|receive|get|claim|activate)\b.{0,50}\bpay\b",
@@ -400,6 +423,17 @@ _ROUTINE_AFTER = re.compile(r"^.{0,40}\b(?:delivery\s*(?:agent|partner|executive
 _SECRECY_CODES = ("don't", "do not", "can't", "cannot", "dont")
 
 
+# "O T P", "o.t.p", "C-V-V", "K Y C": letters spelled out one by one to slip
+# past keyword filters. Runs of 2-6 single letters separated by a space, dot
+# or hyphen are joined back into one word before matching. Letters next to
+# digits ("Q 3") or inside longer words are left alone.
+_SPELLED_OUT = re.compile(r"(?<![\w.\-])(?:[a-z][ .\-]){1,5}[a-z](?![\w\-]|\.\w)")
+
+
+def _join_spelled_out(text: str) -> str:
+    return _SPELLED_OUT.sub(lambda m: re.sub(r"[ .\-]", "", m.group(0)), text)
+
+
 def _first_affirmative(expression: str, text: str) -> Optional[str]:
     """The first match of `expression` in `text` that is not negated, or None."""
     for found in re.finditer(expression, text, re.IGNORECASE | re.DOTALL):
@@ -434,7 +468,7 @@ class MessageScamDetector(FraudDetector):
         return bool(text) and len(text.split()) >= self.MIN_WORDS
 
     def _run(self, text: str, classification: Classification) -> Optional[FraudFinding]:
-        lowered = text.lower()
+        lowered = _join_spelled_out(text.lower())
 
         matched: List[Tuple[Pattern, str]] = []
         for pattern in PATTERNS:

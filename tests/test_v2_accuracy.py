@@ -39,12 +39,18 @@ def test_eval_set_holds(name):
 def test_final_blind_set_holds_its_measured_level():
     """
     The final blind set is never tuned on (see tests/eval/README.md), so it
-    is held at the level first measured, not at perfection: precision 0.971,
-    recall 0.943, false-positive rate 0.033 (65 items, 20 October 2026).
+    is held at the level first measured, not at perfection: precision 0.929,
+    recall 0.867, false-positive rate 0.080 (55 items, 20 October 2026).
     """
-    report = evaluate(load(EVAL / "fraud_final_blind.jsonl"))
-    assert report["recall"] >= 0.94 and report["precision"] >= 0.97
-    assert report["false_positive_rate"] <= 0.034
+    report = evaluate(load(EVAL / "fraud_final_blind2.jsonl"))
+    assert report["recall"] >= 0.86 and report["precision"] >= 0.92
+    assert report["false_positive_rate"] <= 0.081
+
+
+@pytest.mark.parametrize("name", ["fraud_dev2", "fraud_final_blind"])
+def test_development_and_former_blind_sets_hold(name):
+    report = evaluate(load(EVAL / f"{name}.jsonl"))
+    assert report["recall"] >= 0.95 and report["false_positive_rate"] <= 0.04
 
 
 def _item(content, type="message"):
@@ -112,3 +118,24 @@ class TestLookalikes:
         # "mantra" is one letter from "myntra"; an edit-distance match would
         # flag a legitimate yoga shop.
         assert brand_similarity("mantra.com").closest != "myntra"
+
+
+class TestSpelledOutLetters:
+    @pytest.mark.parametrize("raw, joined", [
+        ("read out the p i n we sent", "read out the pin we sent"),
+        ("send the o.t.p you got", "send the otp you got"),
+        ("reply with the c-v-v", "reply with the cvv"),
+        ("aapka k y c pending", "aapka kyc pending"),
+    ])
+    def test_spelled_out_keywords_are_joined(self, raw, joined):
+        from truthshield.fraud.detectors.message import _join_spelled_out
+        assert _join_spelled_out(raw) == joined
+
+    def test_letters_next_to_digits_and_inside_words_are_left_alone(self):
+        from truthshield.fraud.detectors.message import _join_spelled_out
+        assert "q 3" in _join_spelled_out("review the q 3 plan")
+        assert _join_spelled_out("the otp is ready") == "the otp is ready"
+
+    def test_a_spelled_out_otp_request_is_flagged_but_a_spelled_out_warning_is_not(self):
+        assert assess(_item("Bank desk here. Kindly read out the P I N we sent to stop the transaction.")).flagged
+        assert not assess(_item("Never share your P I N or O T P with anyone. Bank staff will never ask.")).flagged

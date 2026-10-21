@@ -362,6 +362,8 @@ class InvestigationRunner:
         with recorder.stage(Stage.REPORT, "report") as st:
             result = self._payload(inv, source, ctx, engines, assessment, classification,
                                    category, explanation, uncertainties, actions)
+            from truthshield.investigations import report
+            result["report"] = report.build(result)
             st.message = f"Structured result assembled ({len(result['signals'])} signals)"
 
         with recorder.stage(Stage.STORAGE, "database") as st:

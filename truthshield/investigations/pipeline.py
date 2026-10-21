@@ -333,7 +333,8 @@ class InvestigationRunner:
 
             classification, category = explain.classify(assessment, engines)
             uncertainties = explain.uncertainties(engines, assessment)
-            actions = explain.recommended_actions(classification, category)
+            # A copy: the action tables are shared module constants.
+            actions = {**explain.recommended_actions(classification, category), **explain.urgency(assessment)}
             evidence_result = next((e for e in engines if e.engine == "evidence"), None)
             checked_claims = (evidence_result.artifacts.get("claims") or []) if evidence_result else []
             llm_block, llm_record = interpret(assessment, checked_claims, uncertainties, ctx.input_sha256)

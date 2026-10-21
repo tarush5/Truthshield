@@ -126,6 +126,23 @@ DOCUMENT_ACTIONS = {
 }
 
 
+URGENCY = {
+    "CRITICAL": ("act_now", "Strong warning signs. Do not act on this content; if you already did, act on the steps below now."),
+    "HIGH": ("act_now", "Clear warning signs. Do not act on this content until it is verified independently."),
+    "MEDIUM": ("verify_first", "Some warning signs. Verify through a channel you already trust before acting."),
+    "LOW": ("stay_alert", "Few or no warning signs in what was checked. Stay alert to requests for money or codes."),
+}
+
+
+def urgency(assessment: RiskAssessment) -> dict:
+    """How urgently to follow the advice: from the level, or 'unverified' when abstaining."""
+    if assessment.determination == "INCONCLUSIVE":
+        return {"urgency": "unverified",
+                "urgency_note": "Nothing could be concluded from the checks that ran; treat the content as unverified."}
+    key, note = URGENCY.get(assessment.level, URGENCY["LOW"])
+    return {"urgency": key, "urgency_note": note}
+
+
 def recommended_actions(classification: str, category: FraudCategory) -> dict:
     if classification == "inconclusive":
         return INCONCLUSIVE_ACTIONS

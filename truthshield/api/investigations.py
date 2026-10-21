@@ -455,6 +455,17 @@ def dashboard_summary(
     return service.dashboard(session, principal, days=days)
 
 
+@platform_router.get("/dashboard/patterns")
+def dashboard_patterns(
+    days: int = Query(30, ge=1, le=365),
+    limit: int = Query(15, ge=1, le=50),
+    principal: Principal = Depends(require_principal),
+    session: Session = Depends(get_session),
+):
+    """Risk factors and classifications rising or falling against the previous window."""
+    return service.scam_patterns(session, principal, days=days, limit=limit)
+
+
 @platform_router.get("/engines")
 def engines(principal: Principal = Depends(require_principal)):
     from truthshield.investigations.engines import catalogue

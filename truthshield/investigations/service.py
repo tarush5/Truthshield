@@ -663,3 +663,62 @@ def dashboard(session: Session, principal: Principal, *, days: int = 30) -> dict
         "top_risk_factors": [{"code": c, "title": t, "count": n} for c, t, n in factor_rows],
         "recent": [summary(r) for r in recent],
     }
+
+
+def scam_patterns(session: Session, principal: Principal, *, days: int = 30, limit: int = 15) -> dict:
+    """
+    Which risk factors and classifications are rising or falling: this
+    window against the window of the same length before it.
+
+    Counts of investigations, not of the world: they reflect what users chose
+    to submit. A change on a handful of cases is noise, so each row carries
+    both counts and the change is null when the earlier window was empty.
+    """
+    days = max(1, min(days, 365))
+    now = datetime.now(timezone.utc)
+    current_start, previous_start = now - timedelta(days=days), now - timedelta(days=2 * days)
+
+    def factor_counts(start, end):
+        query = (
+            session.query(RiskFactor.code, RiskFactor.title, func.count(func.distinct(RiskFactor.investigation_id)))
+            .join(Investigation, RiskFactor.investigation_id == Investigation.id)
+            .filter(Investigation.created_at >= start, Investigation.created_at < end, RiskFactor.points > 0)
+        )
+        if principal.role != "ADMIN":
+            query = query.filter(Investigation.user_id == principal.user_id)
+        return {code: (title, n) for code, title, n in query.group_by(RiskFactor.code, RiskFactor.title).all()}
+
+    def class_counts(start, end):
+        rows = (_scoped(session, principal)
+                .filter(Investigation.created_at >= start, Investigation.created_at < end,
+                        Investigation.classification.isnot(None))
+                .with_entities(Investigation.classification, func.count())
+                .group_by(Investigation.classification).all())
+        return dict(rows)
+
+    def rows(current: dict, previous: dict):
+        out = []
+        for key in set(current) | set(previous):
+            cur = current.get(key)
+            prev = previous.get(key)
+            cur_n = (cur[1] if isinstance(cur, tuple) else cur) or 0
+            prev_n = (prev[1] if isinstance(prev, tuple) else prev) or 0
+            out.append({
+                "key": key,
+                "title": (cur or prev)[0] if isinstance(cur or prev, tuple) else None,
+                "current": cur_n,
+                "previous": prev_n,
+                "change": round((cur_n - prev_n) / prev_n, 2) if prev_n else None,
+            })
+        out.sort(key=lambda r: (-(r["current"] - r["previous"]), -r["current"], r["key"]))
+        return out[:limit]
+
+    return {
+        "window_days": days,
+        "scope": "all" if principal.role == "ADMIN" else "own",
+        "current_window_start": iso(current_start),
+        "previous_window_start": iso(previous_start),
+        "risk_factors": rows(factor_counts(current_start, now), factor_counts(previous_start, current_start)),
+        "classifications": rows(class_counts(current_start, now), class_counts(previous_start, current_start)),
+        "note": "Counts of submitted investigations, not prevalence in the wild. Rising means submitted more often.",
+    }

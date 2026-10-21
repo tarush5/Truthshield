@@ -184,3 +184,59 @@ class TestReanalysis:
         inv = investigate(client, user, SCAM)
         assert client.post(f"/api/v1/investigations/{inv['id']}/reanalyze",
                            headers=account(client)).status_code == 404
+
+
+class TestReviewPrivacyAndCategories:
+    def test_plain_feedback_never_exposes_content_to_reviewers(self, client, user, analyst):
+        inv = investigate(client, user, SCAM)
+        fb = feedback(client, user, inv["id"], label="legitimate", category="false_positive").json()
+        detail = client.get(f"/api/v1/admin/reviews/{fb['id']}", headers=analyst).json()
+        assert detail["investigation"]["content_available"] is False
+        assert "redacted_input" not in detail["investigation"] and "result" not in detail["investigation"]
+        assert detail["category"] == "false_positive"
+
+    def test_feedback_can_name_a_finding_from_this_result_only(self, client, user):
+        inv = investigate(client, user, SCAM)
+        code = inv["risk_factors"][0]["code"]
+        r = feedback(client, user, inv["id"], label="legitimate", category="false_positive", finding=code)
+        assert r.status_code == 201 and r.json()["finding"] == code
+        bad = feedback(client, user, inv["id"], label="legitimate", finding="not_a_real_signal")
+        assert bad.status_code == 400
+
+    def test_detector_versions_are_snapshotted(self, client, user):
+        inv = investigate(client, user, SCAM)
+        versions = feedback(client, user, inv["id"], label="fraud").json()["system"]["versions"]
+        assert versions["text"] and versions["schema"] == inv["result"]["schema_version"]
+
+    def test_unknown_category_is_rejected(self, client, user):
+        inv = investigate(client, user, SCAM)
+        assert feedback(client, user, inv["id"], label="fraud", category="vibes").status_code == 422
+
+
+class TestReanalysisChanges:
+    def test_identical_rerun_reports_no_difference(self, client, user):
+        inv = investigate(client, user, SCAM)
+        new_id = client.post(f"/api/v1/investigations/{inv['id']}/reanalyze", headers=user).json()["id"]
+        changes = client.get(f"/api/v1/investigations/{new_id}", headers=user).json()["reanalysis_of"]["changes"]
+        assert changes["unchanged"] is True
+        assert changes["reasons"] == ["No difference: the same input produced the same result."]
+
+    def test_differences_are_named(self):
+        from truthshield.investigations.service import result_changes
+
+        before = {"classification": "potential_scam", "engines": [{"name": "text", "version": "1.0"}],
+                  "risk": {"score": 40, "level": "MEDIUM", "config": {"version": "a"},
+                           "contributions": [{"code": "old_sig", "title": "Old", "points": 40}]},
+                  "claims": [{"text": "The bridge reopened.", "assessment": "INSUFFICIENT_EVIDENCE"}]}
+        after = {"classification": "potential_scam", "engines": [{"name": "text", "version": "1.1"}],
+                 "risk": {"score": 70, "level": "HIGH", "config": {"version": "a"},
+                          "contributions": [{"code": "new_sig", "title": "New", "points": 70}]},
+                 "claims": [{"text": "The bridge reopened.", "assessment": "SUPPORTED"}]}
+        c = result_changes(before, after)
+        assert c["score"] == {"before": 40, "after": 70} and c["level"]["after"] == "HIGH"
+        assert c["signals_added"] == [{"code": "new_sig", "title": "New"}]
+        assert c["signals_removed"] == [{"code": "old_sig", "title": "Old"}]
+        assert c["engines_changed"] == [{"engine": "text", "before": "1.0", "after": "1.1"}]
+        assert c["claims_changed"][0]["after"] == "SUPPORTED"
+        assert not c["config_changed"] and not c["unchanged"]
+        assert any("text 1.0 -> 1.1" in r for r in c["reasons"])

@@ -67,6 +67,10 @@ class FeedbackBody(BaseModel):
         ..., description="What you believe the content is.")
     comment: Optional[str] = Field(None, max_length=2000, description="Optional; redacted before storage.")
     appeal: bool = Field(False, description="Ask a reviewer to look at this result.")
+    category: Optional[Literal["false_positive", "missed_threat", "incorrect_evidence", "broken_citation",
+                               "outdated_information", "unclear_explanation", "other"]] = None
+    finding: Optional[str] = Field(None, max_length=64,
+                                   description="A signal code or claim id from this result, if the feedback is about one.")
 
 
 class ReviewDecision(BaseModel):
@@ -349,7 +353,8 @@ def investigation_feedback(
 
     try:
         review = reviews.submit(session, principal, _find(session, principal, ident),
-                                label=body.label, comment=body.comment, appeal=body.appeal)
+                                label=body.label, comment=body.comment, appeal=body.appeal,
+                                category=body.category, finding=body.finding)
     except InvestigationError as exc:
         _raise(exc)
     return reviews.out(review)

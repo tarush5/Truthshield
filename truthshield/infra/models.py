@@ -302,12 +302,17 @@ class InvestigationReview(Base, TimestampMixin):
     user_label = Column(String(16), nullable=False)    # fraud | legitimate | unsure
     comment = Column(Text, nullable=True)              # redacted before storage
     status = Column(String(16), nullable=False)        # recorded | open | resolved
+    # What kind of problem, and which finding (signal code or claim id) it is about.
+    category = Column(String(32), nullable=True)
+    finding = Column(String(64), nullable=True)
 
     system_score = Column(Integer, nullable=True)
     system_level = Column(String(12), nullable=True)
     system_confidence = Column(Float, nullable=True)
     system_classification = Column(String(48), nullable=True)
     system_config_version = Column(String(32), nullable=True)
+    # {engine: version} plus the result schema version, at feedback time.
+    system_versions = Column(JSONType, nullable=True)
 
     reviewer_id = Column(GUID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     reviewer_label = Column(String(16), nullable=True)  # fraud | legitimate | inconclusive

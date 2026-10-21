@@ -8,6 +8,9 @@ Rules this module holds to:
   assessments stay what the engines produced; a reviewer's decision sits
   beside them, attributed and timestamped.
 * A reviewer cannot decide an appeal they filed themselves.
+* Reviewers see an investigation's (redacted) content only through an
+  appeal -- the submitter asking for a human to look. Plain feedback shows
+  the label, category and comment, never the content.
 * Comments are redacted before storage, like every other submitted text.
 * Accuracy is computed only from reviewer decisions, with every rate next to
   its denominator, and with the selection bias stated: reviewed cases are the
@@ -27,6 +30,8 @@ from truthshield.investigations.service import InvestigationError, iso
 from truthshield.services.auth import Principal
 
 USER_LABELS = ("fraud", "legitimate", "unsure")
+CATEGORIES = ("false_positive", "missed_threat", "incorrect_evidence", "broken_citation",
+              "outdated_information", "unclear_explanation", "other")
 REVIEWER_LABELS = ("fraud", "legitimate", "inconclusive")
 # The same line the offline evaluation uses: MEDIUM or above is "flagged".
 FLAGGED_LEVELS = ("MEDIUM", "HIGH", "CRITICAL")
@@ -40,12 +45,32 @@ def _redact(text: Optional[str]) -> Optional[str]:
     return redact(text)[0] if text else None
 
 
+def _findings(inv: Investigation) -> set:
+    result = inv.result or {}
+    codes = {c.get("code") for c in ((result.get("risk") or {}).get("contributions") or [])}
+    claims = {c.get("id") for c in (result.get("claims") or [])}
+    return {x for x in codes | claims if x}
+
+
+def _versions(inv: Investigation) -> dict:
+    result = inv.result or {}
+    versions = {e["name"]: e.get("version") for e in (result.get("engines") or []) if e.get("name")}
+    versions["schema"] = result.get("schema_version")
+    return versions
+
+
 def submit(session: Session, principal: Principal, inv: Investigation, *,
-           label: str, comment: Optional[str] = None, appeal: bool = False) -> InvestigationReview:
+           label: str, comment: Optional[str] = None, appeal: bool = False,
+           category: Optional[str] = None, finding: Optional[str] = None) -> InvestigationReview:
     if inv.status != "COMPLETED":
         raise InvestigationError(409, "NOT_READY", "Feedback can be given once the investigation has completed.")
     if label not in USER_LABELS:
         raise InvestigationError(400, "BAD_REQUEST", f"label must be one of: {', '.join(USER_LABELS)}.")
+    if category is not None and category not in CATEGORIES:
+        raise InvestigationError(400, "BAD_REQUEST", f"category must be one of: {', '.join(CATEGORIES)}.")
+    if finding is not None and finding not in _findings(inv):
+        # Only findings this investigation actually reported can be disputed.
+        raise InvestigationError(400, "BAD_REQUEST", "finding must be a signal code or claim id from this result.")
 
     kind = "appeal" if appeal else "feedback"
     existing = None
@@ -62,6 +87,9 @@ def submit(session: Session, principal: Principal, inv: Investigation, *,
     review.user_label = label
     review.comment = _redact(comment)
     review.status = "open" if appeal else "recorded"
+    review.category = category
+    review.finding = finding
+    review.system_versions = _versions(inv)
     review.system_score = inv.risk_score
     review.system_level = inv.risk_level
     review.system_confidence = inv.confidence
@@ -117,11 +145,14 @@ def out(review: InvestigationReview, *, with_investigation: bool = False) -> dic
         "kind": review.kind,
         "status": review.status,
         "user_label": review.user_label,
+        "category": review.category,
+        "finding": review.finding,
         "comment": review.comment,
         "system": {
             "score": review.system_score, "level": review.system_level,
             "confidence": review.system_confidence, "classification": review.system_classification,
             "config_version": review.system_config_version,
+            "versions": review.system_versions,
         },
         "reviewer_label": review.reviewer_label,
         "reviewer_note": review.reviewer_note,
@@ -129,7 +160,7 @@ def out(review: InvestigationReview, *, with_investigation: bool = False) -> dic
         "created_at": iso(review.created_at),
         "note": "A reviewer's decision is recorded beside the automated result; it does not change it.",
     }
-    if with_investigation:
+    if with_investigation and review.kind == "appeal":
         inv = review.investigation
         source = inv.inputs[0] if inv.inputs else None
         data["investigation"] = {
@@ -138,6 +169,12 @@ def out(review: InvestigationReview, *, with_investigation: bool = False) -> dic
             # Reviewers work from the redacted copy, never the original.
             "redacted_input": source.redacted_content if source else None,
             "result": inv.result,
+        }
+    elif with_investigation:
+        data["investigation"] = {
+            "public_id": review.investigation.public_id, "type": review.investigation.type,
+            "content_available": False,
+            "note": "Content is shared with reviewers only when the submitter appeals.",
         }
     return data
 

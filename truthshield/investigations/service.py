@@ -424,6 +424,79 @@ def _previous_run(inv: Investigation, source) -> Optional[dict]:
         "config_version": (risk.get("config") or {}).get("version"),
         "schema_version": (prev.result or {}).get("schema_version"),
         "completed_at": iso(prev.completed_at),
+        "changes": result_changes(prev.result, inv.result),
+    }
+
+
+def result_changes(before: Optional[dict], after: Optional[dict]) -> Optional[dict]:
+    """
+    What differs between two results of the same input, and why.
+
+    Deterministic and descriptive: each reason names a concrete difference
+    (a detector version, the weights, a signal, a claim's evidence). It does
+    not judge which result is right.
+    """
+    if not before or not after:
+        return None
+
+    def risk(r):
+        return r.get("risk") or {}
+
+    def signals(r):
+        return {c["code"]: c.get("title") for c in risk(r).get("contributions") or [] if c.get("points", 0) > 0}
+
+    def engines(r):
+        return {e["name"]: e.get("version") for e in r.get("engines") or [] if e.get("name")}
+
+    def claims(r):
+        return {c.get("text"): c.get("assessment") for c in r.get("claims") or [] if c.get("text")}
+
+    b_sig, a_sig = signals(before), signals(after)
+    b_eng, a_eng = engines(before), engines(after)
+    b_cl, a_cl = claims(before), claims(after)
+    b_cfg = (risk(before).get("config") or {}).get("version")
+    a_cfg = (risk(after).get("config") or {}).get("version")
+
+    engine_changes = [
+        {"engine": name, "before": b_eng.get(name), "after": a_eng.get(name)}
+        for name in sorted(set(b_eng) | set(a_eng)) if b_eng.get(name) != a_eng.get(name)
+    ]
+    claim_changes = [
+        {"claim": text[:200], "before": b_cl.get(text), "after": a_cl.get(text)}
+        for text in sorted(set(b_cl) | set(a_cl)) if b_cl.get(text) != a_cl.get(text)
+    ]
+    added = sorted(set(a_sig) - set(b_sig))
+    removed = sorted(set(b_sig) - set(a_sig))
+
+    reasons = []
+    if engine_changes:
+        reasons.append("Detector versions changed: " + ", ".join(
+            f"{c['engine']} {c['before'] or 'absent'} -> {c['after'] or 'absent'}" for c in engine_changes) + ".")
+    if b_cfg != a_cfg:
+        reasons.append(f"Risk weights or thresholds changed ({b_cfg} -> {a_cfg}).")
+    if added:
+        reasons.append("New signals: " + ", ".join(added) + ".")
+    if removed:
+        reasons.append("Signals no longer present: " + ", ".join(removed) + ".")
+    if claim_changes:
+        reasons.append(f"{len(claim_changes)} claim assessment(s) changed, typically because different "
+                       "evidence was retrieved.")
+    score_before, score_after = risk(before).get("score"), risk(after).get("score")
+    if not reasons and score_before != score_after:
+        reasons.append("The score changed without a change in versions, weights, signals or claims.")
+
+    return {
+        "score": {"before": score_before, "after": score_after},
+        "level": {"before": risk(before).get("level"), "after": risk(after).get("level")},
+        "confidence": {"before": risk(before).get("confidence"), "after": risk(after).get("confidence")},
+        "classification": {"before": before.get("classification"), "after": after.get("classification")},
+        "signals_added": [{"code": c, "title": a_sig[c]} for c in added],
+        "signals_removed": [{"code": c, "title": b_sig[c]} for c in removed],
+        "claims_changed": claim_changes,
+        "engines_changed": engine_changes,
+        "config_changed": b_cfg != a_cfg,
+        "unchanged": not (reasons or score_before != score_after),
+        "reasons": reasons or ["No difference: the same input produced the same result."],
     }
 
 

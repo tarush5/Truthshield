@@ -318,6 +318,7 @@ class InvestigationRunner:
             for engine in engines:
                 if engine.status is EngineStatus.OK:
                     assessed |= ENGINE_FAMILIES.get(engine.engine, set())
+                    assessed |= set(engine.artifacts.get("assessed_families", ()))
             risk_engine = RiskEngine()
             assessment = risk_engine.assess(
                 [s for e in engines for s in e.signals], engines, assessed,

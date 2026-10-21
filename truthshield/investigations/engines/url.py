@@ -38,10 +38,12 @@ FETCH_MAX_BYTES = 2 * 1024 * 1024
 
 ALWAYS_UNCHECKED = [
     "Domain age and registration details were not checked (no WHOIS provider configured).",
-    "The domain was not checked against a reputation or threat-intelligence feed "
-    "(no provider configured), so the reputation family is not assessed.",
     "TLS certificate details were not inspected.",
 ]
+NO_FEED = (
+    "The domain was not checked against a reputation or threat-intelligence feed "
+    "(no provider configured), so the reputation family is not assessed."
+)
 
 
 class UrlEngine(Engine):
@@ -65,6 +67,8 @@ class UrlEngine(Engine):
         urls = urls[:MAX_URLS]
 
         fetch_allowed = settings.URL_FETCH_ENABLED and settings.network_allowed and ctx.allow_page_fetch
+        from truthshield.infra.threat_feed import get_threat_feed
+        feed = get_threat_feed()
         seen_codes = set()
         reports: List[dict] = []
 
@@ -86,6 +90,19 @@ class UrlEngine(Engine):
             codes = {s.code for s in signals}
 
             signals.extend(self._lookalike(features, codes))
+            listed = feed.lookup(url) if feed.configured else None
+            if listed:
+                signals.append(Signal(
+                    code="threat_feed_match", title="Listed on a threat-intelligence feed",
+                    family=Family.REPUTATION, provenance=Provenance.RETRIEVED,
+                    engine=self.name, engine_version=self.version, severity=Severity.HIGH,
+                    explanation=(
+                        f"This {'address' if listed['kind'] == 'url' else 'domain'} appears on the "
+                        f"configured feed '{listed['feed']}' (file updated {listed['feed_updated_at']}). "
+                        "Feeds can lag or contain mistakes, but a listing is direct evidence of reported abuse."
+                    ),
+                    evidence=listed["matched"], confidence=0.9,
+                ))
 
             page = None
             fetch = {"status": "skipped", "reason": "Page retrieval is disabled or the system is offline."}
@@ -112,11 +129,24 @@ class UrlEngine(Engine):
                 "signals": [s.code for s in signals],
                 "page": page,
                 "fetch": fetch,
+                "reputation": ({"checked": True, "listed": bool(listed), "match": listed}
+                               if feed.configured else {"checked": False}),
             })
 
         result.artifacts["urls"] = reports
         result.features["urls_examined"] = len(reports)
         result.limitations.extend(ALWAYS_UNCHECKED)
+        if feed.configured:
+            status = feed.status()
+            result.artifacts["assessed_families"] = ["reputation"]
+            result.artifacts["threat_feed"] = status
+            result.limitations.append(
+                f"Reputation was checked against {status['entries']} entries in "
+                f"{len(status['files'])} local threat feed file(s), only as current as those files. "
+                "Feeds list known threats: a newly created site will not be on them."
+            )
+        else:
+            result.limitations.append(NO_FEED)
         if not fetch_allowed:
             reason = (
                 "this is a demo sample with an invented domain"

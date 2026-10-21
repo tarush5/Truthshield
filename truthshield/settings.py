@@ -162,6 +162,10 @@ class Settings(BaseSettings):
     EVIDENCE_RETRIEVAL_ENABLED: bool = True
     URL_FETCH_ENABLED: bool = True
     URL_CACHE_TTL_SECONDS: int = 3600
+    # Comma-separated local threat-intelligence lists (domains or URLs, one
+    # per line). Empty: reputation is reported as not assessed. See
+    # infra/threat_feed.py.
+    THREAT_FEED_PATHS: str = ""
 
     # JSON object overriding the risk engine's family weights and level
     # thresholds, e.g. {"weights": {"url": 25}}. See investigations/risk_config.py.

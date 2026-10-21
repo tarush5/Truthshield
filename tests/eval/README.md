@@ -136,3 +136,13 @@ independent, labelled real messages.
 
 `retrieval_corpus.jsonl` (25 passages) and `retrieval_queries.jsonl` (20
 claims, half paraphrased): `python -m truthshield.rag.evaluation`.
+
+### Leakage check (21 October 2026)
+
+`truthshield.investigations.dataset.near_duplicates` compares every item across sets on word
+3-gram shingles after blanking numbers, links and addresses. `fraud_final_blind5` has no pair
+at Jaccard >= 0.4 with any other set (enforced in `tests/test_v2_dataset.py`). Earlier sets
+were not clean: `fraud_final_blind3` w-f13, w-f19 and w-b17 and `fraud_final_blind2` y-b07 are
+rewordings (0.62-0.85) of `fraud_eval` items. All four were scored correctly by both rule
+versions, so the old-versus-new comparisons stand, but blind3's absolute numbers are slightly
+optimistic.

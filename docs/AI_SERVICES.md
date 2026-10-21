@@ -84,6 +84,25 @@ figures and must not be presented as such.**
 | `fraud_blind` | 52 | second unseen set | 1.00 / 0.35 / 0.00 | **1.00 / 0.77 / 0.00** on first sight |
 | `fraud_blind2` | 54 | third unseen set (20 Oct 2026) | not measured | **0.95 / 0.71 / 0.04** on first sight, with the rules as they stood after `fraud_blind` |
 
+Later sets (October 2026) follow a stricter protocol -- each final set is committed alone
+before any rule change and measured exactly once against the old and the new rules; fixes are
+developed on separate `fraud_dev*` sets. Full history and every remaining error are in
+`tests/eval/README.md`:
+
+| Final set (64 items) | Before cycle | After cycle (P / R / FPR) |
+|---|---|---|
+| `fraud_final_blind3` | 0.86 / 0.97 / 0.16 | 0.86 / 0.97 / 0.16 (cycle 3 did not generalise) |
+| `fraud_final_blind4` | 0.81 / 0.78 / 0.19 | 0.87 / 0.81 / 0.13 |
+| `fraud_final_blind5` | 0.89 / 0.75 / 0.09 | **0.90 / 0.81 / 0.09** (current reference) |
+
+Each rate carries a 95% Wilson interval of about ±0.13 at this size, so no single cycle's
+change is statistically conclusive. `fraud_final_blind5` has no near-duplicate (3-gram Jaccard
+≥ 0.4) in any other set; a test enforces this. Three of blind3's items were found to be
+rewordings of development items. Confidence calibration (`--calibration`): accuracy rises
+with the confidence band; stated confidence is conservative by design and was not refitted.
+
+The rows below this point describe the earlier sets.
+
 The two blind rows are the honest estimates of how the rules generalise. `fraud_blind2`
 exposed sextortion (now `EXTORTION`), Hindi and Tamil police and prize-fee wording, "deposit
 the GST first" lottery fees, fake auto-renewal refund calls, doubled-letter lookalikes

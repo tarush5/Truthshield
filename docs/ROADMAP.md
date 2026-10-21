@@ -72,6 +72,31 @@ Measured on the dev machine; single runs, not a benchmark.
 | Next page after landing / sign-in | downloaded on click | prefetched at idle (skipped with Save-Data) |
 | Scam detection, second blind set (P / R / FPR) | 0.95 / 0.71 / 0.04 | fixed classes; all four sets pass |
 
+## Trust releases (21 October 2026)
+
+Status against the four-release plan. "Done" means implemented with automated tests;
+"partial" says what is missing; "blocked" needs a decision or a provider.
+
+| Release | Item | Status |
+|---|---|---|
+| 1 Accuracy foundation | Fraud rules: context, negation, awareness/news, obfuscation, Hinglish/Hindi/Tamil | done (5 sealed-set cycles; `tests/eval/README.md`) |
+| | False-positive protection (benign twins per rule, benign kinds in every set) | done |
+| | Evaluation datasets: dev / sealed final sets, near-duplicate check, Wilson CIs, per-kind FPR | done; **independent real data: blocked** (consent / licensing) |
+| 2 Evidence & trust | Citation integrity (passage in stored source, publisher = link, dates) | done |
+| | Multi-source corroboration, attribution, claim typing (factual / opinion / personal / instruction) | done |
+| | Abstention (INCONCLUSIVE) incl. unread images, unsupported languages | done |
+| | Confidence statement, calibration table, Brier | done; refitting confidence: not done (needs real labels) |
+| | Single official source deciding a claim | **decision pending** (adjudicator needs > 1 source) |
+| 3 Advanced intelligence | Local threat feeds, reputation status vocabulary | done |
+| | Google Safe Browsing / VirusTotal / OpenPhish APIs, RDAP, TLS | **blocked** (approval: sends URLs out; some paid) |
+| | SPF / DKIM / DMARC from pasted headers | done |
+| | QR decoding in images | done |
+| | Language identification (Hinglish, Indic scripts), abstain on unsupported languages | done |
+| 4 Production excellence | Analyst review, appeals, feedback categories, reanalysis with diffs | done (API); **UI: frozen** |
+| | Reviewed-case export for evaluation | done (requires `--confirm-consent`) |
+| | Metrics endpoint, JSON logs, benchmark script, concurrent evidence retrieval | done |
+| | Report (`result.report`): questions, finding kinds, checks completed / not | done (API and JSON export; **UI: frozen**) |
+
 ## Phases 3–8
 
 | Phase | Scope | Status |

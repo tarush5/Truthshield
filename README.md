@@ -73,8 +73,10 @@ The synthetic demos work either way.
 ## Test
 
 ```bash
-pytest tests/ -q            # backend: 504 tests, offline and deterministic
-python -m truthshield.investigations.evaluation tests/eval/fraud_blind.jsonl   # detector accuracy
+pytest tests/ -q            # backend: ~700 tests, offline and deterministic
+python -m truthshield.investigations.evaluation tests/eval/fraud_final_blind5.jsonl --calibration   # detector accuracy
+python -m truthshield.rag.evaluation          # retrieval Recall@K / Precision@K / MRR / NDCG
+python scripts/benchmark.py                   # offline latency per input type
 ruff check truthshield tests
 cd frontend && npm run typecheck && npm test && npm run build
 ```
@@ -97,13 +99,18 @@ and up again, fails on model/migration drift (`alembic check`), and enforces a
   Wikipedia and RSS, and many claims honestly end as
   `INSUFFICIENT_EVIDENCE`. `GET /api/v1/system/health` reports `degraded`
   in that state.
-- **Detectors are rule-based.** No trained-model metrics are shown, because
-  no model is trained. The rules are checked against small labelled sets
-  written for this project (on the blind set: precision 1.00, recall 0.77
-  before it was used for fixes). Those are regression checks, not real-world
-  accuracy; see [AI services §2.1.2](docs/AI_SERVICES.md#212-evaluation).
-- **Reputation, WHOIS and certificate checks** need providers that are not
-  configured yet. Every URL result lists them as unchecked.
+- **Detectors are rule-based, and their accuracy is measured only on
+  author-written sets.** No model is trained. The current sealed final set
+  (`fraud_final_blind5`, 64 items, measured once) gives precision 0.897,
+  recall 0.812, false-positive rate 0.094 -- with 95% intervals of roughly
+  ±0.13. That is evidence the rules generalise to new wording somewhat, not
+  a real-world accuracy figure; see [AI services §2.1.2](docs/AI_SERVICES.md#212-evaluation)
+  and `tests/eval/README.md`. Reviewer decisions on appeals can be exported
+  as an independently labelled set (`python -m truthshield.investigations.export_reviewed`).
+- **Reputation** is checked only against local threat-feed files
+  (`THREAT_FEED_PATHS`); with none configured it is reported as not checked.
+  WHOIS/RDAP and certificate checks need providers that are not configured.
+  A link with no known listing is never reported as safe.
 
 ## License
 

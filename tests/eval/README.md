@@ -48,6 +48,25 @@ blind (next step: development examples of each class, then a new blind set):
 
     python -m truthshield.investigations.evaluation tests/eval/fraud_final_blind2.jsonl --by
 
+### Confidence calibration (`--calibration`)
+
+Measured on `fraud_final_blind2.jsonl` (21 October 2026), not fitted:
+
+| Confidence band | Items | Verdict accuracy | Mean stated confidence |
+|---|---|---|---|
+| LOW | 25 | 0.84 | 0.35 |
+| MODERATE | 17 | 0.88 | 0.72 |
+| HIGH | 13 | 1.00 | 0.80 |
+
+Accuracy rises with the band, which is the property the confidence exists
+for, and all four missed scams sit in the LOW band. Stated confidence is
+below measured accuracy (weighted gap 0.32), largely by design: results with
+no signal are capped at 0.35 because absence of signals is weak evidence.
+The formula was not recalibrated: fitting it to author-written sets would
+measure the author, not the world. Reviewer decisions
+(`GET /api/v1/admin/reviews/accuracy`, by confidence band) are where real
+calibration data accumulates.
+
 ## Retrieval
 
 `retrieval_corpus.jsonl` (25 passages) and `retrieval_queries.jsonl` (20

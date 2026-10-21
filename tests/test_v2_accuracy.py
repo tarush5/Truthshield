@@ -139,3 +139,15 @@ class TestSpelledOutLetters:
     def test_a_spelled_out_otp_request_is_flagged_but_a_spelled_out_warning_is_not(self):
         assert assess(_item("Bank desk here. Kindly read out the P I N we sent to stop the transaction.")).flagged
         assert not assess(_item("Never share your P I N or O T P with anyone. Bank staff will never ask.")).flagged
+
+
+def test_calibration_table_is_reported_and_ordered():
+    """Higher stated confidence should not mean lower accuracy on the blind set."""
+    from truthshield.investigations.evaluation import DEFAULT_SET, evaluate, load
+
+    report = evaluate(load(DEFAULT_SET.parent / "fraud_final_blind2.jsonl"))
+    bands = report["calibration"]["bands"]
+    assert sum(b["items"] for b in bands.values()) == report["items"]
+    order = [bands[k]["accuracy"] for k in ("VERY_LOW", "LOW", "MODERATE", "HIGH") if k in bands]
+    assert order == sorted(order)
+    assert report["calibration"]["weighted_gap"] is not None

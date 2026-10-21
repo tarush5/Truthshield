@@ -40,6 +40,7 @@ class Outcome:
     type: str = ""
     language: str = ""
     length: str = ""
+    confidence: float = 0.0
 
     @property
     def flagged(self) -> bool:
@@ -91,6 +92,7 @@ def assess(item: dict) -> Outcome:
         # Detected, not labelled: the breakdown shows how the engine saw it.
         language=item.get("lang") or (text.artifacts.get("language", {}).get("detected") or "-"),
         length="short (<80)" if chars < 80 else "medium (80-199)" if chars < 200 else "long (200+)",
+        confidence=assessment.confidence,
     )
 
 
@@ -112,6 +114,36 @@ def _scores(outcomes: List[Outcome]) -> dict:
     }
 
 
+def calibration(outcomes: List[Outcome]) -> dict:
+    """
+    Reliability by confidence band: how often the verdict (flagged or not)
+    was right, next to the confidence the system stated.
+
+    Confidence here is "how sure the system is of its assessment", so a
+    well-calibrated band has accuracy close to its mean confidence. The gap
+    is the item-weighted mean of |accuracy - mean confidence| over bands.
+    Measured, never fitted: nothing here adjusts the confidence formula.
+    """
+    from truthshield.investigations.risk import band_for
+
+    bands: dict = {}
+    for o in outcomes:
+        bands.setdefault(band_for(o.confidence), []).append(o)
+    table = {}
+    gap = 0.0
+    for band in ("VERY_LOW", "LOW", "MODERATE", "HIGH"):
+        members = bands.get(band, [])
+        if not members:
+            continue
+        accuracy = sum(o.correct for o in members) / len(members)
+        mean_conf = sum(o.confidence for o in members) / len(members)
+        gap += len(members) * abs(accuracy - mean_conf)
+        table[band] = {"items": len(members), "accuracy": round(accuracy, 3),
+                       "mean_confidence": round(mean_conf, 3),
+                       "flagged": sum(o.flagged for o in members)}
+    return {"bands": table, "weighted_gap": round(gap / len(outcomes), 3) if outcomes else None}
+
+
 def evaluate(items: Iterable[dict]) -> dict:
     outcomes = [assess(item) for item in items]
     groups = {
@@ -130,6 +162,7 @@ def evaluate(items: Iterable[dict]) -> dict:
             kind: _scores([o for o in outcomes if o.kind == kind])["recall"]
             for kind in sorted({o.kind for o in outcomes if o.label == "fraud"})
         },
+        "calibration": calibration(outcomes),
         "errors": [o for o in outcomes if not o.correct],
         "outcomes": outcomes,
     }
@@ -147,6 +180,11 @@ def main(argv: List[str]) -> int:
             for value, m in slices.items():
                 print(f"  {dim:<9} {value:<16} n={m['items']:>3}  P {m['precision']:.2f}  R {m['recall']:.2f}  "
                       f"FPR {m['false_positive_rate']:.2f}")
+    if "--calibration" in argv:
+        for band, b in report["calibration"]["bands"].items():
+            print(f"  confidence {band:<9} n={b['items']:>3}  accuracy {b['accuracy']:.2f}  "
+                  f"mean confidence {b['mean_confidence']:.2f}  flagged {b['flagged']}")
+        print(f"  weighted |accuracy - confidence| gap: {report['calibration']['weighted_gap']}")
     for o in report["errors"]:
         miss = "MISSED" if o.label == "fraud" else "FALSE ALARM"
         print(f"  {miss:<11} {o.id:<14} {o.score:>3} {o.level:<8} {o.classification:<26} {', '.join(o.top_signals)}")

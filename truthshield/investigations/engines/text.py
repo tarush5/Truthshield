@@ -64,6 +64,12 @@ class TextEngine(Engine):
                 f"({', '.join(nlp.SUPPORTED_LANGUAGES)}); pattern checks are tuned for those "
                 "languages and may miss signals here."
             )
+            # Only when the detection itself is sure and there is enough text:
+            # a short English note misread as Dutch must not abstain.
+            if language.confidence >= 0.9 and len(nlp.LETTER.findall(text)) >= 20:
+                result.artifacts["coverage_gap"] = (
+                    f"the text is in a language the checks do not cover ('{language.detected}')"
+                )
 
         if hidden:
             result.signals.append(self._signal(

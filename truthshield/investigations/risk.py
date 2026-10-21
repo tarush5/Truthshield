@@ -32,7 +32,8 @@ score. The method, and why each step is shaped the way it is:
    single number cannot express.
 
 5. **Abstention.** When no signal fired but an engine that applied to the
-   input did not run, the determination is INCONCLUSIVE: "nothing found"
+   input did not run, or ran without being able to cover it (a language the
+   patterns do not read), the determination is INCONCLUSIVE: "nothing found"
    would claim more than was checked. The score and level are left exactly
    as computed -- abstention adds a statement, it never moves a threshold.
 """
@@ -222,6 +223,13 @@ class RiskEngine:
             return None
         applicable = [e for e in engines if e.status is not EngineStatus.NOT_APPLICABLE]
         missing = [e for e in applicable if e.status is not EngineStatus.OK]
+        gaps = [e.artifacts["coverage_gap"] for e in applicable
+                if e.status is EngineStatus.OK and e.artifacts.get("coverage_gap")]
+        if gaps:
+            return (
+                f"No risk signal fired, but {'; '.join(gaps)}. "
+                "The absence of warning signs is therefore not a finding."
+            )
         if applicable and not missing:
             return None
         if not applicable:

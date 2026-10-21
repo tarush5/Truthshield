@@ -27,6 +27,27 @@ SUPPORTED_LANGUAGES = ("en", "hi", "ta")
 
 DEVANAGARI = re.compile(r"[ऀ-ॿ]")
 TAMIL = re.compile(r"[஀-௿]")
+# Other Indian scripts. Detected so the result names the language correctly
+# (and reports it as unsupported) instead of guessing from Latin statistics.
+OTHER_SCRIPTS = (
+    ("bn", "bengali", re.compile(r"[ঀ-৿]")),
+    ("pa", "gurmukhi", re.compile(r"[਀-੿]")),
+    ("gu", "gujarati", re.compile(r"[઀-૿]")),
+    ("or", "odia", re.compile(r"[଀-୿]")),
+    ("te", "telugu", re.compile(r"[ఀ-౿]")),
+    ("kn", "kannada", re.compile(r"[ಀ-೿]")),
+    ("ml", "malayalam", re.compile(r"[ഀ-ൿ]")),
+)
+# Romanized Hindi (Hinglish). langdetect has no such class and calls it
+# Indonesian, Estonian or Somali; these function words are what give it away.
+# Words that are also common English ("main", "par", "to") are left out.
+HINGLISH_MARKERS = frozenset({
+    "hai", "hain", "ho", "ka", "ki", "ke", "ko", "se", "nahi", "nahin", "kya", "aap", "aapka",
+    "aapke", "aapko", "apna", "apne", "karo", "karein", "kare", "karna", "kijiye", "mein", "hum",
+    "tum", "abhi", "turant", "jaldi", "gaya", "gayi", "raha", "rahe", "rahi", "wala", "wale", "bhi",
+    "aur", "liye", "yeh", "woh", "kal", "aaj", "paisa", "paise", "rupaye", "jayega", "jayegi",
+    "milega", "milegi", "chahiye", "sirf", "dijiye", "bhejo", "bhejein", "lagega", "hoga", "tha",
+})
 LETTER = re.compile(r"[^\W\d_]", re.UNICODE)
 WORD_RE = re.compile(r"[^\W_]+(?:'[^\W_]+)?", re.UNICODE)
 
@@ -73,6 +94,16 @@ def detect_language(text: str) -> LanguageResult:
         return LanguageResult("hi", min(1.0, 0.6 + deva * 0.4), "script", "devanagari")
     if tamil >= 0.3:
         return LanguageResult("ta", min(1.0, 0.6 + tamil * 0.4), "script", "tamil")
+    for code, script, pattern in OTHER_SCRIPTS:
+        share = len(pattern.findall(text)) / total
+        if share >= 0.3:
+            return LanguageResult(code, min(1.0, 0.6 + share * 0.4), "script", script)
+
+    words = [w.lower() for w in WORD_RE.findall(text)]
+    markers = {w for w in words if w in HINGLISH_MARKERS}
+    hits = sum(1 for w in words if w in HINGLISH_MARKERS)
+    if len(markers) >= 3 and hits / max(1, len(words)) >= 0.12:
+        return LanguageResult("hi", min(0.95, 0.5 + hits / len(words)), "romanized-markers", "latin")
 
     try:
         from langdetect import DetectorFactory, detect_langs

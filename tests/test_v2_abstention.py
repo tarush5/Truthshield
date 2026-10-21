@@ -55,3 +55,39 @@ def test_signals_with_a_missing_check_are_still_assessed():
 def test_no_applicable_engine_is_inconclusive():
     a = assess(engine("url", EngineStatus.NOT_APPLICABLE))
     assert a.determination == "INCONCLUSIVE"
+
+
+def test_a_coverage_gap_with_no_signal_is_inconclusive():
+    text = engine("text")
+    text.artifacts["coverage_gap"] = "the text is in a language the checks do not cover ('es')"
+    a = assess(text)
+    assert a.determination == "INCONCLUSIVE" and "'es'" in a.abstention_reason
+
+
+class TestLanguage:
+    def test_hinglish_is_recognised_as_romanized_hindi(self):
+        from truthshield.investigations.nlp import detect_language
+
+        r = detect_language("Aapka account block ho gaya hai, turant KYC update karo.")
+        assert (r.detected, r.script, r.supported) == ("hi", "latin", True)
+
+    def test_english_is_not_mistaken_for_hinglish(self):
+        from truthshield.investigations.nlp import detect_language
+
+        for text in ("Ho ho ho, see you at the main party on Friday.",
+                     "Please send the report to the team before the meeting."):
+            assert detect_language(text).detected == "en"
+
+    def test_other_indian_scripts_are_named(self):
+        from truthshield.investigations.nlp import detect_language
+
+        r = detect_language("আপনার ব্যাংক অ্যাকাউন্ট বন্ধ হয়ে যাবে। এখনই OTP নম্বরটি আমাদের পাঠান।")
+        assert (r.detected, r.script, r.supported) == ("bn", "bengali", False)
+
+    def test_unsupported_language_scam_is_inconclusive_not_clean(self, client, auth):
+        content = "Su cuenta bancaria será bloqueada hoy. Envíenos el código que recibió ahora mismo."
+        r = client.post("/api/v1/investigations", json={"type": "message", "content": content}, headers=auth)
+        inv = client.get(f"/api/v1/investigations/{r.json()['id']}", headers=auth).json()
+        assert inv["risk_factors"] == []
+        assert inv["classification"] == "inconclusive"
+        assert inv["result"]["risk"]["determination"] == "INCONCLUSIVE"

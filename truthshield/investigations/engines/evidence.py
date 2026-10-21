@@ -227,6 +227,7 @@ class EvidenceEngine(Engine):
                 logger.warning("Evidence retrieval failed: %s", exc, exc_info=True)
                 session.rollback()
                 return [exc for _ in claims]
+            self._load_chunk_texts(session, retrievals)
             outcomes = []
             for item, retrieval in zip(claims, retrievals):
                 try:
@@ -255,15 +256,47 @@ class EvidenceEngine(Engine):
         finally:
             session.close()
 
+    @staticmethod
+    def _load_chunk_texts(session, retrievals) -> None:
+        """The stored text of every cited chunk, read back for the citation check."""
+        import uuid
+
+        from truthshield.infra.models import EvidenceChunk
+
+        ids = set()
+        for retrieval in retrievals:
+            for p in getattr(retrieval, "passages", None) or []:
+                if p.get("chunk_id"):
+                    try:
+                        ids.add(uuid.UUID(str(p["chunk_id"])))
+                    except ValueError:
+                        pass
+        if not ids:
+            return
+        try:
+            rows = dict(session.query(EvidenceChunk.id, EvidenceChunk.text)
+                        .filter(EvidenceChunk.id.in_(list(ids))).all())
+        except Exception as exc:  # the check degrades to "unverified", never blocks
+            logger.warning("Could not read chunks for citation checks: %s", exc)
+            session.rollback()
+            return
+        texts = {str(k): v for k, v in rows.items()}
+        for retrieval in retrievals:
+            if hasattr(retrieval, "chunk_texts"):
+                retrieval.chunk_texts = {str(p["chunk_id"]): texts[str(p["chunk_id"])]
+                                         for p in retrieval.passages if str(p.get("chunk_id")) in texts}
+
     def _unchecked(self, claim: dict, reason: str) -> dict:
         return {**claim, "assessment": "NOT_CHECKED", "checked": False, "confidence": None,
                 "reasoning": reason, "sources": []}
 
     def _assess(self, ctx, claim: dict, verdict, retrieved_at: str, result: EngineResult,
                 retrieval=None) -> dict:
+        from truthshield.investigations import citations
         from truthshield.rag.store import normalise_url
 
         assessment = ASSESSMENT.get(verdict.verdict.value, "INSUFFICIENT_EVIDENCE")
+        chunk_texts = getattr(retrieval, "chunk_texts", None) or {}
         reasoning = verdict.reasoning
         passages = {normalise_url(p["url"]): p for p in (retrieval.passages if retrieval else [])}
 
@@ -291,6 +324,15 @@ class EvidenceEngine(Engine):
                 # returned (which the platform has not read in full).
                 "attribution": "evidence_store" if stored.get("chunk_id") else "search_snippet",
             })
+            chunk_text = chunk_texts.get(str(stored.get("chunk_id")))
+            sources[-1]["citation"] = citations.check(
+                sources[-1],
+                passage_found=citations.passage_in(item.snippet or "", chunk_text) if chunk_text else None,
+            )
+
+        # A citation that failed its integrity check may be shown, never relied on.
+        rejected = [s for s in sources if s["citation"]["status"] == "mismatch"]
+        usable = [s for s in sources if s["citation"]["status"] != "mismatch"]
 
         if retrieval is not None and not retrieval.passages and assessment == "INSUFFICIENT_EVIDENCE":
             reasoning = (
@@ -306,8 +348,15 @@ class EvidenceEngine(Engine):
         downgraded = False
         if assessment in ("SUPPORTED", "CONTRADICTED"):
             stance = "SUPPORTS" if assessment == "SUPPORTED" else "REFUTES"
-            decisive = [s for s in sources if s["stance"] == stance]
-            if not any(s["credibility"] >= CREDIBLE or s["category"] in ("OFFICIAL", "PRIMARY") for s in decisive):
+            decisive = [s for s in usable if s["stance"] == stance]
+            if not decisive and any(s["stance"] == stance for s in rejected):
+                downgraded = True
+                reasoning = (
+                    f"{reasoning} Downgraded to insufficient evidence: the sources behind this decision "
+                    "failed the citation check (see each source's citation problems)."
+                ).strip()
+                assessment = "INSUFFICIENT_EVIDENCE"
+            elif not any(s["credibility"] >= CREDIBLE or s["category"] in ("OFFICIAL", "PRIMARY") for s in decisive):
                 downgraded = True
                 reasoning = (
                     f"{reasoning} Downgraded to insufficient evidence: every source that "
@@ -315,7 +364,7 @@ class EvidenceEngine(Engine):
                 ).strip()
                 assessment = "INSUFFICIENT_EVIDENCE"
 
-        corroborated = corroboration(assessment, sources)
+        corroborated = corroboration(assessment, usable)
         if corroborated["level"] == "single_source":
             reasoning = (
                 f"{reasoning} Only one credible publisher "
@@ -333,7 +382,7 @@ class EvidenceEngine(Engine):
             confidence=round(verdict.confidence, 3),
         ))
 
-        refuting = [s for s in sources if s["stance"] == "REFUTES"]
+        refuting = [s for s in usable if s["stance"] == "REFUTES"]
         if assessment == "CONTRADICTED" and verdict.confidence >= 0.4:
             lead = refuting[0] if refuting else (sources[0] if sources else None)
             result.signals.append(Signal(
@@ -371,4 +420,9 @@ class EvidenceEngine(Engine):
             "support_count": sum(1 for s in sources if s["stance"] == "SUPPORTS"),
             "contradict_count": len(refuting),
             "corroboration": corroborated,
+            "citations": {
+                "verified": sum(1 for s in sources if s["citation"]["status"] == "verified"),
+                "unverified": sum(1 for s in sources if s["citation"]["status"] == "unverified"),
+                "mismatch": len(rejected),
+            },
         }

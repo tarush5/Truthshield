@@ -46,6 +46,8 @@ class Retrieval:
     live_detail: Optional[str] = None
     candidates: int = 0
     passages: List[dict] = field(default_factory=list)
+    # Stored text of each cited chunk, for citation checks. Not serialised.
+    chunk_texts: Dict[str, str] = field(default_factory=dict)
 
     def diagnostics(self) -> dict:
         return {

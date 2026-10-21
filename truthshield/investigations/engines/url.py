@@ -129,8 +129,12 @@ class UrlEngine(Engine):
                 "signals": [s.code for s in signals],
                 "page": page,
                 "fetch": fetch,
-                "reputation": ({"checked": True, "listed": bool(listed), "match": listed}
-                               if feed.configured else {"checked": False}),
+                "reputation": ({"checked": True, "listed": bool(listed), "match": listed,
+                                "status": "KNOWN_MALICIOUS" if listed else "NO_KNOWN_LISTING"}
+                               if feed.configured else {"checked": False, "status": "NOT_CHECKED"}),
+                # Structure is not reputation: indicators mean "looks like", never "is known".
+                "structure": "SUSPICIOUS" if any(s.family is Family.URL and s.contribution > 0 for s in signals)
+                             else "NO_STRUCTURAL_INDICATORS",
             })
 
         result.artifacts["urls"] = reports

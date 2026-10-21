@@ -67,7 +67,7 @@ class TestInvestigation:
         inv = run_url(client, auth, "http://quiet-garden-photos.com/album/1")
         families = inv["result"]["risk"]["families"]
         assert families["reputation"]["assessed"] is False
-        assert inv["result"]["url_intelligence"][0]["reputation"] == {"checked": False}
+        assert inv["result"]["url_intelligence"][0]["reputation"] == {"checked": False, "status": "NOT_CHECKED"}
         assert any("threat-intelligence feed" in u for u in inv["result"]["uncertainties"])
 
     def test_a_listed_url_is_a_retrieved_reputation_signal(self, client, auth, feed_file, monkeypatch):
@@ -79,6 +79,8 @@ class TestInvestigation:
         assert factor["family"] == "reputation" and factor["provenance"] == "retrieved"
         assert inv["result"]["risk"]["families"]["reputation"]["assessed"] is True
         assert inv["result"]["url_intelligence"][0]["reputation"]["listed"] is True
+        assert inv["result"]["url_intelligence"][0]["reputation"]["status"] == "KNOWN_MALICIOUS"
+        assert inv["result"]["url_intelligence"][0]["structure"] == "SUSPICIOUS"
         assert any("local threat feed" in u for u in inv["result"]["uncertainties"])
 
     def test_unlisted_url_with_a_feed_is_assessed_and_clean(self, client, auth, feed_file, monkeypatch):
@@ -88,4 +90,5 @@ class TestInvestigation:
         inv = run_url(client, auth, "http://quiet-garden-photos.com/album/2")
         assert inv["result"]["risk"]["families"]["reputation"]["assessed"] is True
         assert inv["result"]["url_intelligence"][0]["reputation"] == {"checked": True, "listed": False,
-                                                                       "match": None}
+                                                                       "match": None, "status": "NO_KNOWN_LISTING"}
+        assert inv["result"]["url_intelligence"][0]["structure"] == "NO_STRUCTURAL_INDICATORS"

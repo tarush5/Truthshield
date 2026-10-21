@@ -1,7 +1,14 @@
 """
 Image engine (Phase 2 scope: screenshots and photos of text).
 
-    image → safe decode (pixel cap) → EXIF metadata → OCR → text engine
+    image → safe decode (pixel cap) → EXIF metadata → QR codes → OCR → text engine
+
+QR codes are decoded (OpenCV, already a dependency) because "quishing" puts
+the link where no text rule can see it. A decoded web address joins the
+investigation's URLs and goes through the URL engine like any other link; a
+UPI payment code is reported with what scanning it would pay, since the
+common QR scam is "scan this to receive money" -- scanning a payment code
+only ever sends money.
 
 Screenshots of messages are among the most common things people want
 checked, and their content is text: OCR turns them into input for the
@@ -24,6 +31,8 @@ from truthshield.investigations.types import (
 EDITING_SOFTWARE = ("photoshop", "gimp", "snapseed", "picsart", "canva", "lightroom", "pixlr",
                     "affinity", "paint.net", "faceapp", "remini")
 MAX_OCR_WORDS = 2000
+MAX_QR_CODES = 5
+QR_SCAN_MAX_SIDE = 2000
 
 
 class ImageEngine(Engine):
@@ -71,6 +80,11 @@ class ImageEngine(Engine):
                 evidence=exif.get("Software"), confidence=0.4,
             ))
 
+        qr_block = self._qr_codes(image, result)
+        for code in qr_block.get("codes", []):
+            if code["kind"] == "url" and code["payload"] not in ctx.urls:
+                ctx.urls.append(code["payload"])
+
         provider = get_ocr_provider()
         ocr_block: dict
         if provider.available:
@@ -103,8 +117,68 @@ class ImageEngine(Engine):
             "Pixel-level forensics (error-level analysis, copy-move detection, synthetic-image detection) "
             "were not performed; they arrive in Phase 3."
         )
-        result.artifacts["image"] = {**info, "exif": exif, "ocr": ocr_block}
+        result.artifacts["image"] = {**info, "exif": exif, "ocr": ocr_block, "qr": qr_block}
         result.features.update({"width": info["width"], "height": info["height"]})
+
+    def _qr_codes(self, image, result: EngineResult) -> dict:
+        """Decode QR codes. Never raises: a failure is reported as not checked."""
+        try:
+            import cv2
+            import numpy as np
+        except ImportError:
+            result.limitations.append("QR codes were not checked (OpenCV is not installed).")
+            return {"status": "unavailable"}
+        try:
+            scan = image
+            longest = max(scan.size)
+            if longest > QR_SCAN_MAX_SIDE:
+                ratio = QR_SCAN_MAX_SIDE / longest
+                scan = scan.resize((int(scan.width * ratio), int(scan.height * ratio)))
+            gray = cv2.cvtColor(np.asarray(scan), cv2.COLOR_RGB2GRAY)
+            ok, payloads, _points, _ = cv2.QRCodeDetector().detectAndDecodeMulti(gray)
+        except Exception as exc:  # malformed images must not fail the engine
+            result.limitations.append(f"QR codes could not be checked ({type(exc).__name__}).")
+            return {"status": "error"}
+
+        codes = []
+        for payload in (payloads if ok else [])[:MAX_QR_CODES]:
+            if payload:
+                codes.append(self._describe_qr(payload[:2000]))
+        undecoded = sum(1 for p in (payloads if ok else []) if not p)
+        if undecoded:
+            result.limitations.append(f"{undecoded} QR code(s) were found but could not be decoded.")
+        for code in codes:
+            if code["kind"] == "upi_payment":
+                upi = code["upi"]
+                result.signals.append(Signal(
+                    code="qr_upi_payment", title="QR code that sends a payment", severity=Severity.INFO,
+                    family=Family.DOCUMENT_MEDIA, provenance=Provenance.HEURISTIC,
+                    engine=self.name, engine_version=self.version,
+                    explanation=(
+                        f"Scanning this QR code pays {upi.get('payee') or 'the payee'}"
+                        + (f" Rs {upi['amount']}" if upi.get("amount") else "")
+                        + ". A QR code can only send money from the person who scans it, never receive it; "
+                        "anyone saying 'scan to receive' is asking you to pay."
+                    ),
+                    evidence=code["payload"][:200], confidence=0.9,
+                ))
+        return {"status": "done", "count": len(codes), "codes": codes}
+
+    @staticmethod
+    def _describe_qr(payload: str) -> dict:
+        from urllib.parse import parse_qs, urlparse
+
+        lowered = payload.strip().lower()
+        if lowered.startswith(("http://", "https://")):
+            return {"kind": "url", "payload": payload.strip()}
+        if lowered.startswith("upi://"):
+            query = parse_qs(urlparse(payload.strip()).query)
+            first = {k: v[0] for k, v in query.items() if v}
+            return {"kind": "upi_payment", "payload": payload.strip(), "upi": {
+                "payee": first.get("pa"), "name": first.get("pn"), "amount": first.get("am"),
+                "note": first.get("tn"),
+            }}
+        return {"kind": "text", "payload": payload}
 
     @staticmethod
     def _exif(img) -> dict:

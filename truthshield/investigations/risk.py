@@ -60,6 +60,16 @@ REPRESENTS = (
 DECAY = 0.72
 MAX_SCORE = 99.0
 
+# What each way of knowing cannot establish, attached to every contribution
+# so a signal is never read as more than it is.
+PROVENANCE_LIMITATION = {
+    "heuristic": "A rule-based pattern match: genuine messages can use the same wording, so this is a "
+                 "reason to check, not proof.",
+    "retrieved": "Based on retrieved sources, which can be incomplete, out of date or wrong; see the evidence.",
+    "ml_prediction": "A model prediction, not a verified fact.",
+    "llm": "A language-model interpretation, not a verified fact.",
+}
+
 
 class Contribution(BaseModel):
     code: str
@@ -73,6 +83,7 @@ class Contribution(BaseModel):
     confidence: float
     evidence: str | None = None
     explanation: str = ""
+    limitation: str = ""
 
 
 class FamilyScore(BaseModel):
@@ -182,7 +193,7 @@ class RiskEngine:
                 code=s.code, title=s.title, family=s.family.value, severity=s.severity.value,
                 provenance=s.provenance.value, engine=s.engine, engine_version=s.engine_version,
                 points=p, confidence=round(s.confidence, 2), evidence=s.evidence,
-                explanation=s.explanation,
+                explanation=s.explanation, limitation=PROVENANCE_LIMITATION.get(s.provenance.value, ""),
             )
             for s, p in zip(ordered, points)
         ]

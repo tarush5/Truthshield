@@ -155,10 +155,27 @@ def recommended_actions(classification: str, category: FraudCategory) -> dict:
     return for_category(category).as_dict()
 
 
+def confidence_statement(assessment: RiskAssessment) -> str:
+    """'Risk HIGH, confidence MODERATE: <why>' -- risk and confidence as separate axes."""
+    band = assessment.confidence_band.lower().replace("_", " ")
+    head = f"Risk {assessment.level}, confidence {band}"
+    if assessment.determination == "INCONCLUSIVE":
+        return f"{head}: inconclusive. {assessment.abstention_reason}"
+    reasons = [n for n in assessment.notes if n]
+    if not reasons:
+        reasons = ["every applicable check ran and the leading signals are consistent."]
+    why = reasons[0][0].lower() + reasons[0][1:]
+    more = f" ({len(reasons) - 1} further note{'s' if len(reasons) > 2 else ''} under uncertainties.)" \
+        if len(reasons) > 1 else ""
+    return (f"{head}: {why}{more} Confidence describes how complete and consistent the assessment is; "
+            "it is a heuristic, not a calibrated probability.")
+
+
 def explanation(assessment: RiskAssessment, classification: str, llm: Optional[dict] = None) -> dict:
     llm = llm or {"status": "not_configured", "text": None, "note": "No language model is configured."}
     return {
         "summary": summarise(assessment, classification),
+        "confidence": confidence_statement(assessment),
         "top_signals": [
             {"code": c.code, "title": c.title, "points": c.points, "provenance": c.provenance}
             for c in assessment.contributions[:5] if c.points > 0

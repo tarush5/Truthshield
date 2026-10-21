@@ -108,6 +108,8 @@ class ImageEngine(Engine):
             ))
         else:
             ocr_block = {"status": "unavailable", "detail": provider.unavailable_reason}
+            if not qr_block.get("codes"):
+                result.artifacts["coverage_gap"] = "the text in the image could not be read because OCR is unavailable"
             result.limitations.append(
                 f"Text in the image was not read: OCR is unavailable ({provider.unavailable_reason}). "
                 "Only the image metadata was examined."

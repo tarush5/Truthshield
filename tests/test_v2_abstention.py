@@ -91,3 +91,20 @@ class TestLanguage:
         assert inv["risk_factors"] == []
         assert inv["classification"] == "inconclusive"
         assert inv["result"]["risk"]["determination"] == "INCONCLUSIVE"
+
+
+def test_contributions_carry_their_limitation():
+    a = assess(engine("text", signals=[signal()]))
+    assert "not proof" in a.contributions[0].limitation
+
+
+def test_confidence_statement_names_level_band_and_reason():
+    a = assess(engine("text", signals=[signal()]), engine("evidence", EngineStatus.UNAVAILABLE))
+    text = explain.confidence_statement(a)
+    assert text.startswith(f"Risk {a.level}, confidence ")
+    assert "evidence" in text and "not a calibrated probability" in text
+
+
+def test_confidence_statement_when_abstaining():
+    a = assess(engine("text"), engine("evidence", EngineStatus.UNAVAILABLE))
+    assert "inconclusive" in explain.confidence_statement(a)

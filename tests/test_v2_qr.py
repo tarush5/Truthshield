@@ -42,3 +42,36 @@ def test_an_image_without_a_qr_code_reports_none(client, auth):
     Image.fromarray(np.full((200, 200, 3), 255, dtype=np.uint8)).save(blank, "PNG")
     inv = run(client, auth, "blank.png", blank.getvalue())
     assert inv["result"]["image"]["qr"] == {"status": "done", "count": 0, "codes": []}
+
+
+def test_an_unreadable_screenshot_is_inconclusive_not_clean(client, auth, monkeypatch):
+    """Without OCR and without a QR code, nothing in the image was read."""
+    from truthshield import providers
+
+    class NoOcr:
+        available = False
+        unavailable_reason = "test: OCR disabled"
+        name = "none"
+
+    monkeypatch.setattr(providers, "get_ocr_provider", lambda: NoOcr())
+    blank = io.BytesIO()
+    Image.fromarray(np.full((120, 300, 3), 255, dtype=np.uint8)).save(blank, "PNG")
+    inv = run(client, auth, "screenshot.png", blank.getvalue())
+    assert inv["result"]["risk"]["determination"] == "INCONCLUSIVE"
+    assert inv["classification"] == "inconclusive"
+    assert "could not be read" in inv["result"]["risk"]["abstention_reason"]
+
+
+def test_a_scanned_pdf_without_ocr_is_inconclusive(client, auth, monkeypatch):
+    from tests.pdf_factory import build_pdf
+    from truthshield import providers
+
+    class NoOcr:
+        available = False
+        unavailable_reason = "test: OCR disabled"
+        name = "none"
+
+    monkeypatch.setattr(providers, "get_ocr_provider", lambda: NoOcr())
+    inv = run(client, auth, "scan.pdf", build_pdf([""]))
+    assert inv["result"]["risk"]["determination"] == "INCONCLUSIVE"
+    assert "scanned page" in inv["result"]["risk"]["abstention_reason"]

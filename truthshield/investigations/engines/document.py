@@ -171,6 +171,12 @@ class DocumentEngine(Engine):
             )
 
         ocr = self._ocr_scanned(reader, scanned, page_texts, result)
+        if ocr.get("status") == "unavailable":
+            # Read by the risk engine: if nothing fires, "no signals" would
+            # describe pages that were never read.
+            result.artifacts["coverage_gap"] = (
+                f"{len(scanned)} scanned page(s) could not be read because OCR is unavailable"
+            )
         full_text = "\n\n".join(page_texts)[:MAX_TEXT_CHARS]
         ctx.text = full_text
 

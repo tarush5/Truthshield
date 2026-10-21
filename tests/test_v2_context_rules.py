@@ -79,3 +79,31 @@ def test_a_provider_writing_from_its_own_domain_is_not_free_mail():
     assert "institution_on_free_mail" not in codes(text)
     spoof = "From: HDFC Bank Billing <hdfc.billing@zohomail.in>\nSubject: Invoice\n\nYour invoice is attached."
     assert "institution_on_free_mail" in codes(spoof)
+
+
+@pytest.mark.parametrize("scam,benign", [
+    # A code passed to the sender's side, not a referral code passed to friends.
+    ("Your wallet is frozen. Share the code you received with our verification desk to unfreeze it.",
+     "Share your referral code with friends and both of you get a discount on the next order."),
+    # "Do not" after an OTP sentence is a warning, not the Hinglish "do" (give).
+    ("Aapke phone par OTP aaya hoga, jaldi se OTP do humein.",
+     "Banks never ask for your PIN or OTP. Do not share them with anyone."),
+    # A KYC reminder pointing to a branch or the official app, with no link.
+    ("Your KYC is pending, update your KYC immediately at http://kyc-update-now.top or the account is blocked.",
+     "Please update your KYC at your home branch or in the official mobile banking app."),
+    # A completed refund is not a call to act.
+    ("Income tax refund of Rs 12,400 is pending. Verify your bank account at http://itr-refund-claim.top today.",
+     "Your income tax refund of Rs 12,400 has been credited to your bank account. View details on the portal."),
+    # A described scam followed by its verdict is awareness.
+    ("A courier in your name has drugs. Pay the penalty of Rs 30,000 today to avoid arrest.",
+     "Got a call saying a courier in your name has drugs? That is a scam. Hang up and report it."),
+    # Money to get hired under another verb.
+    ("You are selected for the store associate position. Transfer Rs 1,900 for your uniform before onboarding.",
+     "You are selected for the store associate position. Onboarding starts Monday at 9 AM at the store."),
+    # Returns per period.
+    ("My mentor's platform lets you earn 15% every week, totally safe. Let me send you the link to join.",
+     "The bank's fixed deposit pays 7% a year, credited quarterly to your savings account."),
+])
+def test_scam_and_benign_twins_cycle_five(scam, benign):
+    assert flagged(scam), analyze(scam)
+    assert not flagged(benign), analyze(benign)

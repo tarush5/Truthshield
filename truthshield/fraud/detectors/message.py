@@ -84,8 +84,18 @@ PATTERNS: Tuple[Pattern, ...] = (
         "Never share an OTP or approve a request you did not start. No genuine "
         "organisation will ask for one.",
         (
+            # "do" is Hinglish for "give" ("OTP do"); the English "Do not ..." that
+            # opens the next sentence of a warning is not it.
             r"\b(?:otp|one[\s-]?time\s*(?:password|code)|verification\s*code)\b.{0,40}"
-            r"\b(?:share|send|tell|provide|forward|batao|bhejo|do)\b",
+            r"\b(?:share|send|tell|provide|forward|batao|bhejo|do(?!\s+not\b))\b",
+            # A code handed to the sender's side: "share the code with our executive".
+            # Not "share your referral code with friends".
+            r"\b(?:share|send|forward|give)\b.{0,30}\bcode\b.{0,40}\b(?:with|to)\s*"
+            r"(?:me|us|our\s+\w+|the\s+(?:officer|executive|agent|desk|team|caller))\b",
+            # Tamil: OTP + send / share / tell.
+            r"(?:otp|ஓடிபி).{0,40}(?:அனுப்ப|பகிர|சொல்ல|கூற)",
+            # QR first, then scan and PIN: "sending a QR, scan it and put your PIN".
+            r"\bqr\b.{0,60}\bscan\b.{0,40}\b(?:upi\s*)?pin\b",
             r"\b(?:share|send|tell|provide|forward|read\s*out)\b.{0,30}\b(?:otp|pin|cvv)\b",
             # "read out the verification code you receive"
             r"\bread\s*(?:out|aloud)\b.{0,30}\b(?:code|otp|pin)\b",
@@ -192,6 +202,7 @@ PATTERNS: Tuple[Pattern, ...] = (
         "regulator before considering anything further.",
         (
             r"\bguaranteed\s*(?:return|profit|income)\b",
+            r"\b(?:earn|profit|returns?|gains?|make)\b.{0,30}\b\d{1,3}\s*%\s*(?:every|each|per|a)\s*(?:day|week|month)\b",
             r"\b(?:double|triple|2x|3x)\b.{0,25}\b(?:money|investment|capital)\b",
             r"\b(?:\d{2,4})\s*%\s*(?:return|profit|monthly|weekly|daily)\b",
             r"\b(?:risk[\s-]?free|no\s*risk)\b.{0,30}\b(?:invest|return|trading)\b",
@@ -244,10 +255,11 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"\b(?:police|court|arrest|warrant|legal action|summons)\b.{0,50}"
             r"\b(?:pay|fine|settle|immediately|penalty)\b",
             r"\b(?:income\s*tax|gst|irs|hmrc|itr)\b.{0,60}\b(?:refund|notice|penalty|due)\b.{0,80}"
-            r"\b(?:click|submit|update|verify|claim|link|details|pay)",
+            r"\b(?:click|submit|update|verify|claim|link|pay)",
             r"(?:आयकर|इनकम\s*टैक्स).{0,80}(?:क्लिक|अपडेट|लिंक)",
             r"\b(?:aadhaar|social security)\b.{0,35}\b(?:suspend|block|misuse|link)",
             r"\bdigital\s*arrest\b",
+            r"\b(?:pay|deposit|transfer)\b.{0,40}\b(?:penalty|fine)\b.{0,50}\b(?:avoid|or\s*face)\b.{0,20}\b(?:arrest|jail)\b",
             r"\bfir\b.{0,40}\b(?:registered|filed|lodged)\b",
             r"\b(?:arrest\s*)?warrant\b.{0,30}\b(?:issued|will\s*be)",
             r"\b(?:number|sim|mobile\s*number)\b.{0,30}\bwill\s*be\s*(?:blocked|deactivated|suspended|disconnected)",
@@ -276,6 +288,8 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"\b(?:liking|like|rating|rate|reviewing|review)\b.{0,30}\b(?:youtube|videos?|products?|hotels?|"
             r"posts?|tasks?)\b.{0,60}\b(?:earn|salary|income|paid)",
             r"\b(?:hr|recruiter|recruitment|hiring)\b.{0,40}\b(?:telegram|whatsapp)\b",
+            r"\b(?:paid|earn|get)\b.{0,20}(?:rs\.?|₹|inr)?\s*\d+\s*(?:per|for\s*(?:every|each))\s*"
+            r"(?:review|like|task|video|rating|post)\b",
             r"\b(?:salary|income)\b.{0,30}\d[\d,]*\s*(?:weekly|daily|per\s*day)",
             # Hinglish: "roz 2000 kamao", "3000 rupaye roz kamao", "ghar baithe kamao".
             r"\b(?:roz|rozana|har\s*din|daily)\b.{0,20}\d[\d,]*.{0,20}\bkama(?:o|ye|iye|en)\b",
@@ -293,11 +307,12 @@ PATTERNS: Tuple[Pattern, ...] = (
         "or an HR contact you find yourself.",
         (
             # "Selected" also means a school team or a contest: only with a job nearby.
-            r"\b(?:offer\s*letter|joining|appointment\s*letter|interview|vacancy|recruitment)\b"
-            r".{0,140}\b(?:fees?|charges?|deposit|jama|pay\b.{0,15}(?:rs\.?|inr|₹|\d))",
+            r"\b(?:offer\s*letter|joining|onboarding|appointment\s*letter|interview|vacancy|recruitment)\b"
+            r".{0,140}\b(?:fees?|charges?|deposit|jama|(?:pay|transfer|send)\b.{0,15}(?:rs\.?|inr|₹|\d))",
             r"\b(?:selected|selection|shortlisted)\b.{0,60}\b(?:job|role|post|position|vacancy|company|interview|"
-            r"recruit\w*|hiring|executive|engineer|supervisor|clerk|typist|staff|data\s*entry|back\s*office)\b"
-            r".{0,140}\b(?:fees?|charges?|deposit|jama|pay\b.{0,15}(?:rs\.?|inr|₹|\d))",
+            r"recruit\w*|hiring|executive|engineer|supervisor|clerk|typist|staff|data\s*entry|back\s*office|"
+            r"associate|operator)\b"
+            r".{0,140}\b(?:fees?|charges?|deposit|jama|(?:pay|transfer|send)\b.{0,15}(?:rs\.?|inr|₹|\d))",
             r"\bpay\b.{0,15}(?:rs\.?|inr|₹|\d).{0,80}\bbefore\s*(?:your\s*)?(?:joining|first\s*day|appointment)",
             r"\b(?:fees?|charges?|deposit)\b.{0,100}\b(?:offer\s*letter|joining|appointment|first\s*day)\b",
             r"\b(?:earn|kamao|kamaye|income|salary)\b.{0,160}\bregistration\s*(?:fees?|charges?|amount)\b",
@@ -420,6 +435,12 @@ URGENCY_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Where a genuine bank sends you: a branch, its own app, internet banking.
+_OFFICIAL_CHANNEL = re.compile(
+    r"\b(?:(?:at|visit|visiting)\s*(?:any|your|the|a)?\s*(?:home\s*|nearest\s*)?branch|"
+    r"official\s*(?:mobile\s*(?:banking\s*)?)?app|internet\s*banking|net\s*banking\s*portal)\b"
+)
+
 CODE_SWITCH_RE = re.compile(
     r"\b(?:aapka|aapke|apna|karo|kijiye|kare|kar\s*lo|ho\s*gaya|hai|nahi|"
     r"turant|abhi|jaldi|paisa|rupaye|khata|band|link\s*par|click\s*karo)\b",
@@ -440,7 +461,11 @@ _NEGATION_INSIDE = re.compile(r"\b(?:do\s*not|don'?t|never|not\s*to)\b")
 # Awareness messages describe the scam: "beware of digital arrest scams".
 _AWARENESS_BEFORE = re.compile(r"\b(?:beware\s*of|be\s*aware\s*of|alert\s*about|warn(?:s|ing)?\s*(?:about|of)|"
                                r"scams?\s*(?:like|such\s*as)|report|scammers|fraudsters|fake|fraudulent|bogus|"
-                               r"victims?|accused|gang|duped|cheated|so[\s-]*called|no\s*such\s*thing\s*as)\b[^.!?]*$")
+                               r"victims?|accused|gang|duped|cheated|so[\s-]*called|no\s*such\s*thing\s*as|"
+                               r"posing\s*as|pretending\s*to\s*be|impersonating)\b[^.!?]*$")
+# The description is followed by its verdict: "...has drugs? That is a scam."
+_AWARENESS_AFTER = re.compile(r"^[^\n]{0,120}?[.!?]\s*(?:it|this|that)\s*(?:is|'s)\s*(?:a\s*|an\s*)?"
+                              r"(?:scam|fraud|fake)\b")
 # News: the authority in the match has already arrested someone ("cyber crime
 # police arrested a gang ..."). A scam threatens arrest; it never reports one.
 # "arrested your son" stays a threat: only an article or number follows.
@@ -540,6 +565,8 @@ def _first_affirmative(expression: str, text: str) -> Optional[str]:
             continue
         if _ROUTINE_AFTER.search(text[found.end():found.end() + 60]):
             continue
+        if _AWARENESS_AFTER.search(text[found.end():found.end() + 160]):
+            continue
         if _NEWS_AFTER.search(_sentence_rest(text, found.end())):
             continue
         if not is_secrecy and _NEGATION_INSIDE.search(span):
@@ -576,6 +603,11 @@ class MessageScamDetector(FraudDetector):
                 if found:
                     matched.append((pattern, found[:110].strip()))
                     break
+
+        if any(p.category is FraudCategory.BANK_IMPERSONATION for p, _ in matched):
+            if (not (classification.entities.get("urls") or [])
+                    and _OFFICIAL_CHANNEL.search(lowered) and not URGENCY_RE.search(text)):
+                matched = [(p, e) for p, e in matched if p.category is not FraudCategory.BANK_IMPERSONATION]
 
         if not matched:
             return None

@@ -39,16 +39,16 @@ def test_eval_set_holds(name):
 def test_final_blind_set_holds_its_measured_level():
     """
     The final blind set is never tuned on (see tests/eval/README.md), so it
-    is held at the level first measured, not at perfection: precision 0.867,
-    recall 0.812, false-positive rate 0.125 (64 items, 21 October 2026).
+    is held at the level first measured, not at perfection: precision 0.897,
+    recall 0.812, false-positive rate 0.094 (64 items, 21 October 2026).
     """
-    report = evaluate(load(EVAL / "fraud_final_blind4.jsonl"))
-    assert report["recall"] >= 0.81 and report["precision"] >= 0.86
-    assert report["false_positive_rate"] <= 0.126
+    report = evaluate(load(EVAL / "fraud_final_blind5.jsonl"))
+    assert report["recall"] >= 0.81 and report["precision"] >= 0.89
+    assert report["false_positive_rate"] <= 0.095
 
 
 @pytest.mark.parametrize("name", ["fraud_dev2", "fraud_final_blind", "fraud_dev3", "fraud_final_blind2",
-                                  "fraud_dev4", "fraud_final_blind3"])
+                                  "fraud_dev4", "fraud_final_blind3", "fraud_dev5", "fraud_final_blind4"])
 def test_development_and_former_blind_sets_hold(name):
     report = evaluate(load(EVAL / f"{name}.jsonl"))
     assert report["recall"] >= 0.95 and report["false_positive_rate"] <= 0.04

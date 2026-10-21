@@ -88,8 +88,8 @@ knowledge of those classes. Cycle 4's fixes were limited to blind3's error
 classes and `fraud_dev4`.
 
 `fraud_final_blind3` is now development data (its errors were fixed in
-cycle 4). **`fraud_final_blind4` is the current honest estimate.** Its
-remaining errors, left unfixed:
+cycle 4). `fraud_final_blind4` was the reference until cycle 5; its errors,
+listed here, were fixed in cycle 5 and it is now development data too:
 
 - missed: Tamil OTP request ("பகிரவும்" -- share)
 - missed: "share the c0de" (a code, not an "OTP", with look-alike characters)
@@ -102,8 +102,35 @@ remaining errors, left unfixed:
 - false alarm: police awareness message about parcel/drugs calls
 - false alarm: a bank's Re-KYC reminder that says no link is sent
 
-Known gap found in development, also left open: "pay the penalty today to
-avoid arrest" with no other cue is not caught.
+Known gap found in development (fixed in cycle 5): "pay the penalty today to
+avoid arrest" with no other cue was not caught.
+
+### Cycle 5 (21 October 2026)
+
+| Set | Rules | Precision | Recall | F1 | FPR |
+|---|---|---|---|---|---|
+| `fraud_final_blind5` (64) | after cycle 4 | 0.889 | 0.750 | 0.814 | 0.094 |
+| `fraud_final_blind5` (64) | after cycle 5 | 0.897 | 0.812 | 0.852 | 0.094 |
+
+Two more scams caught, no new false alarm; 95% CIs overlap (recall
+[0.65, 0.91]), so not conclusive. blind5 has blind3's category mix and was
+written after blind4's errors were known. **`fraud_final_blind5` is the
+current honest estimate.** Its errors, left unfixed:
+
+- missed: "read out the six digit message" (a "message", not a "code")
+- missed: Hindi lottery asking to send ("भेजें") a processing fee
+- missed: "You have won a Samsung Galaxy for Rs 199" brand prize (34, below MEDIUM)
+- missed: Hindi request for card number, CVV and OTP (no Hindi OTP-request rule)
+- missed: fake e-challan with a payment link (no challan rule)
+- missed: dating-app forex pitch with "the returns are guaranteed" (word order)
+- false alarm: a genuine bank OTP with "If you did not request this, call ..."
+- false alarm: a CERT-In advisory about fake TRAI disconnection calls
+- false alarm: a lottery results announcement
+
+Five cycles in, each new author-written set surfaces new phrasings the
+rules miss. That pattern, not any single number, is the main finding: rule
+coverage keeps growing, but real-world accuracy can only be measured on
+independent, labelled real messages.
 
 ## Retrieval
 

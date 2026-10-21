@@ -13,6 +13,8 @@ their findings into the shared Signal vocabulary with provenance attached.
 
 from __future__ import annotations
 
+import re
+
 from typing import List
 
 from truthshield.fraud.contract import Severity
@@ -173,36 +175,65 @@ class TextEngine(Engine):
     # Longer than this is a paragraph or a whole page, not one assertion.
     MAX_CLAIM_WORDS = 60
 
+    # Explicit opinion markers only: "should", "best" and similar are too
+    # common in checkable statements to exclude on.
+    _OPINION = re.compile(r"^\s*(?:i|we)\s+(?:think|believe|feel|guess|reckon)\b|\bin\s+my\s+(?:opinion|view)\b"
+                          r"|\bimo\b|\bpersonally\b", re.IGNORECASE)
+    # "I read that ..." carries a third-party claim: check what was read.
+    _REPORTED = re.compile(r"^\s*(?:i|we)\s+(?:read|heard|saw|was\s+told|were\s+told)\b", re.IGNORECASE)
+    # A named thing after the first word: something public sources could cover.
+    _NAMED = re.compile(r"(?<!^)\b(?:[A-Z][a-z]{2,}|[A-Z]{2,})\b")
+    _CALENDAR = re.compile(r"^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|January|February|March|"
+                           r"April|May|June|July|August|September|October|November|December)$")
+    _PERSONAL_START = re.compile(r"^\s*(?:i|i'm|i've|my|me|we|we're|our|you|you're|your|aap\w*|mera|meri|"
+                                 r"hum|hamara|hamari)\b", re.IGNORECASE)
+
+    def _claim_type(self, claim, url_re) -> tuple:
+        """(type, reason). Only FACTUAL sentences go to public fact-checking."""
+        intents = {i["intent"] for i in nlp.detect_intents(claim.text)}
+        if url_re.search(claim.text) or intents & self.INSTRUCTION_INTENTS:
+            return "INSTRUCTION", "an instruction or a link, not a statement of fact"
+        if self._OPINION.search(claim.text):
+            return "OPINION", "marked as the writer's opinion"
+        named = [m.group(0) for m in self._NAMED.finditer(claim.text.strip())
+                 if not self._CALENDAR.match(m.group(0))]
+        if self._PERSONAL_START.search(claim.text) and not self._REPORTED.search(claim.text) and not named:
+            return "PERSONAL", "about the writer or the reader, which public sources cannot confirm"
+        words = len(nlp.WORD_RE.findall(claim.text))
+        if words < self.MIN_CLAIM_WORDS or words > self.MAX_CLAIM_WORDS:
+            # "It is 100% proven" has no subject to look up; searching it
+            # matches any page containing the same words.
+            return "UNVERIFIABLE", "too short to name what it is about, or too long to check as one claim"
+        return "FACTUAL", None
+
     def _claims(self, text: str, language: str, result: EngineResult) -> List[dict]:
         from truthshield.domain.verdict.claim_extractor import ClaimExtractor
         from truthshield.fraud.classify import URL_RE
 
         lang = language if language in nlp.SUPPORTED_LANGUAGES else "en"
-        claims, excluded = [], 0
+        claims, excluded, screening = [], 0, []
         for claim in ClaimExtractor().extract(text, lang)[:10]:
-            intents = {i["intent"] for i in nlp.detect_intents(claim.text)}
-            if URL_RE.search(claim.text) or intents & self.INSTRUCTION_INTENTS:
-                excluded += 1
-                continue
-            # "It is 100% proven" has no subject to look up; searching it
-            # matches any page containing the same words.
-            words = len(nlp.WORD_RE.findall(claim.text))
-            if words < self.MIN_CLAIM_WORDS or words > self.MAX_CLAIM_WORDS:
+            kind, reason = self._claim_type(claim, URL_RE)
+            screening.append({"text": claim.text[:300], "type": kind, "fact_checked": kind == "FACTUAL",
+                              "reason": reason})
+            if kind != "FACTUAL":
                 excluded += 1
                 continue
             claims.append({
                 "id": f"C{len(claims) + 1}",
                 "text": claim.text,
+                "type": "FACTUAL",
                 "entity": getattr(claim, "entity", None),
                 "date": getattr(claim, "date", None),
                 "location": getattr(claim, "location", None),
             })
         result.artifacts["claims_excluded"] = excluded
+        result.artifacts["claim_screening"] = screening
         if excluded:
             result.limitations.append(
                 f"{excluded} sentence{'s were' if excluded != 1 else ' was'} not fact-checked: "
-                "instructions, links, statements addressed to the recipient and fragments "
-                "without a subject cannot be verified against public sources."
+                "instructions, links, opinions, statements about the writer or the reader, and "
+                "fragments without a subject cannot be verified against public sources."
             )
         return claims
 

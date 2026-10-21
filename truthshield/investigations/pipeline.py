@@ -467,6 +467,7 @@ class InvestigationRunner:
             "url_intelligence": url_artifacts.get("urls", []),
             "prompt_injection": text_artifacts.get("prompt_injection", []),
             "email_authentication": text_artifacts.get("email_authentication"),
+            "claim_screening": text_artifacts.get("claim_screening", []),
             "document": next((e.artifacts.get("document") for e in engines if e.engine == "document"), None),
             "image": next((e.artifacts.get("image") for e in engines if e.engine == "image"), None),
             "features": features,

@@ -40,7 +40,8 @@ ADDRESS_RE = re.compile(r"<([^>]+)>|([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{
 FREE_PROVIDERS = frozenset({
     "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "outlook.com",
     "hotmail.com", "live.com", "aol.com", "proton.me", "protonmail.com",
-    "mail.com", "yandex.com", "rediffmail.com", "zoho.com", "gmx.com",
+    "mail.com", "yandex.com", "rediffmail.com", "zohomail.com", "zohomail.in", "gmx.com",
+    "ymail.com", "icloud.com", "me.com", "outlook.in", "hotmail.co.uk", "yahoo.co.uk",
 })
 
 # Names that, when used in a display name, imply an institution.

@@ -51,3 +51,31 @@ def test_account_numbers_and_codes_are_not_treated_as_disguise():
 
 def test_unrequested_code_with_the_verb_first():
     assert flagged("Kindly forward that 4 digit number to me, it came to your phone by my mistake.")
+
+
+@pytest.mark.parametrize("scam,benign", [
+    # A negated fee is not a fee.
+    ("You are shortlisted for the clerk post. Pay the joining fee of Rs 3,000 to receive your offer letter.",
+     "Your offer letter for the clerk post is attached. There is no joining fee at any stage."),
+    # A request followed by a PIN moves money out; asking for money back does not.
+    ("I sent 1,000 to you by mistake. I raised a request, please approve it and enter your UPI PIN to return it.",
+     "I think I sent you 1,000 by mistake yesterday, could you send it back when you're free?"),
+    # A report about a scam never addresses the reader.
+    ("Officials said your Aadhaar is linked to a money laundering case. Pay the security amount today "
+     "to avoid digital arrest.",
+     "Callers posing as customs officers told the man a parcel with drugs was seized and demanded money, "
+     "police said on Friday."),
+    # "No such thing as a digital arrest" is the warning, not the threat.
+    ("This is the CBI. You are under digital arrest. Stay on the video call and transfer the funds.",
+     "Remember there is no such thing as a digital arrest; hang up on anyone who says otherwise."),
+])
+def test_scam_and_benign_twins_cycle_four(scam, benign):
+    assert flagged(scam), analyze(scam)
+    assert not flagged(benign), analyze(benign)
+
+
+def test_a_provider_writing_from_its_own_domain_is_not_free_mail():
+    text = "From: Billing <billing@zoho.com>\nSubject: Invoice\n\nYour invoice for October is attached."
+    assert "institution_on_free_mail" not in codes(text)
+    spoof = "From: HDFC Bank Billing <hdfc.billing@zohomail.in>\nSubject: Invoice\n\nYour invoice is attached."
+    assert "institution_on_free_mail" in codes(spoof)

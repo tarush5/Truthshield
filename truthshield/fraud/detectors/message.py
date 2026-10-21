@@ -99,6 +99,8 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"\bto\s*(?:get|receive)\b.{0,60}\b(?:scan|qr\s*code|upi\s*pin|enter\s*(?:your\s*)?pin)",
             r"\bscan\b.{0,30}\bqr\b.{0,40}\bpin\b",
             r"\bapprove\b.{0,25}\b(?:request|payment|debit)\b",
+            r"\brequest\b.{0,80}\b(?:approve|accept)\b.{0,40}\b(?:enter|type|put)\b.{0,15}\b(?:upi\s*)?pin\b",
+            r"\b(?:collect\s*)?request\b.{0,80}\b(?:enter|type|put)\b.{0,15}\b(?:your\s*)?(?:upi\s*)?pin\b",
             r"\bupi\s*pin\b.{0,30}\b(?:enter|share|daal)",
             r"\bpay\s*now\b.{0,30}\b(?:receive|claim|get)\b",
             r"\b\d\s*[-\s]?digit\s*(?:code|otp|number)\b.{0,80}\b(?:forward|send|share|tell|batao|bhejo)",
@@ -438,11 +440,17 @@ _NEGATION_INSIDE = re.compile(r"\b(?:do\s*not|don'?t|never|not\s*to)\b")
 # Awareness messages describe the scam: "beware of digital arrest scams".
 _AWARENESS_BEFORE = re.compile(r"\b(?:beware\s*of|be\s*aware\s*of|alert\s*about|warn(?:s|ing)?\s*(?:about|of)|"
                                r"scams?\s*(?:like|such\s*as)|report|scammers|fraudsters|fake|fraudulent|bogus|"
-                               r"victims?|accused|gang|duped|cheated)\b[^.!?]*$")
+                               r"victims?|accused|gang|duped|cheated|so[\s-]*called|no\s*such\s*thing\s*as)\b[^.!?]*$")
 # News: the authority in the match has already arrested someone ("cyber crime
 # police arrested a gang ..."). A scam threatens arrest; it never reports one.
 # "arrested your son" stays a threat: only an article or number follows.
-_NEWS_AFTER = re.compile(r"^[^.!?]{0,60}\b(?:arrested|busted|nabbed)\s+(?:a|an|the|two|three|four|five|six|\d+|several)\b")
+_NEWS_AFTER = re.compile(
+    r"^[^.!?]{0,60}\b(?:arrested|busted|nabbed)\s+(?:a|an|the|two|three|four|five|six|\d+|several)\b"
+    # Reported speech closing the sentence. A scam addresses you; it does not
+    # end its demand with "officials said on Monday."
+    r"|^[^.!?]{0,160},\s*(?:police|officials?|investigators|officers|authorities|the\s*commissioner)\s+"
+    r"(?:said|added|announced)(?:\s+on\s+\w+)?\s*[.!?]?\s*$"
+)
 # A delivery OTP is meant to be shown to the courier at the door.
 _ROUTINE_AFTER = re.compile(r"^.{0,40}\b(?:delivery\s*(?:agent|partner|executive|boy|person)|at\s*the\s*time\s*of\s*delivery)")
 _SECRECY_CODES = ("don't", "do not", "can't", "cannot", "dont")
@@ -488,6 +496,35 @@ def _unleet(text: str) -> Tuple[str, List[str]]:
     return _LEET_TOKEN.sub(repl, text), disguised
 
 
+# A news report about a scam: attributed to an authority, and never speaking
+# to the reader. A scam has to address its target ("your account", "aapka
+# khata", "உங்கள்"), so the absence of any second person is required too.
+_REPORTING = re.compile(
+    r"\b(?:police|officials?|investigators|officers|authorities|the\s*commissioner)\s+"
+    r"(?:said|added|announced|told\s+reporters)\b"
+)
+_SECOND_PERSON = re.compile(
+    r"\b(?:you|your|yours|u|ur|aap\w*|tum\w*|tera|teri|tujhe)\b|आप|तुम|உங்கள்|நீங்கள்|உன்"
+)
+
+
+def _is_report(text: str) -> bool:
+    return bool(_REPORTING.search(text)) and not _SECOND_PERSON.search(text)
+
+
+def _sentence_rest(text: str, start: int) -> str:
+    """From `start` to the end of its sentence, end punctuation included."""
+    end = re.search(r"[.!?](?=\s|$)", text[start:start + 240])
+    return text[start:start + end.end()] if end else text[start:start + 240]
+
+
+# A fee that is itself negated: "there is no fee", "free of charge",
+# "never charge any fee". The span ends on the fee word.
+_NEGATED_FEE_END = re.compile(
+    r"\b(?:no|zero|without|never|not|free\s*of)\b\W+(?:[\w-]+\W+){0,3}(?:fees?|charges?|deposit|cost)$"
+)
+
+
 def _first_affirmative(expression: str, text: str) -> Optional[str]:
     """The first match of `expression` in `text` that is not negated, or None."""
     for found in re.finditer(expression, text, re.IGNORECASE | re.DOTALL):
@@ -499,13 +536,15 @@ def _first_affirmative(expression: str, text: str) -> Optional[str]:
         negation = _NEGATION_BEFORE.search(before)
         if negation and (not _WEAK_NEGATION.match(negation.group(0).strip()) or _FEE_RE.search(span)):
             continue
-        if _AWARENESS_BEFORE.search(text[max(0, found.start() - 60):found.start()]):
+        if _AWARENESS_BEFORE.search(text[max(0, found.start() - 100):found.start()]):
             continue
         if _ROUTINE_AFTER.search(text[found.end():found.end() + 60]):
             continue
-        if _NEWS_AFTER.search(text[found.end():found.end() + 120]):
+        if _NEWS_AFTER.search(_sentence_rest(text, found.end())):
             continue
         if not is_secrecy and _NEGATION_INSIDE.search(span):
+            continue
+        if _NEGATED_FEE_END.search(span):
             continue
         return span
     return None
@@ -526,6 +565,9 @@ class MessageScamDetector(FraudDetector):
     def _run(self, text: str, classification: Classification) -> Optional[FraudFinding]:
         unleeted, disguised = _unleet(text.lower())
         lowered = _join_spelled_out(unleeted)
+        if _is_report(lowered):
+            # Describes a scam to a reader; does not run one on them.
+            return None
 
         matched: List[Tuple[Pattern, str]] = []
         for pattern in PATTERNS:

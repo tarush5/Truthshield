@@ -96,6 +96,16 @@ def assess(item: dict) -> Outcome:
     )
 
 
+def wilson(k: int, n: int, z: float = 1.96) -> Optional[List[float]]:
+    """95% Wilson score interval for k successes in n trials; None when n is 0."""
+    if not n:
+        return None
+    p = k / n
+    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
+    half = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / (1 + z * z / n)
+    return [round(max(0.0, centre - half), 3), round(min(1.0, centre + half), 3)]
+
+
 def _scores(outcomes: List[Outcome]) -> dict:
     tp = sum(1 for o in outcomes if o.label == "fraud" and o.flagged)
     fn = sum(1 for o in outcomes if o.label == "fraud" and not o.flagged)
@@ -111,6 +121,12 @@ def _scores(outcomes: List[Outcome]) -> dict:
         "f1": round(2 * precision * recall / (precision + recall), 3) if precision + recall else 0.0,
         "false_positive_rate": round(fp / (fp + tn), 3) if fp + tn else 0.0,
         "false_negative_rate": round(fn / (fn + tp), 3) if fn + tp else 0.0,
+        # Small sets give wide intervals; read every rate with its interval.
+        "ci95": {
+            "precision": wilson(tp, tp + fp),
+            "recall": wilson(tp, tp + fn),
+            "false_positive_rate": wilson(fp, fp + tn),
+        },
     }
 
 
@@ -131,6 +147,10 @@ def calibration(outcomes: List[Outcome]) -> dict:
         bands.setdefault(band_for(o.confidence), []).append(o)
     table = {}
     gap = 0.0
+    # Brier score of confidence read as P(verdict correct). Lower is better;
+    # it is only meaningful because the verdict is checked against a label.
+    brier = (sum((o.confidence - (1.0 if o.correct else 0.0)) ** 2 for o in outcomes) / len(outcomes)
+             if outcomes else None)
     for band in ("VERY_LOW", "LOW", "MODERATE", "HIGH"):
         members = bands.get(band, [])
         if not members:
@@ -141,7 +161,8 @@ def calibration(outcomes: List[Outcome]) -> dict:
         table[band] = {"items": len(members), "accuracy": round(accuracy, 3),
                        "mean_confidence": round(mean_conf, 3),
                        "flagged": sum(o.flagged for o in members)}
-    return {"bands": table, "weighted_gap": round(gap / len(outcomes), 3) if outcomes else None}
+    return {"bands": table, "weighted_gap": round(gap / len(outcomes), 3) if outcomes else None,
+            "brier": round(brier, 3) if brier is not None else None}
 
 
 def evaluate(items: Iterable[dict]) -> dict:
@@ -162,6 +183,10 @@ def evaluate(items: Iterable[dict]) -> dict:
             kind: _scores([o for o in outcomes if o.kind == kind])["recall"]
             for kind in sorted({o.kind for o in outcomes if o.label == "fraud"})
         },
+        "fpr_by_kind": {
+            kind: _scores([o for o in outcomes if o.kind == kind])["false_positive_rate"]
+            for kind in sorted({o.kind for o in outcomes if o.label == "benign"})
+        },
         "calibration": calibration(outcomes),
         "errors": [o for o in outcomes if not o.correct],
         "outcomes": outcomes,
@@ -173,6 +198,10 @@ def main(argv: List[str]) -> int:
     report = evaluate(load(Path(paths[0]) if paths else None))
     print(f"{report['items']} items  precision {report['precision']:.3f}  recall {report['recall']:.3f}  "
           f"F1 {report['f1']:.3f}  FPR {report['false_positive_rate']:.3f}  FNR {report['false_negative_rate']:.3f}")
+    ci = report["ci95"]
+    fmt = lambda v: f"[{v[0]:.2f}, {v[1]:.2f}]" if v else "n/a"  # noqa: E731
+    print(f"  95% CI  precision {fmt(ci['precision'])}  recall {fmt(ci['recall'])}  "
+          f"FPR {fmt(ci['false_positive_rate'])}")
     print(f"  confusion matrix (rows = label):  fraud -> flagged {report['tp']:>3}  not flagged {report['fn']:>3}")
     print(f"                                    benign -> flagged {report['fp']:>3}  not flagged {report['tn']:>3}")
     if "--by" in argv:
@@ -184,7 +213,8 @@ def main(argv: List[str]) -> int:
         for band, b in report["calibration"]["bands"].items():
             print(f"  confidence {band:<9} n={b['items']:>3}  accuracy {b['accuracy']:.2f}  "
                   f"mean confidence {b['mean_confidence']:.2f}  flagged {b['flagged']}")
-        print(f"  weighted |accuracy - confidence| gap: {report['calibration']['weighted_gap']}")
+        print(f"  weighted |accuracy - confidence| gap: {report['calibration']['weighted_gap']}  "
+              f"Brier: {report['calibration']['brier']}")
     for o in report["errors"]:
         miss = "MISSED" if o.label == "fraud" else "FALSE ALARM"
         print(f"  {miss:<11} {o.id:<14} {o.score:>3} {o.level:<8} {o.classification:<26} {', '.join(o.top_signals)}")

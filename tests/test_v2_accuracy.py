@@ -151,3 +151,21 @@ def test_calibration_table_is_reported_and_ordered():
     order = [bands[k]["accuracy"] for k in ("VERY_LOW", "LOW", "MODERATE", "HIGH") if k in bands]
     assert order == sorted(order)
     assert report["calibration"]["weighted_gap"] is not None
+
+
+def test_wilson_interval_matches_reference_values():
+    from truthshield.investigations.evaluation import wilson
+
+    # Reference: Wilson 95% interval for 26/30 is about [0.703, 0.947].
+    assert wilson(26, 30) == [0.703, 0.947]
+    assert wilson(0, 10)[0] == 0.0 and wilson(10, 10)[1] == 1.0
+    assert wilson(0, 0) is None
+
+
+def test_report_carries_intervals_brier_and_benign_fpr_by_kind():
+    from truthshield.investigations.evaluation import DEFAULT_SET, evaluate, load
+
+    report = evaluate(load(DEFAULT_SET.parent / "fraud_final_blind2.jsonl"))
+    assert report["ci95"]["recall"][0] <= report["recall"] <= report["ci95"]["recall"][1]
+    assert 0.0 <= report["calibration"]["brier"] <= 1.0
+    assert report["fpr_by_kind"] and all(0.0 <= v <= 1.0 for v in report["fpr_by_kind"].values())

@@ -87,6 +87,13 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"\b(?:otp|one[\s-]?time\s*(?:password|code)|verification\s*code)\b.{0,40}"
             r"\b(?:share|send|tell|provide|forward|batao|bhejo|do)\b",
             r"\b(?:share|send|tell|provide|forward|read\s*out)\b.{0,30}\b(?:otp|pin|cvv)\b",
+            # "read out the verification code you receive"
+            r"\bread\s*(?:out|aloud)\b.{0,30}\b(?:code|otp|pin)\b",
+            # "confirm the OTP ... so we can reverse", "confirm the OTP on this chat"
+            r"\bconfirm\b.{0,15}\b(?:otp|pin|cvv|(?:verification\s*)?code)\b.{0,80}"
+            r"\b(?:to\s*(?:me|us)|on\s*this\s*(?:chat|call)|by\s*reply|so\s*(?:that\s*)?(?:we|i)\s*can|with\s*(?:me|us))",
+            # "forward that 4 digit number to me" -- the verb before the code
+            r"\b(?:forward|send|share|tell|read\s*out)\b.{0,20}\b\d\s*[-\s]?digit\s*(?:code|otp|number|pin)\b",
             r"\bcollect\s*request\b",
             r"\b(?:tell|give|read|share)\s*(?:me|us)\b.{0,25}\b(?:code|otp|pin)\b",
             r"\bto\s*(?:get|receive)\b.{0,60}\b(?:scan|qr\s*code|upi\s*pin|enter\s*(?:your\s*)?pin)",
@@ -124,7 +131,9 @@ PATTERNS: Tuple[Pattern, ...] = (
         "Ignore it. Never pay a fee or send documents to release a prize you did "
         "not enter for.",
         (
-            r"\b(?:congratulations|congrats)\b.{0,60}\b(?:won|winner|selected|lucky)",
+            # Not "selected": genuine job offers open with "Congratulations, you
+            # have been selected". Selection for a prize is caught below.
+            r"\b(?:congratulations|congrats)\b.{0,60}\b(?:won|winner|lucky)",
             r"\byou(?:'ve| have)?\s*(?:been\s*)?(?:won|win|selected)\b.{0,50}"
             r"\b(?:lottery|lakh|crore|prize|reward|gift|cash)",
             r"\blucky\s*(?:draw|winner)\b",
@@ -133,7 +142,11 @@ PATTERNS: Tuple[Pattern, ...] = (
             r"\blottery\b.{0,60}\b(?:credited|won|winner|prize)|\b(?:credited|won)\b.{0,60}\blottery\b",
             r"(?:इनाम|लॉटरी).{0,60}(?:जीत|जीता|जीते)|(?:जीत|जीता|जीते).{0,60}(?:इनाम|लॉटरी)",
             r"பரிசு.{0,60}வென்ற|வென்ற.{0,60}பரிசு",
-            r"\byou\s*(?:are|have\s*been|'ve\s*been)\s*(?:selected|chosen)\b.{0,40}\b(?:winner|prize|reward|gift)",
+            r"\byou\s*(?:are|have\s*been|'ve\s*been)\s*(?:selected|chosen)\b.{0,40}"
+            r"\b(?:winner|prize|reward|gift|iphone|car|cash|voucher|lakh|crore|free)",
+            # Hinglish, second person only: "aapne 25 lakh jeete hain", "aap ek car jeet gaye".
+            # "Sharma ji ne lottery jeeti" is news about someone else.
+            r"\baap(?:ne|ka|ke|ko)?\b.{0,60}\bjeet(?:e|a|i)?\b",
             r"\b(?:winner|won)\b.{0,40}\b(?:iphone|car|bike|gift|voucher|laptop)",
             r"\bgiveaway\b.{0,60}\bclaim",
         ),
@@ -277,8 +290,13 @@ PATTERNS: Tuple[Pattern, ...] = (
         "Do not pay. Confirm the offer with the company through its official careers page "
         "or an HR contact you find yourself.",
         (
-            r"\b(?:selected|selection|shortlisted|offer\s*letter|joining|appointment|interview|vacancy)\b"
-            r".{0,140}\b(?:fees?|charges?|deposit|jama)\b",
+            # "Selected" also means a school team or a contest: only with a job nearby.
+            r"\b(?:offer\s*letter|joining|appointment\s*letter|interview|vacancy|recruitment)\b"
+            r".{0,140}\b(?:fees?|charges?|deposit|jama|pay\b.{0,15}(?:rs\.?|inr|₹|\d))",
+            r"\b(?:selected|selection|shortlisted)\b.{0,60}\b(?:job|role|post|position|vacancy|company|interview|"
+            r"recruit\w*|hiring|executive|engineer|supervisor|clerk|typist|staff|data\s*entry|back\s*office)\b"
+            r".{0,140}\b(?:fees?|charges?|deposit|jama|pay\b.{0,15}(?:rs\.?|inr|₹|\d))",
+            r"\bpay\b.{0,15}(?:rs\.?|inr|₹|\d).{0,80}\bbefore\s*(?:your\s*)?(?:joining|first\s*day|appointment)",
             r"\b(?:fees?|charges?|deposit)\b.{0,100}\b(?:offer\s*letter|joining|appointment|first\s*day)\b",
             r"\b(?:earn|kamao|kamaye|income|salary)\b.{0,160}\bregistration\s*(?:fees?|charges?|amount)\b",
             r"\bregistration\s*(?:fees?|charges?|amount)\b.{0,100}\b(?:earn|kamao|kamaye|income|salary)\b",
@@ -411,13 +429,20 @@ CODE_SWITCH_RE = re.compile(
 # share this OTP with anyone", "never click links", "no processing fee".
 # A pattern occurrence is skipped when it is negated, either just before the
 # match or inside it ("your OTP -- do not share it").
-_NEGATION_BEFORE = re.compile(r"(?:\b(?:do\s*not|don'?t|never|not\s*to|no|zero|without|kabhi\s*bhi)\s*\S*\s*)$")
+_NEGATION_BEFORE = re.compile(
+    r"(?:\b(?:do\s*not|don'?t|never|not\s*to|no|zero|without|kabhi\s*bhi)\s*(?:\S+\s+(?:or|and)\s+)?\S*\s*)$"
+)
 _WEAK_NEGATION = re.compile(r"(?:no|zero|without)\b")
 _FEE_RE = re.compile(r"\b(?:fees?|charges?|cost|deposit)\b")
 _NEGATION_INSIDE = re.compile(r"\b(?:do\s*not|don'?t|never|not\s*to)\b")
 # Awareness messages describe the scam: "beware of digital arrest scams".
 _AWARENESS_BEFORE = re.compile(r"\b(?:beware\s*of|be\s*aware\s*of|alert\s*about|warn(?:s|ing)?\s*(?:about|of)|"
-                               r"scams?\s*(?:like|such\s*as)|report|scammers|fraudsters|fake|fraudulent|bogus)\b[^.!?]*$")
+                               r"scams?\s*(?:like|such\s*as)|report|scammers|fraudsters|fake|fraudulent|bogus|"
+                               r"victims?|accused|gang|duped|cheated)\b[^.!?]*$")
+# News: the authority in the match has already arrested someone ("cyber crime
+# police arrested a gang ..."). A scam threatens arrest; it never reports one.
+# "arrested your son" stays a threat: only an article or number follows.
+_NEWS_AFTER = re.compile(r"^[^.!?]{0,60}\b(?:arrested|busted|nabbed)\s+(?:a|an|the|two|three|four|five|six|\d+|several)\b")
 # A delivery OTP is meant to be shown to the courier at the door.
 _ROUTINE_AFTER = re.compile(r"^.{0,40}\b(?:delivery\s*(?:agent|partner|executive|boy|person)|at\s*the\s*time\s*of\s*delivery)")
 _SECRECY_CODES = ("don't", "do not", "can't", "cannot", "dont")
@@ -434,6 +459,35 @@ def _join_spelled_out(text: str) -> str:
     return _SPELLED_OUT.sub(lambda m: re.sub(r"[ .\-]", "", m.group(0)), text)
 
 
+# Digits and symbols standing in for letters. A token is rewritten only when
+# the result is one of these words, so account numbers ("xx4521"), codes and
+# addresses are never touched.
+_LEET = {"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s"}
+_LEET_TOKEN = re.compile(r"[a-z0-9@$]*[a-z][a-z0-9@$]*")
+_LEET_WORDS = frozenset({
+    "otp", "pin", "cvv", "upi", "atm", "kyc", "account", "bank", "card", "code", "verify", "login",
+    "password", "unlock", "locked", "lock", "blocked", "block", "suspended", "update", "wallet", "your",
+    "you", "refund", "prize", "winner", "lottery", "paypal", "amazon", "netflix", "paytm", "urgent",
+})
+
+
+def _unleet(text: str) -> Tuple[str, List[str]]:
+    """Rewrite disguised keywords; return the text and the tokens that were disguised."""
+    disguised: List[str] = []
+
+    def repl(match):
+        token = match.group(0)
+        if not any(c in _LEET for c in token):
+            return token
+        plain = "".join(_LEET.get(c, c) for c in token)
+        if plain in _LEET_WORDS:
+            disguised.append(token)
+            return plain
+        return token
+
+    return _LEET_TOKEN.sub(repl, text), disguised
+
+
 def _first_affirmative(expression: str, text: str) -> Optional[str]:
     """The first match of `expression` in `text` that is not negated, or None."""
     for found in re.finditer(expression, text, re.IGNORECASE | re.DOTALL):
@@ -448,6 +502,8 @@ def _first_affirmative(expression: str, text: str) -> Optional[str]:
         if _AWARENESS_BEFORE.search(text[max(0, found.start() - 60):found.start()]):
             continue
         if _ROUTINE_AFTER.search(text[found.end():found.end() + 60]):
+            continue
+        if _NEWS_AFTER.search(text[found.end():found.end() + 120]):
             continue
         if not is_secrecy and _NEGATION_INSIDE.search(span):
             continue
@@ -468,7 +524,8 @@ class MessageScamDetector(FraudDetector):
         return bool(text) and len(text.split()) >= self.MIN_WORDS
 
     def _run(self, text: str, classification: Classification) -> Optional[FraudFinding]:
-        lowered = _join_spelled_out(text.lower())
+        unleeted, disguised = _unleet(text.lower())
+        lowered = _join_spelled_out(unleeted)
 
         matched: List[Tuple[Pattern, str]] = []
         for pattern in PATTERNS:
@@ -491,6 +548,17 @@ class MessageScamDetector(FraudDetector):
             )
             for p, evidence in matched
         ]
+
+        if disguised:
+            indicators.append(Indicator(
+                code="disguised_keywords", title="Disguised keywords", severity=Severity.MEDIUM,
+                explanation=(
+                    "Words such as 'OTP' or 'account' are written with look-alike characters "
+                    "(0 for O, @ for a) to slip past filters. Genuine organisations do not do this. "
+                    "Evidence excerpts show the words with the substitutions undone."
+                ),
+                evidence=", ".join(disguised[:5]),
+            ))
 
         urgency = URGENCY_RE.search(text)
         if urgency:

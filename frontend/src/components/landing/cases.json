@@ -68,12 +68,12 @@
     "signals": [
       {
         "title": "Replies go to a different domain",
-        "points": 36,
+        "points": 35,
         "evidence": "From: amaz0n-invoices.shop → Reply-To: gmail.com"
       },
       {
         "title": "Bank impersonation",
-        "points": 26,
+        "points": 25,
         "evidence": "account will be suspend"
       },
       {

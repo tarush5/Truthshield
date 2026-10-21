@@ -18,7 +18,6 @@ allocations by OpenCV, NumPy and model weights.
 from __future__ import annotations
 
 import os
-import statistics
 import sys
 import tempfile
 import time

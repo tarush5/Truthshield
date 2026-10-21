@@ -122,6 +122,9 @@ summary fields, `timeline` (events), `risk_factors`, `model_predictions`,
 | `GET /investigations/{id}/events` | The timeline only. Cheap to poll. |
 | `GET /investigations/{id}/export?format=json\|csv` | Download. JSON is the full result with the redacted input. CSV is the risk factors. (PDF: Phase 6) |
 | `DELETE /investigations/{id}` | `204`. Owner or admin. Cascades to inputs, events, factors and predictions. |
+| `POST /investigations/{id}/reanalyze` | `202`. Owner or admin. Re-runs the current pipeline over the stored input as a **new** investigation; the original is untouched. The new one's detail has `reanalysis_of` with the previous score, level, config version and `changes` (signals added/removed, claims changed, engine/config versions changed, plain `reasons`). |
+| `POST /investigations/{id}/feedback` | `201`. Owner or admin. `{label: fraud\|legitimate\|unsure, category?, finding?, comment?, appeal?}`. `category`: `false_positive`, `missed_threat`, `incorrect_evidence`, `broken_citation`, `outdated_information`, `unclear_explanation`, `other`. `finding` must be a signal code or claim id from this result. Comments are redacted before storage. `appeal: true` asks for human review (one open appeal at a time, `409 APPEAL_OPEN`). Never changes the result. |
+| `GET /investigations/{id}/reviews` | Feedback, appeals and reviewer decisions on this investigation. |
 
 ### Synchronous analysis
 
@@ -130,6 +133,21 @@ with body `{content}` (for `/analyze/url`, `{url}`). These create an
 investigation, run it inline, and return the full detail (`200`). They are
 convenient for scripts. Media routes (`/analyze/image|audio|video|pdf`) land
 in Phases 2–3.
+
+### Result fields added in October 2026
+
+| Field | Meaning |
+|---|---|
+| `risk.determination`, `risk.abstention_reason` | `ASSESSED`, or `INCONCLUSIVE` when no signal fired but an applicable check did not run or could not read the input (e.g. an unsupported language). Score and level are unchanged; `classification` is `inconclusive`. |
+| `recommended_actions.urgency`, `.urgency_note` | `act_now`, `verify_first`, `stay_alert`, or `unverified` (abstained), from the level. |
+| `email_authentication` | For email input: SPF/DKIM/DMARC read from the topmost `Authentication-Results` header of pasted full headers (`checked`, `spf`, `dkim[]`, `dmarc`, `authserv_id`, `dkim_aligned`), or `{checked: false}`. Read, never re-verified; a pass never lowers risk. |
+| `url_intelligence[].reputation` | `{checked, listed, match, status}` with `status` `KNOWN_MALICIOUS` / `NO_KNOWN_LISTING` / `NOT_CHECKED` (local threat feeds, `THREAT_FEED_PATHS`). |
+| `url_intelligence[].structure` | `SUSPICIOUS` or `NO_STRUCTURAL_INDICATORS` -- "looks like", never "known". |
+| `claims[].corroboration` | `{level: official\|multiple_independent\|single_source, independent_publishers, publishers, credible_publishers}`; copies on one publisher count once. Descriptive only. |
+| `claims[].sources[].citation` | `{status: verified\|unverified\|mismatch, url_valid, publisher_matches_url, passage_found_in_source, passage_truncated, published_date, age_days, problems[]}`. A `mismatch` citation never decides a claim. `claims[].citations` counts each status. |
+| `claims[].sources[].attribution` | `evidence_store` (a stored chunk) or `search_snippet`. |
+| `image.qr` | Decoded QR codes: `url` (added to the investigation's URLs), `upi_payment` (payee, amount; an INFO signal explains that scanning only ever pays), or `text`. |
+| `reanalysis_of`, `review` (detail) | Link to the run this one re-ran, with `changes`; review state (`count`, `open_appeal`, `reviewer_label`, `reviewed_at`). |
 
 ## Files (Phase 2)
 
@@ -160,6 +178,12 @@ outcome, embedding kind, reranker) and `claims[].sources[].scores`, and `explana
 | Route | Auth | Notes |
 |---|---|---|
 | `GET /dashboard/summary?days=30` | user | Real aggregates over the caller's investigations (all of them for admins): totals, by level, by type, average risk, daily volume, p50/p95/p99 latency, recent items |
+| `GET /dashboard/patterns?days=30&limit=15` | user | Risk factors and classifications in this window vs the previous one (counts and change), scoped like the summary. Submission counts, not prevalence. |
+| `GET /system/metrics` | ADMIN | Prometheus text: request counts and latency histogram per route template (per process), investigations by status and level, open appeals, uptime |
+| `GET /admin/reviews?status=open\|recorded\|resolved\|all&kind=` | ANALYST, ADMIN | Review queue, oldest first |
+| `GET /admin/reviews/{id}` | ANALYST, ADMIN | One review. Redacted input and result are included **only for appeals**; plain feedback shows label, category and comment |
+| `PATCH /admin/reviews/{id}` | ANALYST, ADMIN | `{label: fraud\|legitimate\|inconclusive, note?}`. Stored beside the automated result, never written into it; a reviewer cannot decide their own appeal; audited |
+| `GET /admin/reviews/accuracy?days=90` | ANALYST, ADMIN | Automated result vs reviewer decisions: confusion matrix, precision, recall, FPR, agreement by confidence band, with counts and the selection-bias caveat |
 | `GET /engines` | user | Registered engines, versions, kinds, active risk weights |
 | `GET /demo/samples` | public | Synthetic samples (no real personal data) |
 | `GET /system/health` | public | DB, cache, broker, capabilities, evidence providers, engines |

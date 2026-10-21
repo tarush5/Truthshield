@@ -63,11 +63,9 @@ celery_app.conf.update(
 @setup_logging.connect
 def _configure_logging(**_kwargs):
     """Keep the app's logging config rather than letting Celery replace it."""
-    import logging.config
-    logging.basicConfig(
-        level=settings.LOG_LEVEL,
-        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    )
+    from truthshield.infra.logging_setup import configure
+
+    configure(settings.LOG_LEVEL, settings.LOG_FORMAT)
 
 
 # The probe opens a broker connection, which takes 2-4 s to fail when the

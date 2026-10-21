@@ -52,6 +52,15 @@ def _clean(value: str) -> str:
     return value
 
 
+def _observe(request, status: int, elapsed: float) -> None:
+    from truthshield.infra import metrics
+
+    # The matched route's template, never the raw path (ids would explode
+    # the label set). Unmatched paths share one label.
+    route = getattr(request.scope.get("route"), "path", None) or "unmatched"
+    metrics.observe(request.method, route, status, elapsed)
+
+
 class RequestContextMiddleware(BaseHTTPMiddleware):
     """
     Give every request an id, log how it went, and hand the id back.
@@ -74,6 +83,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             # own handler to turn into a response. The handler cannot log
             # the duration, because it does not know when this started.
             elapsed = time.perf_counter() - started
+            _observe(request, 500, elapsed)
             logger.exception(
                 "%s %s failed after %.3fs [%s]",
                 request.method, request.url.path, elapsed, request_id,
@@ -83,6 +93,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             request_id_var.reset(token)
 
         elapsed = time.perf_counter() - started
+        _observe(request, response.status_code, elapsed)
         response.headers[REQUEST_ID_HEADER] = request_id
         # Exposed explicitly: a browser cannot read a non-safelisted header
         # on a cross-origin response otherwise, which is exactly the case

@@ -479,6 +479,35 @@ def demo_samples():
     return demo.catalogue()
 
 
+@platform_router.get("/system/metrics", response_class=Response)
+def system_metrics(
+    principal: Principal = Depends(require_role("ADMIN")),
+    session: Session = Depends(get_session),
+):
+    """
+    Prometheus text format. Administrators only: volumes are not public.
+
+    Request counters and latency are per process; investigation counts come
+    from the database and are global.
+    """
+    from sqlalchemy import func
+
+    from truthshield.infra import metrics
+    from truthshield.infra.models import Investigation, InvestigationReview
+
+    gauges = []
+    for status, n in session.query(Investigation.status, func.count()).group_by(Investigation.status).all():
+        gauges.append(("truthshield_investigations", "Stored investigations by status.", {"status": status}, n))
+    for level, n in (session.query(Investigation.risk_level, func.count())
+                     .filter(Investigation.risk_level.isnot(None)).group_by(Investigation.risk_level).all()):
+        gauges.append(("truthshield_investigations_by_level", "Completed investigations by risk level.",
+                       {"level": level}, n))
+    open_appeals = (session.query(func.count(InvestigationReview.id))
+                    .filter(InvestigationReview.status == "open").scalar())
+    gauges.append(("truthshield_reviews_open", "Appeals awaiting a reviewer.", {}, open_appeals or 0))
+    return Response(metrics.render(gauges), media_type="text/plain; version=0.0.4; charset=utf-8")
+
+
 @platform_router.get("/system/health")
 def system_health(session: Session = Depends(get_session)):
     """Health plus what this deployment can actually do. Public, like /health."""

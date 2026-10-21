@@ -30,15 +30,12 @@ from truthshield.api.middleware import (
 )
 from truthshield.api.sharing import sharing_router
 from truthshield.api.stream import stream_router
+from truthshield.infra.logging_setup import configure as configure_logging
 from truthshield.settings import get_settings
 
 settings = get_settings()
 
-logging.basicConfig(
-    level=settings.LOG_LEVEL,
-    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    datefmt="%H:%M:%S",
-)
+configure_logging(settings.LOG_LEVEL, settings.LOG_FORMAT, datefmt="%H:%M:%S")
 logger = logging.getLogger("truthshield")
 
 

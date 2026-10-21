@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     APP_HOST: str = "127.0.0.1"
     APP_PORT: int = 8000
     LOG_LEVEL: str = "INFO"
+    # "text" (default) or "json": one JSON object per line, with request_id.
+    LOG_FORMAT: str = "text"
 
     # ── Security ──────────────────────────────────────────────
     JWT_SECRET_KEY: str = ""

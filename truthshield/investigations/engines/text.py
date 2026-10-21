@@ -169,8 +169,6 @@ class TextEngine(Engine):
     # Statements *about the recipient* ("you have won", "your account will be
     # blocked") are not public facts either: no source can confirm what one
     # stranger told another, so searching them only returns noise.
-    INSTRUCTION_INTENTS = {"credential_request", "otp_request", "payment_request", "link_click",
-                           "prize_claim", "account_threat"}
     MIN_CLAIM_WORDS = 5
     # Longer than this is a paragraph or a whole page, not one assertion.
     MAX_CLAIM_WORDS = 60
@@ -185,19 +183,31 @@ class TextEngine(Engine):
     _NAMED = re.compile(r"(?<!^)\b(?:[A-Z][a-z]{2,}|[A-Z]{2,})\b")
     _CALENDAR = re.compile(r"^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|January|February|March|"
                            r"April|May|June|July|August|September|October|November|December)$")
+    # An instruction tells the reader to act. "The scheme requires a fee" states
+    # a policy that sources can confirm or contradict; "Pay the fee at ..." does not.
+    _IMPERATIVE = re.compile(
+        r"^\s*(?:please\s+|kindly\s+)?(?:pay|send|transfer|deposit|click|tap|open|visit|call|share|enter|"
+        r"update|verify|confirm|reply|scan|download|install|forward|submit|register|login|log\s+in|sign\s+in)\b"
+        r"|\b(?:please|kindly)\s+\w+|\byou\s+(?:must|need\s+to|have\s+to|should)\s+\w+",
+        re.IGNORECASE,
+    )
+    # Asking for a secret is never a statement of fact, whatever its grammar.
+    SECRET_INTENTS = {"credential_request", "otp_request", "link_click"}
+    _SECOND_PERSON = re.compile(r"\b(?:you|your|yours)\b", re.IGNORECASE)
     _PERSONAL_START = re.compile(r"^\s*(?:i|i'm|i've|my|me|we|we're|our|you|you're|your|aap\w*|mera|meri|"
                                  r"hum|hamara|hamari)\b", re.IGNORECASE)
 
     def _claim_type(self, claim, url_re) -> tuple:
         """(type, reason). Only FACTUAL sentences go to public fact-checking."""
         intents = {i["intent"] for i in nlp.detect_intents(claim.text)}
-        if url_re.search(claim.text) or intents & self.INSTRUCTION_INTENTS:
+        if url_re.search(claim.text) or intents & self.SECRET_INTENTS or self._IMPERATIVE.search(claim.text):
             return "INSTRUCTION", "an instruction or a link, not a statement of fact"
         if self._OPINION.search(claim.text):
             return "OPINION", "marked as the writer's opinion"
         named = [m.group(0) for m in self._NAMED.finditer(claim.text.strip())
                  if not self._CALENDAR.match(m.group(0))]
-        if self._PERSONAL_START.search(claim.text) and not self._REPORTED.search(claim.text) and not named:
+        personal = self._PERSONAL_START.search(claim.text) or self._SECOND_PERSON.search(claim.text)
+        if personal and not self._REPORTED.search(claim.text) and not named:
             return "PERSONAL", "about the writer or the reader, which public sources cannot confirm"
         words = len(nlp.WORD_RE.findall(claim.text))
         if words < self.MIN_CLAIM_WORDS or words > self.MAX_CLAIM_WORDS:
@@ -206,13 +216,33 @@ class TextEngine(Engine):
             return "UNVERIFIABLE", "too short to name what it is about, or too long to check as one claim"
         return "FACTUAL", None
 
+    @staticmethod
+    def _one_sentence_each(extracted) -> list:
+        """
+        Split multi-sentence claims. Without spaCy the extractor can return the
+        whole input as one claim; typed as a unit, a factual sentence next to a
+        link ("The scheme requires a fee. Pay at http://...") was skipped as an
+        instruction and never checked.
+        """
+        from types import SimpleNamespace
+
+        out = []
+        for claim in extracted:
+            parts = nlp.sentences(claim.text)
+            if len(parts) <= 1:
+                out.append(claim)
+                continue
+            out.extend(SimpleNamespace(text=part, entity=None, date=getattr(claim, "date", None),
+                                       location=getattr(claim, "location", None)) for part in parts)
+        return out
+
     def _claims(self, text: str, language: str, result: EngineResult) -> List[dict]:
         from truthshield.domain.verdict.claim_extractor import ClaimExtractor
         from truthshield.fraud.classify import URL_RE
 
         lang = language if language in nlp.SUPPORTED_LANGUAGES else "en"
         claims, excluded, screening = [], 0, []
-        for claim in ClaimExtractor().extract(text, lang)[:10]:
+        for claim in self._one_sentence_each(ClaimExtractor().extract(text, lang))[:10]:
             kind, reason = self._claim_type(claim, URL_RE)
             screening.append({"text": claim.text[:300], "type": kind, "fact_checked": kind == "FACTUAL",
                               "reason": reason})

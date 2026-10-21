@@ -51,6 +51,30 @@ COMMUNITY_HOSTS = ("wikipedia.org", "reddit.com", "quora.com", "medium.com", "x.
 CREDIBLE = 0.7
 
 
+def corroboration(assessment: str, sources: List[dict]) -> dict:
+    """
+    How many independent publishers stand behind a SUPPORTED or CONTRADICTED
+    decision. Syndicated copies on one publisher count once.
+
+    Descriptive only: it labels the decision, it never changes it.
+    """
+    if assessment not in ("SUPPORTED", "CONTRADICTED"):
+        return {"level": None, "independent_publishers": 0, "publishers": [], "credible_publishers": []}
+    stance = "SUPPORTS" if assessment == "SUPPORTED" else "REFUTES"
+    decisive = [s for s in sources if s["stance"] == stance]
+    publishers = sorted({s["publisher"] for s in decisive if s["publisher"]})
+    credible = {s["publisher"] for s in decisive
+                if s["publisher"] and (s["credibility"] >= CREDIBLE or s["category"] in ("OFFICIAL", "PRIMARY"))}
+    if any(s["category"] in ("OFFICIAL", "PRIMARY") for s in decisive):
+        level = "official"
+    elif len(credible) >= 2:
+        level = "multiple_independent"
+    else:
+        level = "single_source"
+    return {"level": level, "independent_publishers": len(publishers), "publishers": publishers[:8],
+            "credible_publishers": sorted(credible)[:8]}
+
+
 def publisher_of(source_domain, url: str) -> str:
     """
     The publisher's bare host name.
@@ -262,6 +286,10 @@ class EvidenceEngine(Engine):
                 "chunk_id": stored.get("chunk_id"),
                 "content_scope": stored.get("content_scope"),
                 "scores": stored.get("scores"),
+                # Where the passage text comes from: a chunk of a document the
+                # platform fetched and stored, or the snippet a search provider
+                # returned (which the platform has not read in full).
+                "attribution": "evidence_store" if stored.get("chunk_id") else "search_snippet",
             })
 
         if retrieval is not None and not retrieval.passages and assessment == "INSUFFICIENT_EVIDENCE":
@@ -286,6 +314,14 @@ class EvidenceEngine(Engine):
                     f"{'supported' if stance == 'SUPPORTS' else 'contradicted'} this claim is low-credibility."
                 ).strip()
                 assessment = "INSUFFICIENT_EVIDENCE"
+
+        corroborated = corroboration(assessment, sources)
+        if corroborated["level"] == "single_source":
+            reasoning = (
+                f"{reasoning} Only one credible publisher "
+                f"({', '.join(corroborated['credible_publishers']) or 'unnamed'}) stands behind this; "
+                "no independent credible source was found to confirm it."
+            ).strip()
 
         result.predictions.append(ModelPredictionRecord(
             model_name="claim-verification", model_version=self.version,
@@ -334,4 +370,5 @@ class EvidenceEngine(Engine):
             "retrieval": retrieval.diagnostics() if retrieval is not None else None,
             "support_count": sum(1 for s in sources if s["stance"] == "SUPPORTS"),
             "contradict_count": len(refuting),
+            "corroboration": corroborated,
         }

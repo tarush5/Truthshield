@@ -10,10 +10,10 @@ lookup.
 
 Scope, stated because it bounds what the score means: this reads headers as
 *pasted*, which means it cannot verify them. SPF, DKIM and DMARC results
-live in headers a webmail client does not show by default, and without them
-a forged From is indistinguishable from a real one. So the detector reports
-what the visible structure supports and lists authentication as unchecked,
-rather than implying a verdict it has no basis for.
+live in headers a webmail client does not show by default. When the user
+pastes full headers, the receiving server's recorded results are read (see
+`truthshield.fraud.email_auth`); otherwise authentication is listed as
+unchecked, rather than implying a verdict there is no basis for.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional, Tuple
 
+from truthshield.fraud import email_auth
 from truthshield.fraud.classify import Classification, InputKind
 from truthshield.fraud.contract import (
     FraudCategory, FraudFinding, Indicator, Severity, score_from_indicators,
@@ -133,9 +134,6 @@ class EmailFraudDetector(FraudDetector):
     handles = (InputKind.EMAIL_MESSAGE,)
 
     UNCHECKED = [
-        "SPF, DKIM and DMARC were not checked — those live in full headers, "
-        "which most mail clients do not show. Without them a forged sender "
-        "cannot be distinguished from a real one.",
         "The sending server and its reputation were not examined.",
         "Attachments were not scanned.",
     ]
@@ -148,6 +146,10 @@ class EmailFraudDetector(FraudDetector):
         from_address = address_of(from_raw)
         from_display = display_name_of(from_raw)
         from_domain = domain_of(from_address)
+
+        # ── Authentication recorded by the receiving server ───
+        auth = email_auth.parse(text)
+        indicators.extend(email_auth.indicators(auth, from_domain))
 
         reply_raw = headers.get("replyto", "")
         reply_address = address_of(reply_raw)
@@ -275,12 +277,13 @@ class EmailFraudDetector(FraudDetector):
                 if strong else
                 "Verify through a channel you already trust before acting on this."
             ),
-            limitations=self.UNCHECKED,
+            limitations=email_auth.limitations(auth) + self.UNCHECKED,
             methods=["email-structure-rules", "url-structure-rules"],
             extra={
                 "from": from_address or None,
                 "reply_to": reply_address or None,
                 "subject": headers.get("subject"),
+                "authentication": auth.as_dict(from_domain) if auth else {"checked": False},
             },
         )
 

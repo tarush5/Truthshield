@@ -46,8 +46,22 @@ GENERAL_ACTIONS = {
 }
 
 
+INCONCLUSIVE_ACTIONS = {
+    "headline": "Not enough could be checked to give an assessment.",
+    "do_now": [
+        "Treat the content as unverified: see what was not checked, and try again later if a check was unavailable.",
+        "If it asks you to act, verify it through a channel you already trust.",
+    ],
+    "do_not": ["Do not read this result as a sign that the content is safe."],
+    "if_already_acted": [],
+    "verify_how": "Contact the organisation or person directly using details you already hold.",
+}
+
+
 def classify(assessment: RiskAssessment, engines: Sequence[EngineResult]) -> tuple:
     """(classification label, fraud category) for display and routing."""
+    if assessment.determination == "INCONCLUSIVE":
+        return "inconclusive", FraudCategory.NONE
     categories: List[str] = []
     for engine in engines:
         categories.extend(engine.artifacts.get("fraud_categories", []))
@@ -79,6 +93,8 @@ def classify(assessment: RiskAssessment, engines: Sequence[EngineResult]) -> tup
 def summarise(assessment: RiskAssessment, classification: str) -> str:
     label = classification.replace("_", " ")
     top = [c for c in assessment.contributions if c.points > 0][:3]
+    if assessment.determination == "INCONCLUSIVE":
+        return f"Inconclusive. {assessment.abstention_reason}"
     if not top:
         return (
             f"Risk {assessment.score}/100 ({assessment.level}). No risk signals were detected by the "
@@ -111,6 +127,8 @@ DOCUMENT_ACTIONS = {
 
 
 def recommended_actions(classification: str, category: FraudCategory) -> dict:
+    if classification == "inconclusive":
+        return INCONCLUSIVE_ACTIONS
     if classification == "potential_misinformation":
         return MISINFORMATION_ACTIONS
     if classification == "potential_document_manipulation":

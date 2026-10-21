@@ -30,6 +30,11 @@ score. The method, and why each step is shaped the way it is:
    says how much of the system looked and how sure the leading signals are.
    High risk at low confidence ("looks bad, not sure") is a real state that a
    single number cannot express.
+
+5. **Abstention.** When no signal fired but an engine that applied to the
+   input did not run, the determination is INCONCLUSIVE: "nothing found"
+   would claim more than was checked. The score and level are left exactly
+   as computed -- abstention adds a statement, it never moves a threshold.
 """
 
 from __future__ import annotations
@@ -88,6 +93,10 @@ class RiskAssessment(BaseModel):
     families: Dict[str, FamilyScore] = Field(default_factory=dict)
     config: dict = Field(default_factory=dict)
     notes: List[str] = Field(default_factory=list)
+    # ASSESSED, or INCONCLUSIVE when nothing fired and not everything that
+    # applied was checked. See step 5 above.
+    determination: str = "ASSESSED"
+    abstention_reason: str | None = None
 
 
 def level_for(score: float, config: RiskConfig) -> str:
@@ -192,6 +201,7 @@ class RiskEngine:
 
         # ── 4. Confidence ────────────────────────────────────
         confidence, notes = self._confidence(scoring, contributions, engines, family_raw)
+        abstention = self._abstention(scoring, engines)
 
         return RiskAssessment(
             score=score,
@@ -202,6 +212,24 @@ class RiskEngine:
             families=families,
             config=self.config.as_dict(),
             notes=notes,
+            determination="INCONCLUSIVE" if abstention else "ASSESSED",
+            abstention_reason=abstention,
+        )
+
+    @staticmethod
+    def _abstention(scoring, engines) -> str | None:
+        if scoring:
+            return None
+        applicable = [e for e in engines if e.status is not EngineStatus.NOT_APPLICABLE]
+        missing = [e for e in applicable if e.status is not EngineStatus.OK]
+        if applicable and not missing:
+            return None
+        if not applicable:
+            return "No analysis engine applied to this input, so nothing about it was assessed."
+        names = ", ".join(e.engine for e in missing)
+        return (
+            f"No risk signal fired, but not every check that applies to this input ran ({names}). "
+            "The absence of warning signs is therefore not a finding."
         )
 
     def _confidence(self, scoring, contributions, engines, family_raw):

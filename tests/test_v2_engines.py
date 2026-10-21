@@ -238,6 +238,50 @@ class TestEvidenceEngine:
         claim = EvidenceEngine().run(c).artifacts["claims"][0]
         assert claim["assessment"] == "INSUFFICIENT_EVIDENCE" and claim["downgraded"]
         assert "low-credibility" in claim["reasoning"]
+        assert claim["corroboration"]["level"] is None
+
+    def _support(self, monkeypatch, *items):
+        from truthshield.domain.types import ClaimVerdict, Claim, EvidenceItem, Stance, Verdict
+        from truthshield.settings import get_settings
+
+        monkeypatch.setattr(get_settings(), "OFFLINE_MODE", False)
+
+        async def fake_verify(self, claims):
+            return [ClaimVerdict(
+                claim=Claim(text=claims[0]["text"]), verdict=Verdict.LIKELY_TRUE, confidence=0.7,
+                reasoning="Supported.",
+                evidence=[EvidenceItem(title=t, url=u, snippet="s", source_score=score, stance=Stance.SUPPORTS)
+                          for t, u, score in items],
+            )]
+
+        monkeypatch.setattr(EvidenceEngine, "_verify", fake_verify)
+        text = "The bridge reopened to traffic on Monday."
+        c = ctx(text)
+        c.artifacts["claims"] = [{"id": "C1", "text": text}]
+        return EvidenceEngine().run(c).artifacts["claims"][0]
+
+    def test_syndicated_copies_on_one_publisher_are_a_single_source(self, monkeypatch):
+        claim = self._support(monkeypatch,
+                              ("A", "https://www.reuters.com/a", 0.9),
+                              ("A again", "https://reuters.com/b", 0.9),
+                              ("Blog", "https://blog.example/c", 0.4))
+        assert claim["assessment"] == "SUPPORTED", "corroboration never changes the decision"
+        assert claim["corroboration"]["level"] == "single_source"
+        assert claim["corroboration"]["credible_publishers"] == ["reuters.com"]
+        assert claim["corroboration"]["independent_publishers"] == 2
+        assert "Only one credible publisher (reuters.com)" in claim["reasoning"]
+        assert {s["attribution"] for s in claim["sources"]} == {"search_snippet"}
+
+    def test_two_credible_publishers_are_independent_corroboration(self, monkeypatch):
+        claim = self._support(monkeypatch,
+                              ("A", "https://www.reuters.com/a", 0.9),
+                              ("B", "https://apnews.com/b", 0.85))
+        assert claim["corroboration"]["level"] == "multiple_independent"
+        assert "Only one" not in claim["reasoning"]
+
+    def test_an_official_source_is_labelled_official(self, monkeypatch):
+        claim = self._support(monkeypatch, ("Notice", "https://www.mumbai.gov.in/x", 0.6))
+        assert claim["corroboration"]["level"] == "official"
 
     @pytest.mark.parametrize("source_domain,url,expected", [
         ("https://health.clevelandclinic.org", "https://health.clevelandclinic.org/x", "health.clevelandclinic.org"),

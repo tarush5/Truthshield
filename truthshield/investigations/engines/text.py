@@ -203,10 +203,21 @@ class TextEngine(Engine):
     def _fraud_detectors(self, ctx: InvestigationContext, text: str, result: EngineResult) -> set:
         import truthshield.fraud  # noqa: F401  (registers the detector plugins)
         from truthshield.fraud.registry import registered
-        from truthshield.fraud.classify import classify
+        from truthshield.fraud.classify import InputKind, classify
 
         classification = classify(text, hint=HINTS.get(ctx.type, ""))
         result.artifacts["input_kinds"] = classification.as_dict()["kinds"]
+        if InputKind.EMAIL_MESSAGE in classification.kinds:
+            # Reported whether or not anything failed: a pass, or the absence
+            # of headers, is what the reader needs to weigh the rest.
+            from truthshield.fraud import email_auth
+            from truthshield.fraud.detectors.email import address_of, domain_of, parse_headers
+
+            auth = email_auth.parse(text)
+            from_domain = domain_of(address_of(parse_headers(text).get("from", "")))
+            result.artifacts["email_authentication"] = (
+                auth.as_dict(from_domain) if auth else {"checked": False}
+            )
 
         covered = set()
         categories = []

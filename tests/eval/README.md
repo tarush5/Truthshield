@@ -67,6 +67,44 @@ measure the author, not the world. Reviewer decisions
 (`GET /api/v1/admin/reviews/accuracy`, by confidence band) are where real
 calibration data accumulates.
 
+### Cycles 3 and 4 (21 October 2026)
+
+Protocol for each cycle: write the final test set first, commit it alone
+(sealed), develop fixes only on a separate dev set plus the *previous*
+final set's known errors, then run the sealed set exactly once against the
+old and the new rules. Every set is author-written; the sets carry the
+author's bias and none is evidence of real-world accuracy.
+
+| Set | Rules | Precision | Recall | F1 | FPR | Notes |
+|---|---|---|---|---|---|---|
+| `fraud_final_blind3` (64) | before cycle 3 | 0.861 | 0.969 | 0.912 | 0.156 | |
+| `fraud_final_blind3` (64) | after cycle 3 | 0.861 | 0.969 | 0.912 | 0.156 | dev3 fixes did not generalise |
+| `fraud_final_blind4` (64) | after cycle 3 | 0.806 | 0.781 | 0.794 | 0.188 | |
+| `fraud_final_blind4` (64) | after cycle 4 | 0.867 | 0.812 | 0.839 | 0.125 | 95% CIs overlap: not conclusive |
+
+`fraud_final_blind4` mirrors blind3's category mix one-for-one, but it was
+written after blind3's errors were known, so it is not free of the author's
+knowledge of those classes. Cycle 4's fixes were limited to blind3's error
+classes and `fraud_dev4`.
+
+`fraud_final_blind3` is now development data (its errors were fixed in
+cycle 4). **`fraud_final_blind4` is the current honest estimate.** Its
+remaining errors, left unfixed:
+
+- missed: Tamil OTP request ("பகிரவும்" -- share)
+- missed: "share the c0de" (a code, not an "OTP", with look-alike characters)
+- missed: hiring "transfer Rs ... before onboarding" with no fee or pay word
+- missed: QR scan + "enter your UPI PIN, the money will come" phrasing
+- missed: romance-to-crypto-trading pitch
+- missed: paid Google Maps review task (scored 25, below MEDIUM)
+- false alarm: RBI awareness message ("never ask for your PIN ... OTP")
+- false alarm: an Income Tax refund-credited notice
+- false alarm: police awareness message about parcel/drugs calls
+- false alarm: a bank's Re-KYC reminder that says no link is sent
+
+Known gap found in development, also left open: "pay the penalty today to
+avoid arrest" with no other cue is not caught.
+
 ## Retrieval
 
 `retrieval_corpus.jsonl` (25 passages) and `retrieval_queries.jsonl` (20

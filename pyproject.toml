@@ -1,0 +1,27 @@
+[project]
+name = "truthshield"
+version = "2.0.0"
+description = "Misinformation and fraud detection platform"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    # anyio compat alias used by starlette's test client
+    "ignore:.*BlockingPortal.*:DeprecationWarning",
+    # duckduckgo-search → ddgs rename; the compat import still works
+    "ignore::RuntimeWarning:duckduckgo_search",
+    # feedparser uses deprecated cgi module on 3.13+
+    "ignore:.*cgi.*:DeprecationWarning",
+    # PyJWT warns when test fixtures intentionally use short keys
+    "ignore:.*HMAC key.*:jwt.warnings.InsecureKeyLengthWarning",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]

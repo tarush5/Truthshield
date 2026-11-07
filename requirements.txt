@@ -11,20 +11,20 @@ email-validator>=2.2.0
 sqlalchemy==2.0.35
 alembic>=1.13
 psycopg2-binary==2.9.9
-redis==5.1.0
+redis>=6.1.0
 
 # ── Async work ────────────────────────────────────────────────
 celery>=5.4
 
 # ── Auth ──────────────────────────────────────────────────────
-python-jose[cryptography]==3.3.0
+PyJWT[crypto]>=2.8.0
 
 # ── Evidence retrieval ────────────────────────────────────────
-requests==2.32.0
+requests>=2.32.3
 beautifulsoup4==4.12.3
 lxml==5.3.0
 feedparser>=6.0.10
-duckduckgo-search>=6.0.0
+ddgs>=6.0.0
 fuzzywuzzy>=0.18.0
 python-Levenshtein>=0.23.0
 

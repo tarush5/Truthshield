@@ -138,8 +138,8 @@ class TestTokens:
 
     def test_a_forged_token_is_rejected(self, client):
         """Signed with the wrong key — the signature must actually be checked."""
-        from jose import jwt
-        forged = jwt.encode(
+        import jwt as pyjwt
+        forged = pyjwt.encode(
             {"sub": str(uuid.uuid4()), "email": "attacker@example.com"},
             "not-the-real-signing-key", algorithm="HS256",
         )

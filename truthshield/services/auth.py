@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
-from jose import JWTError, jwt
+import jwt as pyjwt
 from sqlalchemy.orm import Session
 
 from truthshield.infra.models import APIKey, Organization, OrganizationMember, RefreshToken, User
@@ -103,7 +103,7 @@ def issue_token(user: User, org_id: Optional[uuid.UUID] = None) -> Tuple[str, in
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(seconds=expires_in),
     }
-    token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    token = pyjwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return token, expires_in
 
 
@@ -120,17 +120,17 @@ def decode_token(token: str) -> Optional[dict]:
 
     for secret in filter(None, (settings.JWT_SECRET_KEY, settings.SUPABASE_JWT_SECRET)):
         try:
-            header = jwt.get_unverified_header(token)
+            header = pyjwt.get_unverified_header(token)
             if not header.get("alg", "").startswith("HS"):
                 logger.warning("Rejecting token with non-symmetric alg %r", header.get("alg"))
                 return None
-            return jwt.decode(
+            return pyjwt.decode(
                 token,
                 secret,
                 algorithms=["HS256", "HS384", "HS512"],
                 options={"verify_aud": False},
             )
-        except JWTError:
+        except pyjwt.PyJWTError:
             continue
     return None
 

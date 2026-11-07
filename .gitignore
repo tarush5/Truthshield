@@ -136,3 +136,5 @@ truthshield_*.db
 # SQLite write-ahead log files (journal_mode=WAL)
 *.db-wal
 *.db-shm
+
+uv.lock

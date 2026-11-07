@@ -146,6 +146,10 @@ class TestRateLimits:
         from truthshield.api.limits import limiter
         from truthshield.settings import get_settings
 
+        # Importing the app triggers route registration, which populates
+        # the limiter's internal _route_limits dict in newer slowapi.
+        import truthshield.main  # noqa: F401
+
         limited = {name.rsplit(".", 1)[-1]: [str(l.limit) for l in limits]
                    for name, limits in limiter._route_limits.items()}
         for route in ("signin", "signup", "refresh", "request_otp", "verify_otp"):

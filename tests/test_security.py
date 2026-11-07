@@ -170,9 +170,9 @@ class TestTokenVerification:
         assert not any("verify_signature" in s for s in literals)
 
     def test_decode_rejects_a_token_signed_with_another_key(self):
-        from jose import jwt
+        import jwt as pyjwt
         from truthshield.services.auth import decode_token
-        forged = jwt.encode({"sub": "x", "email": "a@example.com"},
+        forged = pyjwt.encode({"sub": "x", "email": "a@example.com"},
                             "not-the-signing-key", algorithm="HS256")
         assert decode_token(forged) is None
 

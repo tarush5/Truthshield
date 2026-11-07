@@ -15,7 +15,6 @@ surface is adapted to `truthshield.domain.types` via `adapters.py`.
 
 import logging
 import re
-import socket
 import threading
 import time
 from collections import OrderedDict
@@ -25,8 +24,10 @@ from urllib.parse import quote_plus, urlparse
 import requests
 from bs4 import BeautifulSoup
 
-# Set global default socket timeout to prevent any third-party library thread from hanging indefinitely
-socket.setdefaulttimeout(12.0)
+# Per-request timeouts are set on each .get()/.post() call and on the session
+# adapter. The previous global socket.setdefaulttimeout(12.0) is removed
+# because it affects every socket in the process -- including database
+# connections and test fixtures.
 
 try:
     import feedparser

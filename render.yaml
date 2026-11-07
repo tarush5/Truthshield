@@ -118,6 +118,7 @@ services:
       # and on a plain static host it returns index.html for every API call.
       - key: VITE_API_URL
         sync: false
+        visibility: config
     routes:
       # SPA fallback. Assets are excluded so a missing bundle 404s honestly
       # instead of returning HTML that the browser then fails to parse as JS.
